@@ -5,14 +5,22 @@ const termDefinitions = {
 const axios = require('axios');
 const CarrierAdapter = require('./CarrierAdapter');
 const { normalizeShipment } = require('../utils/shipmentNormalizer');
+const { dhlApiKey, dhlApiSecret, dhlAccountNumber } = require('../config/config');
 
 class DhlAdapter extends CarrierAdapter {
     constructor() {
+        // Validate required credentials
+        if (!dhlApiKey || !dhlApiSecret) {
+            throw new Error(
+                'DHL API credentials are required. Please set DHL_API_KEY and DHL_API_SECRET environment variables.'
+            );
+        }
+
         super({
             baseUrl: 'https://express.api.dhl.com/mydhlapi/test',
-            apiKey: process.env.DHL_API_KEY || 'apA9dM9fX0dR2r',
-            apiSecret: process.env.DHL_API_SECRET || 'S!7qH!4iM@3mP^4l',
-            accountNumber: process.env.DHL_ACCOUNT_NUMBER || '451012315'
+            apiKey: dhlApiKey,
+            apiSecret: dhlApiSecret,
+            accountNumber: dhlAccountNumber
         });
     }
 

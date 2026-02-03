@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
-const { port, mongoUri } = require('./config/config');
+const { port, mongoUri, corsOrigin } = require('./config/config');
 const { connectDB } = require('./config/database');
 const logger = require('./utils/logger');
 const { errorHandler } = require('./middleware/error.middleware');
@@ -18,7 +18,15 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
-app.use(cors());
+
+// CORS configuration with origin whitelisting
+const corsOptions = {
+  origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map(origin => origin.trim()),
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
+
 app.use('/uploads', express.static('uploads'));
 
 // Body parser middleware

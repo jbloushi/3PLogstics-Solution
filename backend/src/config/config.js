@@ -1,12 +1,54 @@
 require('dotenv').config();
 
-// Allow startup without MONGO_URI to support memory server fallback
-// if (!process.env.MONGO_URI) {
-//   throw new Error('MONGO_URI environment variable is required');
-// }
+/**
+ * Validate required environment variables for production
+ */
+const validateProductionEnv = () => {
+  if (process.env.NODE_ENV === 'production') {
+    const required = ['MONGO_URI', 'JWT_SECRET', 'DHL_API_KEY', 'DHL_API_SECRET'];
+    const missing = required.filter(key => !process.env[key]);
+
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables for production: ${missing.join(', ')}`);
+    }
+
+    // Validate JWT_SECRET length
+    if (process.env.JWT_SECRET && process.env.JWT_SECRET.length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters for production');
+    }
+  }
+};
+
+// Run validation
+if (process.env.NODE_ENV === 'production') {
+  validateProductionEnv();
+}
 
 module.exports = {
-  port: process.env.PORT || 5000,
-  mongoUri: process.env.MONGO_URI,
+  // Server Configuration
+  port: parseInt(process.env.PORT, 10) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
+
+  // Database Configuration
+  mongoUri: process.env.MONGO_URI,
+
+  // Security & Authentication
+  jwtSecret: process.env.JWT_SECRET || 'dev-secret-key-change-in-production',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  corsOrigin: process.env.CORS_ORIGIN || '*',
+
+  // API Keys (will be validated in adapters)
+  dhlApiKey: process.env.DHL_API_KEY,
+  dhlApiSecret: process.env.DHL_API_SECRET,
+  dhlAccountNumber: process.env.DHL_ACCOUNT_NUMBER || '451012315',
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+
+  // Logging Configuration
+  logLevel: process.env.LOG_LEVEL || 'info',
+  logToFile: process.env.LOG_TO_FILE === 'true',
+
+  // Optional Configuration
+  sentryDsn: process.env.SENTRY_DSN,
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100,
+  maxUploadSize: parseInt(process.env.MAX_UPLOAD_SIZE, 10) || 10485760, // 10MB default
 };
