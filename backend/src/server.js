@@ -70,16 +70,29 @@ const apiRoutes = require('./routes/api.routes');
 const financeRoutes = require('./routes/finance.routes');
 const organizationRoutes = require('./routes/organization.routes');
 
+// Mount routes with /api prefix (for direct access or non-stripping proxies)
 app.use('/api/auth', authRoutes);
 app.use('/api/finance', checkDbAuth, financeRoutes);
 app.use('/api/users', checkDbAuth, userRoutes);
 app.use('/api/organizations', checkDbAuth, organizationRoutes);
 app.use('/api/pickups', pickupRoutes);
-app.use('/api/client', externalRoutes); // Legacy or internal external client
-app.use('/api/v1', apiRoutes); // New Public Multi-Carrier API
-app.use('/api/geocode', geocodeRoutes); // Public geocode proxy
-app.use('/api/receivers', receiverRoutes); // Address book
+app.use('/api/client', externalRoutes);
+app.use('/api/v1', apiRoutes);
+app.use('/api/geocode', geocodeRoutes);
+app.use('/api/receivers', receiverRoutes);
 app.use('/api/shipments', checkDbAuth, shipmentRoutes);
+
+// Mount routes WITHOUT /api prefix (for proxies that strip /api)
+app.use('/auth', authRoutes);
+app.use('/finance', checkDbAuth, financeRoutes);
+app.use('/users', checkDbAuth, userRoutes);
+app.use('/organizations', checkDbAuth, organizationRoutes);
+app.use('/pickups', pickupRoutes);
+app.use('/client', externalRoutes);
+app.use('/v1', apiRoutes);
+app.use('/geocode', geocodeRoutes);
+app.use('/receivers', receiverRoutes);
+app.use('/shipments', checkDbAuth, shipmentRoutes);
 
 // Add redirect for /shipments to /api/shipments
 app.use('/shipments', (req, res) => {
