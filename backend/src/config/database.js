@@ -8,9 +8,9 @@ const connectDB = async () => {
     let connectionUri = mongoUri;
     let useMemoryServer = false;
 
-    // In development, ALWAYS use in-memory MongoDB for simplicity
-    if (process.env.NODE_ENV === 'development') {
-      logger.info('Development mode: Starting in-memory MongoDB server with Replica Set...');
+    // In development, use in-memory MongoDB ONLY if no URI is provided
+    if (process.env.NODE_ENV === 'development' && !mongoUri) {
+      logger.info('Development mode & No MONGO_URI: Starting in-memory MongoDB...');
       try {
         const mongoServer = await MongoMemoryServer.create({
           instance: {
@@ -21,11 +21,13 @@ const connectDB = async () => {
         });
         connectionUri = mongoServer.getUri();
         useMemoryServer = true;
-        logger.info('In-memory MongoDB started with Transactions support: ' + connectionUri);
+        logger.info('In-memory MongoDB started: ' + connectionUri);
       } catch (memError) {
         logger.error('Failed to start memory server:', memError);
         // Fall through to try the configured URI
       }
+    } else if (mongoUri) {
+      logger.info('Using provided MongoDB URI' + (process.env.NODE_ENV === 'development' ? ' in Development mode' : ''));
     }
 
     if (!connectionUri) {

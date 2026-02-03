@@ -1,0 +1,24 @@
+# ========================================
+# Docker Compose - Database Only
+# ========================================
+# Use this for native development of Backend & Frontend
+# Usage: docker-compose -f docker-compose.db.yml up -d
+
+services:
+  mongodb:
+    image: mongo:7-jammy
+    container_name: target-logistics-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-cargo-tracker}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
+    driver: local
+    name: target-logistics-mongodb-data
