@@ -73,9 +73,11 @@ Get up and running in under 2 minutes:
 
 ## 📖 Documentation
 
-- 🐳 [**Docker Guide**](DOCKER.md) - Deep dive into container management.
-- 🚀 [**VPS Deployment**](DEPLOYMENT.md) - Manual deployment guide for Linux servers.
-- ⚙️ [**Configuration**](CONFIGURATION_GUIDE.md) - Detailed environment variable reference.
+- 🎯 [**Product Vision**](docs/PRODUCT_VISION.md) - Goals, MVP scope & roadmap.
+- 🏗️ [**Architecture**](docs/ARCHITECTURE.md) - System design, API routes & data models.
+- ⚙️ [**Operations**](docs/OPERATIONS.md) - Deployment, Docker, security & configuration.
+- 👨‍💻 [**Development**](docs/DEVELOPMENT.md) - Local setup, testing & code conventions.
+- 🤖 [**AI Agent Rules**](docs/AI_AGENT_RULES.md) - Binding rules for AI assistants.
 
 ---
 

@@ -171,3 +171,21 @@ generate_*.js
 # Example/Reference Files
 # ============================================
 example_payload_*.json
+
+# ============================================
+# Private Documentation (DO NOT PUSH)
+# ============================================
+# Internal docs - keep classified
+/docs/
+/archive/
+
+# ============================================
+# AI Agent & IDE Files (DO NOT PUSH)
+# ============================================
+.gemini/
+.agent/
+.antigravity/
+.cursor/
+.copilot/
+*.ai-session
+*.ai-context
