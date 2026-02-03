@@ -4,7 +4,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](DOCKER.md)
 [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
 
-**Target-Logistics** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
+**Logistics** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
 
 ---
 
