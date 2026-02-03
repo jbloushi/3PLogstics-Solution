@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # 📦 3PLogistics-Solution 🚢
-=======
-# 📦 Logistics 🚢
->>>>>>> e7540aecd54c5b15c58c212f7b384d84b9303ba7
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](DOCKER.md)
