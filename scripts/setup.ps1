@@ -1,10 +1,10 @@
 # ========================================
-# Target-Logistics Setup Script (Windows)
+# 3PLogistics-Solution Setup Script (Windows)
 # ========================================
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🚀 Starting Target-Logistics Setup..." -ForegroundColor Cyan
+Write-Host "🚀 Starting 3PLogistics-Solution Setup..." -ForegroundColor Cyan
 
 # 1. Check for Docker
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {

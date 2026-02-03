@@ -1,10 +1,10 @@
-# 📦 Target-Logistics 🚢
+# 📦 3PLogistics-Solution 🚢
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](DOCKER.md)
 [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
 
-**Target-Logistics** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
+**3PLogistics-Solution** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
 
 ---
 
@@ -25,8 +25,8 @@ Get up and running in under 2 minutes:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/jbloushi/my-project.git
-   cd my-project
+   git clone https://github.com/jbloushi/3PLogstics-Solution.git
+   cd 3PLogstics-Solution
    ```
 
 2. **Configure Environment**

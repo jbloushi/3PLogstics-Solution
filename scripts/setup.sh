@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # ========================================
-# Target-Logistics Setup Script (Linux)
+# 3PLogistics-Solution Setup Script (Linux)
 # ========================================
 
 set -e
 
-echo "🚀 Starting Target-Logistics Setup..."
+echo "🚀 Starting 3PLogistics-Solution Setup..."
 
 # 1. Check for Docker
 if ! [ -x "$(command -v docker)" ]; then
