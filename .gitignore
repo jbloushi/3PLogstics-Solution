@@ -1,0 +1,173 @@
+# ============================================
+# Target-Logistics - Comprehensive .gitignore
+# ============================================
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================
+# IDE & Editor Folders
+# ============================================
+.vscode/
+.idea/
+.AntiGravity/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# ============================================
+# Dependency Directories
+# ============================================
+node_modules/
+jspm_packages/
+bower_components/
+
+# ============================================
+# Build Output
+# ============================================
+/frontend/build/
+/frontend/dist/
+/backend/dist/
+build/
+dist/
+*.tsbuildinfo
+.cache/
+
+# ============================================
+# Testing
+# ============================================
+/coverage/
+/.nyc_output/
+*.lcov
+.jest-cache/
+test-results/
+
+# ============================================
+# Temporary Files & Directories
+# ============================================
+*.tmp
+*.temp
+temp/
+tmp/
+temp_*/
+*.cache
+.temp/
+
+# ============================================
+# Debug & Test Artifacts
+# ============================================
+debug*.js
+debug*.json
+test_output*.txt
+verify_output*.txt
+*_output.txt
+test-output.txt
+check_*.js
+create-test-*.js
+comprehensive-api-test.js
+manual_debug_*.json
+
+# ============================================
+# Uploads & Generated Files
+# ============================================
+# Uncomment patterns below based on your needs:
+# /backend/uploads/*.pdf
+# /backend/uploads/*.png
+# /backend/uploads/*.jpg
+# /backend/uploads/*.jpeg
+
+# ============================================
+# Docker
+# ============================================
+.dockerignore.bak
+
+# ============================================
+# OS Files
+# ============================================
+Thumbs.db
+Desktop.ini
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# ============================================
+# Backup Files
+# ============================================
+*.bak
+*.backup
+backup_*/
+*.old
+*~
+
+# ============================================
+# Package Manager
+# ============================================
+package-lock.json.backup
+yarn.lock.backup
+.pnpm-debug.log
+
+# ============================================
+# Production Build Artifacts
+# ============================================
+/build
+/dist
+/.next/
+/out/
+
+# ============================================
+# Security & Certificates
+# ============================================
+*.pem
+*.key
+*.cert
+*.csr
+*.pfx
+
+# ============================================
+# MongoDB
+# ============================================
+*.mongodb
+data/db/
+mongo-data/
+
+# ============================================
+# Misc
+# ============================================
+.eslintcache
+.stylelintcache
+*.orig
+
+# ============================================
+# Scripts (Temporary/One-time fixes)
+# ============================================
+fix_*.ps1
+verify_*.js
+test_*.js
+reset-password.js
+get_api_key.js
+generate_*.js
+
+# ============================================
+# Example/Reference Files
+# ============================================
+example_payload_*.json
