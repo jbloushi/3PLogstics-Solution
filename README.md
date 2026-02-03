@@ -4,22 +4,32 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](DOCKER.md)
 [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
 
-<<<<<<< HEAD
 **3PLogistics-Solution** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
-=======
-**Logistics** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
->>>>>>> e7540aecd54c5b15c58c212f7b384d84b9303ba7
 
 ---
 
 ## ✨ Features
 
-- 🚚 **Multi-Carrier Support**: Native integration with [DHL Express API](https://developer.dhl.com/).
-- 🗺️ **Real-time Tracking**: Interactive maps powered by Google Maps API.
-- 🐳 **Dockerized**: One-command deployment with Docker Compose.
-- 🔒 **Secure**: JWT-based authentication and security-first architecture.
-- 📱 **Responsive**: Modern React frontend optimized for all devices.
-- 📊 **Automated Invoices**: Generate professional invoices and shipping labels.
+- 🚚 **Multi-Carrier Integration**: Built-in support for [DHL Express API](https://developer.dhl.com/).
+- � **Driver Pickup Scanner**: QR/Barcode scanning for optimized field operations.
+- 🗺️ **Interactive Mapping**: Real-time visual tracking powered by Google Maps.
+- � **Enterprise-Grade Security**: JWT-based authentication and secure role-based access.
+- 📊 **Automated Documentation**: Dynamic generation of invoices and labels.
+- � **Docker-Ready**: Production-grade containerization for rapid scaling.
+- 🔗 **Public Tracking**: Secure, shareable links for end-customer visibility.
+
+---
+
+## 🗺️ Product Roadmap
+
+We are constantly evolving! Here's what's coming next:
+
+- [ ] **Carrier Expansion**: Integration with FedEx, UPS, and Aramex.
+- [ ] **AI Route Optimization**: Predictive routing for driver efficiency.
+- [ ] **Customer Portal**: Self-service booking for authorized organizations.
+- [ ] **Real-time Notifications**: SMS and Email milestone alerts.
+- [ ] **Advanced Analytics**: Cost analysis and performance reporting.
+- [ ] **Multi-Currency Support**: Automated currency conversion for international bills.
 
 ---
 
