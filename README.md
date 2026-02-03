@@ -1,10 +1,18 @@
+<<<<<<< HEAD
 # 📦 3PLogistics-Solution 🚢
+=======
+# 📦 Logistics 🚢
+>>>>>>> e7540aecd54c5b15c58c212f7b384d84b9303ba7
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](DOCKER.md)
 [![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
 
+<<<<<<< HEAD
 **3PLogistics-Solution** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
+=======
+**Logistics** is a high-performance, multi-carrier shipment tracking and management system. Designed for scalability and ease of deployment, it streamlines logistics workflows for businesses of all sizes.
+>>>>>>> e7540aecd54c5b15c58c212f7b384d84b9303ba7
 
 ---
 
