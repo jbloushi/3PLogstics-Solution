@@ -38,16 +38,22 @@ const sendErrorDev = (err, res) => {
 };
 
 const sendErrorProd = (err, res) => {
+  // Operational, trusted error: send message to client
   if (err.isOperational) {
     res.status(err.statusCode).json({
       status: err.status,
       message: err.message
     });
-  } else {
+  }
+  // Programming or other unknown error: don't leak error details
+  else {
+    // Log error for developers
     logger.error('ERROR 💥', err);
-    res.status(500).json({
+
+    // Send generic message
+    res.status(err.statusCode || 500).json({
       status: 'error',
-      message: 'Something went wrong!'
+      message: err.statusCode === 404 ? err.message : 'Something went wrong!'
     });
   }
 };

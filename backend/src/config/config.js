@@ -26,7 +26,7 @@ if (process.env.NODE_ENV === 'production') {
 
 module.exports = {
   // Server Configuration
-  port: parseInt(process.env.PORT, 10) || 5000,
+  port: parseInt(process.env.PORT, 10) || 8899,
   nodeEnv: process.env.NODE_ENV || 'development',
 
   // Database Configuration

@@ -6,7 +6,7 @@ services:
     container_name: shipment-tracker-api
     restart: always
     ports:
-      - "5000:5000"
+      - "8899:8899"
     env_file:
       - .env
     networks:
@@ -14,4 +14,4 @@ services:
 
 networks:
   shipment-network:
-    driver: bridge 
+    driver: bridge

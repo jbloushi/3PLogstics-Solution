@@ -31,13 +31,13 @@ module.exports = {
             // Environment variables - Production
             env_production: {
                 NODE_ENV: 'production',
-                PORT: 5000,
+                PORT: 8899,
             },
 
             // Environment variables - Development
             env_development: {
                 NODE_ENV: 'development',
-                PORT: 5000,
+                PORT: 8899,
             },
 
             // Advanced options

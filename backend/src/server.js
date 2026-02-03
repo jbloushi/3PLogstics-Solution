@@ -109,9 +109,11 @@ app.get('/', (req, res) => {
   });
 });
 
+const { AppError } = require('./middleware/error.middleware');
+
 // Handle undefined routes
 app.all('*', (req, res, next) => {
-  next(new Error(`Can't find ${req.originalUrl} on this server!`));
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
 
 // Error handling middleware
