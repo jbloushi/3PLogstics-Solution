@@ -59,6 +59,36 @@ Get up and running in under 2 minutes:
 
 ---
 
+## 🔐 Default Credentials
+
+For a fresh installation or development environment, the following default users are created:
+
+| Role | Email | Password |
+|------|-------|----------|
+| **Admin** | `admin@demo.com` | `password123` |
+| **Staff** | `staff@demo.com` | `password123` |
+| **Client** | `client@demo.com` | `password123` |
+| **Driver** | `driver@demo.com` | `password123` |
+
+> [!TIP]
+> Use these credentials to access different perspectives of the system. The **Client** user is pre-linked to the **Target Logistics Org** with a 1000 KWD balance.
+
+---
+
+## 🛠️ Maintenance & Reset
+
+### Fresh Installation / Seeding
+To populate a fresh database with the default users and organization, run:
+```bash
+cd backend
+npm run seed
+```
+
+### Reset Admin / Passwords
+If you need to reset the system to its default state or recover the admin password, simply run the seed command again. It will ensure all default users exist and reset their passwords to `password123`.
+
+---
+
 ## 🛠️ Technology Stack
 
 | Layer | Technology |

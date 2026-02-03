@@ -16,100 +16,78 @@ const seedDemoData = async () => {
             console.log('Connected to DB for seeding...');
         }
 
-        // 1. Create Demo Organization
-        const orgName = 'Global Trading Co.';
+        // 1. Create Default Organization
+        const orgName = 'Target Logistics Org';
         let org = await Organization.findOne({ name: orgName });
 
         if (!org) {
             org = await Organization.create({
                 name: orgName,
-                type: 'client',
+                type: 'internal',
+                balance: 1000,
                 creditLimit: 5000,
-                markup: { type: 'PERCENTAGE', percentageValue: 12 },
+                currency: 'KWD',
+                markup: { type: 'PERCENTAGE', percentageValue: 15 },
                 addresses: [
                     {
-                        label: 'HQ',
-                        company: 'Global Trading Co.',
-                        contactPerson: 'Manager',
-                        phone: '9655551234',
-                        email: 'info@globaltrading.com',
-                        streetLines: ['Al Hamra Tower, Floor 50'],
+                        label: 'Main Warehouse',
+                        company: 'Target Logistics',
+                        contactPerson: 'Operations Manager',
+                        phone: '96500000000',
+                        email: 'ops@targetlogistics.com',
+                        streetLines: ['Industrial Area, Block 4'],
                         city: 'Kuwait City',
                         countryCode: 'KW',
                         isDefault: true
                     }
                 ]
             });
-            console.log(`Created Organization: ${orgName}`);
+            console.log(`Created Default Organization: ${orgName}`);
         } else {
             console.log(`Organization exists: ${orgName}`);
+            // Ensure financial defaults
+            org.balance = 1000;
+            org.creditLimit = 5000;
+            org.type = 'internal';
+            await org.save();
+            console.log(`Organization financial defaults updated.`);
         }
 
-        // 2. Create Demo Client User linked to Org
-        const clientEmail = 'client@globaltrading.com';
-        let client = await User.findOne({ email: clientEmail });
-
-        if (!client) {
-            client = await User.create({
-                name: 'John Trader',
-                email: clientEmail,
+        // 2. Define Default Users
+        const defaultUsers = [
+            {
+                name: 'System Admin',
+                email: 'admin@demo.com',
+                password: 'password123',
+                role: 'admin',
+                phone: '96511111111'
+            },
+            {
+                name: 'Operations Staff',
+                email: 'staff@demo.com',
+                password: 'password123',
+                role: 'staff',
+                phone: '96522222222'
+            },
+            {
+                name: 'Default Client',
+                email: 'client@demo.com',
                 password: 'password123',
                 role: 'client',
                 organization: org._id,
-                phone: '96590001111',
-                carrierConfig: {
-                    preferredCarrier: 'DHL',
-                    taxId: 'TRrade123',
-                    traderType: 'business'
-                }
-            });
-
-            // Add to Org members
-            if (!org.members.includes(client._id)) {
-                org.members.push(client._id);
-                await org.save();
+                phone: '96533333333',
+                carrierConfig: { preferredCarrier: 'DHL', traderType: 'business' }
+            },
+            {
+                name: 'Delivery Driver',
+                email: 'driver@demo.com',
+                password: 'password123',
+                role: 'driver',
+                phone: '96544444444'
             }
-
-            console.log(`Created Client linked to Org: ${clientEmail}`);
-        } else {
-            console.log(`Client exists: ${clientEmail}`);
-            // Ensure link
-            if (!client.organization) {
-                client.organization = org._id;
-                await client.save();
-                console.log(`Linked existing client to Org`);
-            }
-        }
-
-        // 3. Create Demo Admin User
-        const adminEmail = 'admin@targetlogistics.com';
-        let admin = await User.findOne({ email: adminEmail });
-
-        if (!admin) {
-            await User.create({
-                name: 'System Admin',
-                email: adminEmail,
-                password: 'admin123',
-                role: 'admin',
-                phone: '96500000000'
-            });
-            console.log(`Created Admin User: ${adminEmail}`);
-        } else {
-            console.log(`Admin exists: ${adminEmail}`);
-            admin.password = 'admin123';
-            await admin.save();
-            console.log(`Admin password updated.`);
-        }
-
-        // 4. Create @demo.com users
-        const demoUsers = [
-            { name: 'Demo Admin', email: 'admin@demo.com', password: 'password123', role: 'admin' },
-            { name: 'Demo Staff', email: 'staff@demo.com', password: 'password123', role: 'staff' },
-            { name: 'Demo Client', email: 'client@demo.com', password: 'password123', role: 'client', organization: org._id },
-            { name: 'Demo Driver', email: 'driver@demo.com', password: 'password123', role: 'driver' }
         ];
 
-        for (const u of demoUsers) {
+        for (const u of defaultUsers) {
             let existing = await User.findOne({ email: u.email });
             if (!existing) {
                 const created = await User.create(u);
@@ -118,12 +96,16 @@ const seedDemoData = async () => {
                         org.members.push(created._id);
                     }
                 }
-                console.log(`Created Demo User: ${u.email}`);
+                console.log(`Created Default User: ${u.email} (${u.role})`);
             } else {
-                console.log(`Demo User exists: ${u.email}`);
+                console.log(`User exists: ${u.email}. Resetting role and password.`);
                 existing.password = u.password;
+                existing.role = u.role;
                 if (u.organization && !existing.organization) {
                     existing.organization = u.organization;
+                    if (!org.members.includes(existing._id)) {
+                        org.members.push(existing._id);
+                    }
                 }
                 await existing.save();
             }

@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "test": "jest",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "seed": "node src/services/seedDemoData.js"
   },
   "keywords": [],
   "author": "",
