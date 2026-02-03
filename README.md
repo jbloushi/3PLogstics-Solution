@@ -1,4 +1,4 @@
-# 📦 Target-Logistics 🚢
+# 📦 Logistics 🚢
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](DOCKER.md)
