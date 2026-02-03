@@ -173,7 +173,7 @@ server {
     client_max_body_size 10M;
 
     location / {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://localhost:8899;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

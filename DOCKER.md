@@ -59,7 +59,7 @@ docker-compose ps
 ### 4. Verify Deployment
 ```bash
 # Check backend health
-curl http://localhost:5000/health
+curl http://localhost:8899/health
 # Expected: {"status":"ok","database":"connected"}
 
 # Check MongoDB connection
