@@ -111,7 +111,7 @@ const countryCodes = [
 ];
 
 // Use backend proxy for geocoding (avoids CORS issues)
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // Search addresses via backend proxy
 const searchAddress = async (query) => {
@@ -223,7 +223,7 @@ const CreateShipmentPage = () => {
     if (isStaff) {
       const fetchClients = async () => {
         try {
-          const response = await fetch('http://localhost:5000/api/auth/users', {
+          const response = await fetch('/api/auth/users', {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
           });
           const data = await response.json();

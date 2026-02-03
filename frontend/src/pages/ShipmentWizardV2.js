@@ -381,7 +381,7 @@ const ShipmentWizardV2 = () => {
                 try {
                     const token = localStorage.getItem('token');
                     // Fetch full list including org details
-                    const res = await axios.get('http://localhost:5000/api/auth/users', {
+                    const res = await axios.get('/api/auth/users', {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     setClients(res.data.data);

@@ -86,7 +86,7 @@ const ProfilePage = () => {
 
             profilePayload.addresses = currentAddresses;
 
-            await axios.patch('http://localhost:5000/api/users/profile', profilePayload, {
+            await axios.patch('/api/users/profile', profilePayload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

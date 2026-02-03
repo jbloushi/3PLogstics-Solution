@@ -16,7 +16,7 @@ import CalculateIcon from '@mui/icons-material/Calculate';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // Autosave key for localStorage
 const AUTOSAVE_KEY = 'dhl_shipment_wizard_draft';

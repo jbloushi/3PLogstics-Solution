@@ -28,7 +28,7 @@ const SettingsPage = () => {
     const generateNewKey = async () => {
         try {
             setLoading(true);
-            const res = await axios.post('http://localhost:5000/api/auth/api-key', {}, {
+            const res = await axios.post('/api/auth/api-key', {}, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setApiKey(res.data.apiKey);
@@ -42,7 +42,7 @@ const SettingsPage = () => {
 
     const fetchClients = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/auth/users', {
+            const res = await axios.get('/api/auth/users', {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setClients(res.data.data);
@@ -54,7 +54,7 @@ const SettingsPage = () => {
 
     const updateSurcharge = async (userId, multiplier) => {
         try {
-            await axios.patch('http://localhost:5000/api/auth/surcharge', { userId, multiplier }, {
+            await axios.patch('/api/auth/surcharge', { userId, multiplier }, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setSuccess('User surcharge updated!');

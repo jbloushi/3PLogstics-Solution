@@ -33,7 +33,7 @@ const AddressBookManager = () => {
                 updatedAddresses.push(address);
             }
 
-            await axios.patch('http://localhost:5000/api/users/profile', {
+            await axios.patch('/api/users/profile', {
                 addresses: updatedAddresses
             }, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -54,7 +54,7 @@ const AddressBookManager = () => {
             const token = localStorage.getItem('token');
             const updatedAddresses = user.addresses.filter(a => a._id !== id);
 
-            await axios.patch('http://localhost:5000/api/users/profile', {
+            await axios.patch('/api/users/profile', {
                 addresses: updatedAddresses
             }, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -76,7 +76,7 @@ const AddressBookManager = () => {
                 isDefault: a._id === id
             }));
 
-            await axios.patch('http://localhost:5000/api/users/profile', {
+            await axios.patch('/api/users/profile', {
                 addresses: updatedAddresses
             }, {
                 headers: { Authorization: `Bearer ${token}` }

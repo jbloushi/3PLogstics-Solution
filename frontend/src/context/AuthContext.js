@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
             setError(null);
-            const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+            const res = await axios.post('/api/auth/login', { email, password });
 
             const { token, data } = res.data;
             localStorage.setItem('token', token);
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
             setError(null);
-            const res = await axios.post('http://localhost:5000/api/auth/signup', userData);
+            const res = await axios.post('/api/auth/signup', userData);
 
             const { token, data } = res.data;
             localStorage.setItem('token', token);
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const res = await axios.get('http://localhost:5000/api/users/me', {
+            const res = await axios.get('/api/users/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             // Fix: Controller returns { data: userObject }, not { data: { user: userObject } }

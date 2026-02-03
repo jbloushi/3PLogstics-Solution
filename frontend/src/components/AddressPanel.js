@@ -135,7 +135,7 @@ const AddressPanel = ({
                     // Staff: Fetch all client addresses
                     // We reused the /users endpoint which returns all users. 
                     // Ideally we have a dedicated /addresses endpoint, but let's use /users?role=client for now
-                    const res = await axios.get('http://localhost:5000/api/users', {
+                    const res = await axios.get('/api/users', {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     // Flatten addresses with Org info
