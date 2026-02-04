@@ -1,54 +1,74 @@
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import {
-    Container,
-    Paper,
-    Typography,
-    TextField,
-    Button,
-    Box,
-    Link,
-    Alert,
-    CircularProgress,
-    MenuItem
-} from '@mui/material';
-import { styled } from '@mui/material/styles';
+import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
+import { Button, Input, Select, Alert } from '../ui';
 
-const FullPageGradient = styled(Box)(({ theme }) => ({
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Ultra-smooth mesh gradient for Fluid Motion
-    background: theme.palette.mode === 'dark'
-        ? `radial-gradient(at 0% 0%, ${theme.palette.primary.dark} 0px, transparent 50%),
-           radial-gradient(at 100% 0%, ${theme.palette.secondary.dark} 0px, transparent 50%),
-           radial-gradient(at 100% 100%, ${theme.palette.info.dark} 0px, transparent 50%),
-           radial-gradient(at 0% 100%, ${theme.palette.success.dark} 0px, transparent 50%),
-           ${theme.palette.background.default}`
-        : `radial-gradient(at 0% 0%, ${theme.palette.primary.light} 0px, transparent 50%),
-           radial-gradient(at 100% 0%, ${theme.palette.secondary.light} 0px, transparent 50%),
-           #FDFBF7`, // Cream background
-    backgroundSize: '150% 150%',
-    padding: theme.spacing(2)
-}));
+// --- Styled Components ---
 
-const SignupCard = styled(Paper)(({ theme }) => ({
-    padding: theme.spacing(4),
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    borderRadius: 32,
-    width: '100%',
-    maxWidth: 450, // Slightly wider for ease
-    boxShadow: theme.shadows[2],
-    backdropFilter: 'blur(16px)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    backgroundColor: theme.palette.mode === 'dark'
-        ? 'rgba(31, 41, 55, 0.7)'
-        : 'rgba(255, 255, 255, 0.8)',
-}));
+const FullPageGradient = styled.div`
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(at 0% 0%, rgba(0, 217, 184, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%), /* Success/Green hints */
+                linear-gradient(135deg, #0a0e1a 0%, #111827 100%);
+    background-size: cover;
+    padding: 16px;
+`;
+
+const SignupCard = styled.div`
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(30, 41, 59, 0.7);
+    transition: transform 0.3s ease-in-out;
+`;
+
+const Title = styled.h1`
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+    color: #fff;
+    text-align: center;
+`;
+
+const Subtitle = styled.p`
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    text-align: center;
+`;
+
+const Form = styled.form`
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+`;
+
+const LinkText = styled(RouterLink)`
+    color: var(--accent-primary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: opacity 0.2s;
+
+    &:hover {
+        opacity: 0.8;
+    }
+`;
 
 const SignupPage = () => {
     const [formData, setFormData] = useState({
@@ -60,19 +80,15 @@ const SignupPage = () => {
     const { signup, loading, error, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
 
-    // If already authenticated, redirect to appropriate page
+    // If already authenticated, redirect
     React.useEffect(() => {
         if (isAuthenticated && user) {
-            if (user.role === 'driver') {
-                navigate('/driver/pickup');
-            } else {
-                navigate('/dashboard');
-            }
+            navigate(user.role === 'driver' ? '/driver/pickup' : '/dashboard');
         }
     }, [isAuthenticated, user, navigate]);
 
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+    const handleChange = (field, value) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
     };
 
     const handleSubmit = async (e) => {
@@ -87,80 +103,70 @@ const SignupPage = () => {
 
     return (
         <FullPageGradient>
-            <Container maxWidth="sm" sx={{ display: 'flex', justifyContent: 'center' }}>
-                <SignupCard elevation={0}>
-                    <Typography variant="h4" gutterBottom fontWeight="800" color="primary" sx={{ letterSpacing: '-0.02em' }}>
-                        Join Us
-                    </Typography>
-                    <Typography variant="body1" color="textSecondary" sx={{ mb: 4, textAlign: 'center' }}>
-                        Create your 3PL Client Account
-                    </Typography>
+            <SignupCard>
+                <Title>Join 3PLogistics</Title>
+                <Subtitle>Create your account to start managing shipments</Subtitle>
 
-                    {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
+                {error && (
+                    <div style={{ width: '100%', marginBottom: '24px' }}>
+                        <Alert type="error" title="Registration Failed">
+                            {error}
+                        </Alert>
+                    </div>
+                )}
 
-                    <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            label="Full Name"
-                            name="name"
-                            value={formData.name}
-                            onChange={handleChange}
-                            InputProps={{ sx: { borderRadius: 4 } }}
-                        />
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            label="Email Address"
-                            name="email"
-                            autoComplete="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            InputProps={{ sx: { borderRadius: 4 } }}
-                        />
-                        <TextField
-                            fullWidth
-                            select
+                <Form onSubmit={handleSubmit}>
+                    <Input
+                        label="Full Name"
+                        value={formData.name}
+                        onChange={(e) => handleChange('name', e.target.value)}
+                        placeholder="John Doe"
+                        required
+                    />
+                    <Input
+                        label="Email Address"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleChange('email', e.target.value)}
+                        placeholder="name@company.com"
+                        required
+                    />
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                        <Select
                             label="Account Type"
-                            name="role"
                             value={formData.role}
-                            onChange={handleChange}
-                            margin="normal"
-                            InputProps={{ sx: { borderRadius: 4 } }}
+                            onChange={(e) => handleChange('role', e.target.value)}
                         >
-                            <MenuItem value="client">Client (3PL User)</MenuItem>
-                            <MenuItem value="staff">Staff (Logistics Operations)</MenuItem>
-                        </TextField>
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            label="Password"
-                            name="password"
-                            type="password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            InputProps={{ sx: { borderRadius: 4 } }}
-                        />
-                        <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            sx={{ mt: 4, mb: 3, py: 1.5, fontSize: '1.1rem' }}
-                            disabled={loading}
-                        >
-                            {loading ? <CircularProgress size={24} /> : 'Create Account'}
-                        </Button>
-                        <Box display="flex" justifyContent="center">
-                            <Link component={RouterLink} to="/login" variant="subtitle1" underline="hover" fontWeight="bold">
-                                {"Already have an account? Log In"}
-                            </Link>
-                        </Box>
-                    </Box>
-                </SignupCard>
-            </Container>
+                            <option value="client">Client (Sender/Receiver)</option>
+                            <option value="staff">Staff (Logistics Team)</option>
+                        </Select>
+                    </div>
+
+                    <Input
+                        label="Password"
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => handleChange('password', e.target.value)}
+                        placeholder="Create a strong password"
+                        required
+                    />
+
+                    <Button
+                        variant="primary"
+                        type="submit"
+                        disabled={loading}
+                        style={{ width: '100%', marginTop: '16px' }}
+                    >
+                        {loading ? 'Creating Account...' : 'Create Account'}
+                    </Button>
+                </Form>
+
+                <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Already have an account? </span>
+                    <LinkText to="/login">Log In</LinkText>
+                </div>
+            </SignupCard>
         </FullPageGradient>
     );
 };

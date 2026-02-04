@@ -1,50 +1,85 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Box,
-    Typography,
-    Paper,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Chip,
-    Grid,
-    Card,
-    CardContent,
-    Button,
-    Divider,
-    IconButton,
-    LinearProgress,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    Select,
-    MenuItem,
-    FormControl,
-    InputLabel,
-    Alert
-} from '@mui/material';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import HistoryIcon from '@mui/icons-material/History';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import CorporateFareIcon from '@mui/icons-material/CorporateFare';
+import styled from 'styled-components';
+import { useSnackbar } from 'notistack';
+import { format } from 'date-fns';
 import { financeService, userService, organizationService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { format } from 'date-fns';
+import {
+    PageHeader,
+    Card,
+    Button,
+    Input,
+    Select,
+    Modal,
+    TableWrapper,
+    Table,
+    Thead,
+    Tbody,
+    Tr,
+    Th,
+    Td,
+    StatusPill,
+    Alert,
+    Loader
+} from '../ui';
+
+// --- Styled Components ---
+
+const StatsGrid = styled.div`
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+`;
+
+const StatCard = styled.div`
+    background: ${props => props.$gradient ? 'linear-gradient(135deg, #00d9b8 0%, #00b398 100%)' : 'var(--bg-secondary)'};
+    color: ${props => props.$gradient ? 'white' : 'var(--text-primary)'};
+    padding: 24px;
+    border-radius: 16px;
+    border: 1px solid ${props => props.$gradient ? 'transparent' : 'var(--border-color)'};
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+`;
+
+const StatValue = styled.div`
+    font-size: 32px;
+    font-weight: 800;
+    margin-top: 8px;
+    color: ${props => props.$highlight ? 'var(--accent-primary)' : 'inherit'};
+    
+    span {
+        font-size: 16px;
+        font-weight: 600;
+        opacity: 0.7;
+    }
+`;
+
+const StatLabel = styled.div`
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+`;
+
+const TransactionIcon = styled.div`
+    color: ${props => props.$type === 'CREDIT' ? 'var(--accent-success)' : 'var(--accent-error)'};
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+`;
 
 const FinancePage = () => {
     const { user, refreshUser } = useAuth();
     const [ledger, setLedger] = useState([]);
     const [loading, setLoading] = useState(true);
     const [pagination, setPagination] = useState({ page: 1, total: 0 });
-
     const [adminDialogOpen, setAdminDialogOpen] = useState(false);
 
     const fetchLedger = async () => {
@@ -53,7 +88,7 @@ const FinancePage = () => {
             const response = await financeService.getLedger({ page: pagination.page });
             setLedger(response.data || []);
             setPagination(prev => ({ ...prev, total: response.pagination?.total || 0 }));
-            await refreshUser(); // Update balance from core user model
+            await refreshUser();
         } catch (error) {
             console.error('Failed to fetch ledger:', error);
         } finally {
@@ -65,55 +100,125 @@ const FinancePage = () => {
         fetchLedger();
     }, [pagination.page]);
 
-    const getTransactionIcon = (type) => {
-        return type === 'CREDIT'
-            ? <ArrowUpwardIcon color="success" fontSize="small" />
-            : <ArrowDownwardIcon color="error" fontSize="small" />;
-    };
-
-    const getCategoryColor = (category) => {
-        switch (category) {
-            case 'SHIPMENT_FEE': return 'primary';
-            case 'TOP_UP': return 'success';
-            case 'REFUND': return 'warning';
-            default: return 'default';
-        }
+    const getCategoryPill = (category) => {
+        const style = {
+            'SHIPMENT_FEE': 'info',
+            'TOP_UP': 'success',
+            'REFUND': 'warning',
+            'ADJUSTMENT': 'neutral'
+        };
+        return <StatusPill status={style[category] || 'neutral'} text={category.replace('_', ' ')} />;
     };
 
     return (
-        <Box sx={{ p: 4 }}>
-            <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                    <Typography variant="h4" fontWeight="bold" gutterBottom>
-                        Finance & Credits
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Manage your credit balance and view transaction history
-                    </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    {(user?.role === 'admin' || user?.role === 'staff') && (
-                        <Button
-                            variant="contained"
-                            color="secondary"
-                            startIcon={<AdminPanelSettingsIcon />}
-                            onClick={() => setAdminDialogOpen(true)}
-                        >
-                            Adjust Client Balances
+        <div>
+            <PageHeader
+                title="Finance & Credits"
+                description="Manage your wallet, view transaction history, and track your spending."
+                action={
+                    (user?.role === 'admin' || user?.role === 'staff') && (
+                        <Button variant="outline" onClick={() => setAdminDialogOpen(true)}>
+                            Adjust Balances
                         </Button>
-                    )}
-                    <Button
-                        variant="outlined"
-                        startIcon={<RefreshIcon />}
-                        onClick={fetchLedger}
-                        disabled={loading}
-                    >
+                    )
+                }
+                secondaryAction={
+                    <Button variant="secondary" onClick={fetchLedger}>
                         Refresh
                     </Button>
-                </Box>
-            </Box>
+                }
+            />
 
-            {/* Admin Adjustment Dialog */}
+            <StatsGrid>
+                <StatCard $gradient>
+                    <div>
+                        <StatLabel>{user?.organization ? 'Organization Balance' : 'Available Balance'}</StatLabel>
+                        <StatValue>
+                            {parseFloat(user?.organization?.balance ?? user?.balance ?? 0).toFixed(3)} <span>KD</span>
+                        </StatValue>
+                    </div>
+                </StatCard>
+
+                <StatCard>
+                    <div>
+                        <StatLabel>Credit Limit</StatLabel>
+                        <StatValue>
+                            {parseFloat(user?.organization?.creditLimit ?? user?.creditLimit ?? 0).toFixed(3)} <span>KD</span>
+                        </StatValue>
+                    </div>
+                </StatCard>
+
+                <StatCard>
+                    <div>
+                        <StatLabel>Total Purchasing Power</StatLabel>
+                        <StatValue $highlight>
+                            {(
+                                parseFloat(user?.organization?.balance ?? user?.balance ?? 0) +
+                                parseFloat(user?.organization?.creditLimit ?? user?.creditLimit ?? 0)
+                            ).toFixed(3)} <span>KD</span>
+                        </StatValue>
+                    </div>
+                </StatCard>
+            </StatsGrid>
+
+            {/* Ledger Table */}
+            <Card title="Transaction History">
+                <TableWrapper>
+                    <Table>
+                        <Thead>
+                            <Tr>
+                                <Th>Date & Time</Th>
+                                <Th>Description</Th>
+                                <Th>Category</Th>
+                                <Th style={{ textAlign: 'right' }}>Amount</Th>
+                                <Th style={{ textAlign: 'right' }}>Balance After</Th>
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {loading ? (
+                                <Tr><Td colSpan={5} style={{ textAlign: 'center' }}><Loader /></Td></Tr>
+                            ) : ledger.length > 0 ? ledger.map((entry) => (
+                                <Tr key={entry._id}>
+                                    <Td>
+                                        <div style={{ fontWeight: '500' }}>{format(new Date(entry.createdAt), 'MMM dd, yyyy')}</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                                            {format(new Date(entry.createdAt), 'HH:mm')}
+                                        </div>
+                                    </Td>
+                                    <Td>
+                                        <div style={{ maxWidth: '300px' }}>{entry.description}</div>
+                                        {entry.reference && (
+                                            <span style={{
+                                                fontSize: '10px',
+                                                background: 'var(--bg-tertiary)',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                color: 'var(--text-secondary)'
+                                            }}>
+                                                REF: {entry.reference}
+                                            </span>
+                                        )}
+                                    </Td>
+                                    <Td>{getCategoryPill(entry.category)}</Td>
+                                    <Td style={{ textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                            <TransactionIcon $type={entry.type}>
+                                                {entry.type === 'CREDIT' ? '+' : '-'} {entry.amount.toFixed(3)}
+                                            </TransactionIcon>
+                                        </div>
+                                    </Td>
+                                    <Td style={{ textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                                        {entry.balanceAfter.toFixed(3)} KD
+                                    </Td>
+                                </Tr>
+                            )) : (
+                                <Tr><Td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>No transactions found</Td></Tr>
+                            )}
+                        </Tbody>
+                    </Table>
+                </TableWrapper>
+            </Card>
+
             <AdminAdjustmentDialog
                 open={adminDialogOpen}
                 onClose={() => setAdminDialogOpen(false)}
@@ -122,154 +227,18 @@ const FinancePage = () => {
                     fetchLedger();
                 }}
             />
-
-            {/* Stats Cards */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-                <Grid item xs={12} md={4}>
-                    <Card sx={{
-                        borderRadius: 4,
-                        background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-                        color: 'white',
-                        boxShadow: '0 8px 32px rgba(25, 118, 210, 0.2)'
-                    }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="subtitle1" opacity={0.8}>
-                                    {user?.organization ? 'Organization Balance' : 'Available Balance'}
-                                </Typography>
-                                <AccountBalanceWalletIcon sx={{ opacity: 0.8 }} />
-                            </Box>
-                            <Typography variant="h3" fontWeight="bold" sx={{ mb: 2 }}>
-                                {parseFloat(user?.organization?.balance ?? user?.balance ?? 0).toFixed(3)} KD
-                            </Typography>
-                            {user?.role === 'client' && (
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    fullWidth
-                                    onClick={() => alert("Payment gateway integration planned for Phase 4. To top up now, please contact: accounts@target-logstics.com")}
-                                    sx={{
-                                        bgcolor: 'rgba(255,255,255,0.2)',
-                                        '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
-                                        backdropFilter: 'blur(4px)',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    Top Up Now
-                                </Button>
-                            )}
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="subtitle1" color="text.secondary">
-                                    {user?.organization ? 'Org Credit Limit' : 'Credit Limit'}
-                                </Typography>
-                                <Chip label="Overdraft" size="small" variant="outlined" />
-                            </Box>
-                            <Typography variant="h3" fontWeight="bold">
-                                {parseFloat(user?.organization?.creditLimit ?? user?.creditLimit ?? 0).toFixed(3)} KD
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} md={4}>
-                    <Card sx={{ borderRadius: 4, border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
-                        <CardContent sx={{ p: 3 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                <Typography variant="subtitle1" color="text.secondary">Total Purchasing Power</Typography>
-                            </Box>
-                            <Typography variant="h3" fontWeight="bold" color="success.main">
-                                {(
-                                    parseFloat(user?.organization?.balance ?? user?.balance ?? 0) +
-                                    parseFloat(user?.organization?.creditLimit ?? user?.creditLimit ?? 0)
-                                ).toFixed(3)} KD
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
-
-            {/* Ledger Table */}
-            <Paper sx={{ borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', boxShadow: 'none' }}>
-                <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <HistoryIcon color="primary" />
-                    <Typography variant="h6" fontWeight="bold">Transaction History</Typography>
-                </Box>
-                {loading && <LinearProgress />}
-                <TableContainer>
-                    <Table>
-                        <TableHead sx={{ bgcolor: 'rgba(0,0,0,0.02)' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 'bold' }}>Date & Time</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>Description</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>Type</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }} align="right">Amount</TableCell>
-                                <TableCell sx={{ fontWeight: 'bold' }} align="right">Balance Following</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {ledger.length > 0 ? ledger.map((entry) => (
-                                <TableRow key={entry._id} hover>
-                                    <TableCell>
-                                        <Typography variant="body2">{format(new Date(entry.createdAt), 'MMM dd, yyyy')}</Typography>
-                                        <Typography variant="caption" color="text.secondary">{format(new Date(entry.createdAt), 'HH:mm')}</Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight={500}>{entry.description}</Typography>
-                                        {entry.reference && <Typography variant="caption" color="primary">{entry.reference}</Typography>}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                            {getTransactionIcon(entry.type)}
-                                            <Typography variant="body2" fontWeight="bold" color={entry.type === 'CREDIT' ? 'success.main' : 'error.main'}>
-                                                {entry.type}
-                                            </Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Chip
-                                            label={entry.category.replace('_', ' ')}
-                                            size="small"
-                                            color={getCategoryColor(entry.category)}
-                                            variant="light"
-                                            sx={{ textTransform: 'capitalize', fontWeight: 600 }}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Typography variant="body1" fontWeight="bold" color={entry.type === 'CREDIT' ? 'success.main' : 'error.main'}>
-                                            {entry.type === 'CREDIT' ? '+' : '-'}{entry.amount.toFixed(3)} KD
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Typography variant="body2" fontWeight={500}>{entry.balanceAfter.toFixed(3)} KD</Typography>
-                                    </TableCell>
-                                </TableRow>
-                            )) : (
-                                <TableRow>
-                                    <TableCell colSpan={6} align="center" sx={{ py: 10 }}>
-                                        <Typography color="text.secondary">No transactions found</Typography>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-            </Paper>
-        </Box>
+        </div>
     );
 };
 
+// --- Sub-component: Dialog ---
+
 const AdminAdjustmentDialog = ({ open, onClose, onSuccess }) => {
+    const { enqueueSnackbar } = useSnackbar();
     const [clients, setClients] = useState([]);
     const [organizations, setOrganizations] = useState([]);
     const [targetType, setTargetType] = useState('USER'); // 'USER' or 'ORG'
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
     const [formData, setFormData] = useState({
         userId: '',
         type: 'CREDIT',
@@ -298,141 +267,110 @@ const AdminAdjustmentDialog = ({ open, onClose, onSuccess }) => {
 
     const handleSubmit = async () => {
         if (!formData.userId || !formData.amount || !formData.description) {
-            setError('Please fill all fields');
+            enqueueSnackbar('Please fill all fields', { variant: 'error' });
             return;
         }
         setLoading(true);
-        setError('');
         try {
             await financeService.adjustBalance({
                 ...formData,
                 amount: parseFloat(formData.amount)
             });
+            enqueueSnackbar('Balance adjusted successfully', { variant: 'success' });
             onSuccess();
         } catch (err) {
-            setError(err.message || 'Operation failed');
+            enqueueSnackbar(err.message || 'Operation failed', { variant: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Adjust Client Balance</DialogTitle>
-            <DialogContent dividers>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-                    {error && <Alert severity="error">{error}</Alert>}
-                    <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                            <FormControl fullWidth>
-                                <InputLabel>Adjustment Target Type</InputLabel>
-                                <Select
-                                    value={targetType}
-                                    label="Adjustment Target Type"
-                                    onChange={(e) => {
-                                        setTargetType(e.target.value);
-                                        setFormData({ ...formData, userId: '' });
-                                    }}
-                                >
-                                    <MenuItem value="USER">Specific User Wallet</MenuItem>
-                                    <MenuItem value="ORG">Organization Account (Shared)</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12}>
-                            <FormControl fullWidth>
-                                <InputLabel>{targetType === 'USER' ? 'Select Client' : 'Select Organization'}</InputLabel>
-                                <Select
-                                    label={targetType === 'USER' ? 'Select Client' : 'Select Organization'}
-                                    value={formData.userId}
-                                    onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-                                >
-                                    {targetType === 'USER' ? (
-                                        clients.map(c => (
-                                            <MenuItem key={c._id} value={c._id}>
-                                                {c.name} ({c.email}) - Bal: {c.balance?.toFixed(3) || '0.000'} KD
-                                                {c.organization && ` [Org: ${c.organization.name}]`}
-                                            </MenuItem>
-                                        ))
-                                    ) : (
-                                        organizations.map(o => (
-                                            <MenuItem key={o._id} value={o.members?.[0] || ''} disabled={!o.members?.[0]}>
-                                                {o.name} - Bal: {o.balance?.toFixed(3) || '0.000'} KD {!o.members?.[0] && '(No members to link transaction)'}
-                                            </MenuItem>
-                                        ))
-                                    )}
-                                </Select>
-                                {targetType === 'ORG' && (
-                                    <Typography variant="caption" sx={{ mt: 0.5, px: 1.5, display: 'block' }}>
-                                        Note: Adjusting an Organization will record the transaction against its primary member.
-                                    </Typography>
-                                )}
-                            </FormControl>
-                        </Grid>
-                    </Grid>
-
-                    <Grid container spacing={2}>
-                        <Grid item xs={6}>
-                            <FormControl fullWidth>
-                                <InputLabel>Type</InputLabel>
-                                <Select
-                                    label="Type"
-                                    value={formData.type}
-                                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                                >
-                                    <MenuItem value="CREDIT">Add Funds (Credit)</MenuItem>
-                                    <MenuItem value="DEBIT">Deduct (Debit)</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={6}>
-                            <TextField
-                                fullWidth
-                                label="Amount (KD)"
-                                type="number"
-                                value={formData.amount}
-                                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                            />
-                        </Grid>
-                    </Grid>
-
-                    <FormControl fullWidth>
-                        <InputLabel>Category</InputLabel>
-                        <Select
-                            label="Category"
-                            value={formData.category}
-                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        >
-                            <MenuItem value="TOP_UP">TOP_UP</MenuItem>
-                            <MenuItem value="REFUND">REFUND</MenuItem>
-                            <MenuItem value="ADJUSTMENT">ADJUSTMENT</MenuItem>
-                            <MenuItem value="SHIPMENT_FEE">SHIPMENT_FEE</MenuItem>
-                        </Select>
-                    </FormControl>
-
-                    <TextField
-                        fullWidth
-                        label="Description"
-                        placeholder="Reason for adjustment..."
-                        multiline
-                        rows={2}
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    />
-                </Box>
-            </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Cancel</Button>
-                <Button
-                    variant="contained"
-                    color="secondary"
-                    onClick={handleSubmit}
-                    disabled={loading}
+        <Modal
+            isOpen={open}
+            onClose={onClose}
+            title="Adjust Client Balance"
+            width="600px"
+            footer={
+                <>
+                    <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                    <Button variant="primary" onClick={handleSubmit} disabled={loading}>
+                        {loading ? 'Processing...' : 'Apply Adjustment'}
+                    </Button>
+                </>
+            }
+        >
+            <div style={{ display: 'grid', gap: '16px' }}>
+                <Select
+                    label="Target Type"
+                    value={targetType}
+                    onChange={(e) => {
+                        setTargetType(e.target.value);
+                        setFormData({ ...formData, userId: '' });
+                    }}
                 >
-                    {loading ? <Box sx={{ px: 2, py: 1 }}><LinearProgress color="inherit" sx={{ width: 100 }} /></Box> : 'Apply Adjustment'}
-                </Button>
-            </DialogActions>
-        </Dialog>
+                    <option value="USER">Specific User Wallet</option>
+                    <option value="ORG">Organization Account (Shared)</option>
+                </Select>
+
+                <Select
+                    label={targetType === 'USER' ? 'Select Client' : 'Select Organization'}
+                    value={formData.userId}
+                    onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
+                >
+                    <option value="">-- Select Target --</option>
+                    {targetType === 'USER' ? (
+                        clients.map(c => (
+                            <option key={c._id} value={c._id}>
+                                {c.name} - {c.email} (Bal: {c.balance?.toFixed(3)})
+                            </option>
+                        ))
+                    ) : (
+                        organizations.map(o => (
+                            <option key={o._id} value={o.members?.[0] || ''} disabled={!o.members?.[0]}>
+                                {o.name} (Bal: {o.balance?.toFixed(3)})
+                            </option>
+                        ))
+                    )}
+                </Select>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <Select
+                        label="Adjustment Type"
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    >
+                        <option value="CREDIT">Add Funds (Credit)</option>
+                        <option value="DEBIT">Deduct (Debit)</option>
+                    </Select>
+
+                    <Input
+                        label="Amount (KD)"
+                        type="number"
+                        value={formData.amount}
+                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    />
+                </div>
+
+                <Select
+                    label="Category"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                >
+                    <option value="TOP_UP">TOP_UP</option>
+                    <option value="REFUND">REFUND</option>
+                    <option value="ADJUSTMENT">ADJUSTMENT</option>
+                    <option value="SHIPMENT_FEE">SHIPMENT_FEE</option>
+                </Select>
+
+                <Input
+                    label="Description"
+                    placeholder="Reason for adjustment..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+            </div>
+        </Modal>
     );
 };
 

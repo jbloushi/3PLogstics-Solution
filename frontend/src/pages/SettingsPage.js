@@ -1,29 +1,85 @@
-import React, { useState } from 'react';
-import {
-    Container, Typography, Card, CardContent, Box, Button, TextField,
-    Divider, Alert, IconButton, Tooltip, Grid, Tabs, Tab
-} from '@mui/material';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import KeyIcon from '@mui/icons-material/Key';
-import SettingsInputComponentIcon from '@mui/icons-material/SettingsInputComponent';
-import PersonIcon from '@mui/icons-material/Person';
-import SettingsIcon from '@mui/icons-material/Settings';
+import React, { useState, useEffect } from 'react';
+import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
+import { useSnackbar } from 'notistack';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import ProfilePage from './ProfilePage';
+import {
+    PageHeader,
+    Card,
+    Button,
+    Input,
+    Select,
+    Tabs,
+    Tab,
+    AddressPanel,
+    Alert
+} from '../ui';
+
+// --- Styled Components for Settings Layout ---
+const Container = styled.div`
+    max-width: 1200px;
+    margin: 0 auto;
+`;
+
+const SectionGrid = styled.div`
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    
+    @media (min-width: 1024px) {
+        grid-template-columns: 2fr 1fr;
+    }
+`;
+
+const CodeBlock = styled.pre`
+    background: #0a0e1a;
+    padding: 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    overflow-x: auto;
+    margin-top: 16px;
+`;
 
 const SettingsPage = () => {
-    const { user, isStaff } = useAuth();
-    const [activeTab, setActiveTab] = useState(0);
+    const { user, refreshUser, isStaff } = useAuth();
+    const { enqueueSnackbar } = useSnackbar();
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState('general');
 
     // API Key State
     const [apiKey, setApiKey] = useState(user?.apiKey || '');
-    const [success, setSuccess] = useState('');
     const [loading, setLoading] = useState(false);
 
     // Staff states
     const [clients, setClients] = useState([]);
-    const [showStaffPanel, setShowStaffPanel] = useState(false);
+    const [clientsLoading, setClientsLoading] = useState(false);
+
+    // Shipper Profile State
+    const [shipperProfile, setShipperProfile] = useState({});
+    const [profileLoading, setProfileLoading] = useState(false);
+
+    // Initialize Shipper Profile
+    useEffect(() => {
+        if (user) {
+            setApiKey(user.apiKey || '');
+            const defaultAddress = user.addresses?.find(a => a.isDefault) || {};
+            setShipperProfile({
+                ...defaultAddress,
+                company: user.company || defaultAddress.company || '',
+                contactPerson: user.name || defaultAddress.contactPerson || '',
+                phone: user.phone || defaultAddress.phone || '',
+                vatNumber: user.carrierConfig?.vatNo || defaultAddress.vatNumber || '',
+                eoriNumber: user.carrierConfig?.eori || defaultAddress.eoriNumber || '',
+                taxId: user.carrierConfig?.taxId || defaultAddress.taxId || '',
+                traderType: user.carrierConfig?.traderType || defaultAddress.traderType || 'business',
+                reference: user.carrierConfig?.defaultReference || defaultAddress.reference || ''
+            });
+        }
+    }, [user]);
 
     const generateNewKey = async () => {
         try {
@@ -32,275 +88,278 @@ const SettingsPage = () => {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setApiKey(res.data.apiKey);
-            setSuccess('New API Key generated successfully!');
+            enqueueSnackbar('New API Key generated successfully!', { variant: 'success' });
         } catch (err) {
             console.error(err);
+            enqueueSnackbar('Failed to generate API Key', { variant: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(apiKey);
+        enqueueSnackbar('API Key copied!', { variant: 'success' });
+    };
+
     const fetchClients = async () => {
+        setClientsLoading(true);
         try {
             const res = await axios.get('/api/auth/users', {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setClients(res.data.data);
-            setShowStaffPanel(true);
         } catch (err) {
             console.error(err);
+        } finally {
+            setClientsLoading(false);
         }
     };
 
-    const updateSurcharge = async (userId, multiplier) => {
+    const updateSurcharge = async (userId, data) => {
         try {
-            await axios.patch('/api/auth/surcharge', { userId, multiplier }, {
+            await axios.patch('/api/auth/surcharge', { userId, ...data }, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
-            setSuccess('User surcharge updated!');
-            fetchClients();
-            setTimeout(() => setSuccess(''), 3000);
+            enqueueSnackbar('User surcharge updated!', { variant: 'success' });
         } catch (err) {
             console.error(err);
+            enqueueSnackbar('Failed to update surcharge', { variant: 'error' });
         }
     };
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(apiKey);
-        setSuccess('API Key copied to clipboard!');
-        setTimeout(() => setSuccess(''), 3000);
-    };
+    const handleSaveProfile = async () => {
+        setProfileLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            const profilePayload = {
+                name: shipperProfile.contactPerson,
+                phone: shipperProfile.phone,
+                company: shipperProfile.company,
+                carrierConfig: {
+                    preferredCarrier: user.carrierConfig?.preferredCarrier || 'DGR',
+                    taxId: shipperProfile.taxId,
+                    eori: shipperProfile.eoriNumber,
+                    vatNo: shipperProfile.vatNumber,
+                    traderType: shipperProfile.traderType,
+                    defaultReference: shipperProfile.reference
+                }
+            };
 
-    const handleTabChange = (event, newValue) => {
-        setActiveTab(newValue);
+            let currentAddresses = [...(user.addresses || [])];
+            const existingDefaultIndex = currentAddresses.findIndex(a => a.isDefault);
+
+            const newAddressObj = {
+                ...shipperProfile,
+                label: 'Default Shipper Profile',
+                isDefault: true,
+                _id: existingDefaultIndex !== -1 ? currentAddresses[existingDefaultIndex]._id : undefined
+            };
+
+            if (existingDefaultIndex !== -1) {
+                currentAddresses[existingDefaultIndex] = newAddressObj;
+            } else {
+                currentAddresses.push(newAddressObj);
+            }
+
+            // Clean internal props
+            currentAddresses = currentAddresses.map(({ _ownerId, _ownerName, _orgName, ...rest }) => rest);
+            profilePayload.addresses = currentAddresses;
+
+            await axios.patch('/api/users/profile', profilePayload, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            enqueueSnackbar('Shipper Profile Updated Successfully', { variant: 'success' });
+            await refreshUser();
+        } catch (error) {
+            console.error(error);
+            enqueueSnackbar('Failed to update profile', { variant: 'error' });
+        } finally {
+            setProfileLoading(false);
+        }
     };
 
     return (
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-            <Box mb={3}>
-                <Typography variant="h4" fontWeight="bold" gutterBottom>Settings</Typography>
-                <Tabs value={activeTab} onChange={handleTabChange} sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                    <Tab icon={<SettingsIcon />} iconPosition="start" label="General & API" />
-                    <Tab icon={<PersonIcon />} iconPosition="start" label="Profile & Addresses" />
-                </Tabs>
-            </Box>
+        <Container>
+            <PageHeader
+                title="Settings"
+                description="Manage your account, API access, and shipping preferences."
+            />
 
-            {/* TAB 0: General Settings (API Key, etc) */}
-            <div role="tabpanel" hidden={activeTab !== 0}>
-                {activeTab === 0 && (
-                    <Grid container spacing={4}>
-                        {/* API Access Section */}
-                        <Grid item xs={12} md={7}>
-                            <Card sx={{ borderRadius: 4 }}>
-                                <CardContent sx={{ p: 4 }}>
-                                    <Box display="flex" alignItems="center" mb={2}>
-                                        <KeyIcon color="primary" sx={{ mr: 1 }} />
-                                        <Typography variant="h6">Developer API Access</Typography>
-                                    </Box>
-                                    <Typography variant="body2" color="textSecondary" mb={3}>
-                                        Use this key to integrate TargetLogistics tracking into your own warehouse or e-commerce workflow.
-                                    </Typography>
+            <Tabs>
+                <Tab
+                    active={activeTab === 'general'}
+                    onClick={() => setActiveTab('general')}
+                >
+                    General & API
+                </Tab>
+                <Tab
+                    active={activeTab === 'profile'}
+                    onClick={() => setActiveTab('profile')}
+                >
+                    Default Shipper Profile
+                </Tab>
+            </Tabs>
 
-                                    {success && <Alert severity="success" sx={{ mb: 3 }}>{success}</Alert>}
+            {/* GENERAL TAB */}
+            {activeTab === 'general' && (
+                <SectionGrid>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <Card title="Developer API Access">
+                            <Alert severity="info" title="API Usage">
+                                Use this key to integrate TargetLogistics tracking into your own warehouse or e-commerce workflow.
+                            </Alert>
 
-                                    <Box display="flex" gap={1}>
-                                        <TextField
-                                            fullWidth
-                                            label="Your API Key"
-                                            value={apiKey || 'No key generated yet'}
-                                            variant="outlined"
-                                            readOnly
-                                            InputProps={{
-                                                endAdornment: (
-                                                    <IconButton onClick={copyToClipboard} disabled={!apiKey}>
-                                                        <ContentCopyIcon />
-                                                    </IconButton>
-                                                )
-                                            }}
-                                        />
-                                        <Button
-                                            variant="contained"
-                                            onClick={generateNewKey}
-                                            disabled={loading}
-                                            sx={{ whiteSpace: 'nowrap' }}
-                                        >
-                                            {apiKey ? 'Regenerate' : 'Generate'}
-                                        </Button>
-                                    </Box>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', marginTop: '24px' }}>
+                                <div style={{ flex: 1 }}>
+                                    <Input
+                                        label="Your API Key"
+                                        value={apiKey || 'No key generated yet'}
+                                        disabled
+                                        icon={
+                                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                            </svg>
+                                        }
+                                    />
+                                </div>
+                                <Button variant="secondary" onClick={copyToClipboard} disabled={!apiKey}>
+                                    Copy
+                                </Button>
+                                <Button variant="primary" onClick={generateNewKey} disabled={loading}>
+                                    {apiKey ? 'Regenerate' : 'Generate Key'}
+                                </Button>
+                            </div>
 
-                                    <Box mt={4}>
-                                        <Typography variant="subtitle2" gutterBottom>Quick Start Example:</Typography>
-                                        <Card variant="outlined" sx={{ p: 2, bgcolor: '#f5f5f5', fontFamily: 'monospace', fontSize: '13px' }}>
-                                            <Box component="pre" style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                                                curl -X POST http://api.targetlogistics.com/shipments \<br />
-                                                &nbsp;&nbsp;-H "Authorization: Bearer YOUR_API_KEY" \<br />
-                                                &nbsp;&nbsp;-d '{"{\"origin\": \"...\", \"destination\": \"...\"}"}'
-                                            </Box>
-                                        </Card>
-                                    </Box>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-
-                        {/* Instructions Section */}
-                        <Grid item xs={12} md={5}>
-                            <Card sx={{ borderRadius: 4, bgcolor: '#f9fafb' }}>
-                                <CardContent sx={{ p: 4 }}>
-                                    <Box display="flex" alignItems="center" mb={2}>
-                                        <SettingsInputComponentIcon color="secondary" sx={{ mr: 1 }} />
-                                        <Typography variant="h6">Connection Guide</Typography>
-                                    </Box>
-
-                                    <Typography variant="subtitle2" color="primary" mt={2}>1. Map Tracking (Mapbox)</Typography>
-                                    <Typography variant="body2" mb={1}>
-                                        Get your token from Mapbox.com and add it to <code>.env</code> as:<br />
-                                        <code>REACT_APP_MAPBOX_TOKEN=pk.xxx</code>
-                                    </Typography>
-
-                                    <Typography variant="subtitle2" color="primary" mt={3}>2. Carrier API (DHL)</Typography>
-                                    <Typography variant="body2" mb={1}>
-                                        Register at DHL Developer Portal. Add these to backend <code>.env</code>:<br />
-                                        <code>DHL_API_KEY=...</code><br />
-                                        <code>DHL_API_SECRET=...</code>
-                                    </Typography>
-
-                                    <Typography variant="subtitle2" color="primary" mt={3}>3. Auth (WABA/OTP)</Typography>
-                                    <Typography variant="body2">
-                                        For WhatsApp OTP, link your Chatwoot inbox and provide the <code>CHATWOOT_API_TOKEN</code> in backend settings.
-                                    </Typography>
-                                </CardContent>
-                            </Card>
-                        </Grid>
+                            <CodeBlock>
+                                curl -X POST https://api.yourlogistics.com/shipments \<br />
+                                &nbsp;&nbsp;-H "Authorization: Bearer YOUR_API_KEY" \<br />
+                                &nbsp;&nbsp;-d {'\'{"origin": "..."}\''}
+                            </CodeBlock>
+                        </Card>
 
                         {isStaff && (
-                            <Grid item xs={12}>
-                                <Card sx={{ borderRadius: 4, borderLeft: '6px solid #4caf50' }}>
-                                    <CardContent sx={{ p: 4 }}>
-                                        <Typography variant="h6" gutterBottom>Staff Operations Dashboard</Typography>
-                                        <Typography variant="body2" mb={2}>
-                                            You have elevated permissions to manage all client shipments and carrier surcharges.
-                                        </Typography>
-                                        {!showStaffPanel ? (
-                                            <Button variant="outlined" color="success" onClick={fetchClients}>
-                                                Load Client List & Markups
-                                            </Button>
-                                        ) : (
-                                            <Box mt={2}>
-                                                <Divider sx={{ mb: 2 }} />
-                                                <Typography variant="subtitle1" gutterBottom fontWeight="bold">Active 3PL Clients & Surcharges</Typography>
-                                                <Grid container spacing={2} sx={{ mt: 1 }}>
-                                                    {clients.map(client => (
-                                                        <Grid item xs={12} key={client._id}>
-                                                            <ClientMarkupEditor client={client} onUpdate={updateSurcharge} />
-                                                        </Grid>
-                                                    ))}
-                                                </Grid>
-                                            </Box>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </Grid>
+                            <Card title="Staff Operations">
+                                <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                                    Manage client surcharges and global settings.
+                                </p>
+                                {!clients.length ? (
+                                    <Button variant="outlined" onClick={fetchClients} disabled={clientsLoading}>
+                                        {clientsLoading ? 'Loading...' : 'Load Client List'}
+                                    </Button>
+                                ) : (
+                                    <div style={{ display: 'grid', gap: '16px' }}>
+                                        {clients.map(client => (
+                                            <ClientMarkupEditor
+                                                key={client._id}
+                                                client={client}
+                                                onUpdate={(data) => updateSurcharge(client._id, data)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </Card>
                         )}
-                    </Grid>
-                )}
-            </div>
+                    </div>
 
-            {/* TAB 1: Profile & Addresses */}
-            <div role="tabpanel" hidden={activeTab !== 1}>
-                {activeTab === 1 && (
-                    <Box mt={2}>
-                        <ProfilePage />
-                    </Box>
-                )}
-            </div>
-        </Container >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <Card title="Connection Guide">
+                            <h4 style={{ color: 'var(--accent-primary)', marginBottom: '8px' }}>1. Map Tracking (Mapbox)</h4>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>
+                                Add your token to <code>.env</code>:<br />
+                                <code>REACT_APP_MAPBOX_TOKEN=pk.xxx</code>
+                            </p>
+
+                            <h4 style={{ color: 'var(--accent-primary)', marginBottom: '8px' }}>2. Carrier API</h4>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
+                                DGR Developer Portal credentials:<br />
+                                <code>DGR_API_KEY=...</code>
+                            </p>
+                        </Card>
+                    </div>
+                </SectionGrid>
+            )}
+
+            {/* PROFILE TAB */}
+            {activeTab === 'profile' && (
+                <SectionGrid>
+                    <div>
+                        <AddressPanel
+                            title="Default Shipper Details (Autofill)"
+                            values={shipperProfile}
+                            onChange={setShipperProfile}
+                        />
+                        <div style={{ marginTop: '24px' }}>
+                            <Button
+                                variant="primary"
+                                fullWidth
+                                onClick={handleSaveProfile}
+                                disabled={profileLoading}
+                            >
+                                {profileLoading ? 'Saving...' : 'Save Default Shipper Profile'}
+                            </Button>
+                        </div>
+                    </div>
+                    <div>
+                        <Card title="Address Book">
+                            <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                                Manage your saved addresses for receivers and regular destinations.
+                            </p>
+                            <Button
+                                variant="secondary"
+                                fullWidth
+                                onClick={() => navigate('/address-book')}
+                            >
+                                Manage Address Book
+                            </Button>
+                        </Card>
+                    </div>
+                </SectionGrid>
+            )}
+        </Container>
     );
 };
 
-// Sub-component for editing markup (to handle individual state)
+// Mini component for Markup Editor
 const ClientMarkupEditor = ({ client, onUpdate }) => {
-    // Initial state from client data
-    // Normalize backend data to local state
-    const initialType = client.markup?.type || 'PERCENTAGE';
-    const initialPercentage = client.markup?.percentageValue || client.markup?.value || 15;
-    const initialFlat = client.markup?.flatValue || 0;
-
-    const [type, setType] = useState(initialType);
-    const [percentage, setPercentage] = useState(initialPercentage);
-    const [flat, setFlat] = useState(initialFlat);
-    const [unsaved, setUnsaved] = useState(false);
-
-    const handleChangeType = (e) => {
-        setType(e.target.value);
-        setUnsaved(true);
-    };
+    const [type, setType] = useState(client.markup?.type || 'PERCENTAGE');
+    const [percentage, setPercentage] = useState(client.markup?.percentageValue || 15);
+    const [flat, setFlat] = useState(client.markup?.flatValue || 0);
 
     const handleSave = () => {
-        onUpdate(client._id, {
-            type,
-            percentageValue: parseFloat(percentage),
-            flatValue: parseFloat(flat)
+        onUpdate({
+            markup: {
+                type,
+                percentageValue: parseFloat(percentage),
+                flatValue: parseFloat(flat)
+            }
         });
-        setUnsaved(false);
     };
 
     return (
-        <Card variant="outlined" sx={{ p: 2 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
-                <Box minWidth={200}>
-                    <Typography variant="body1" fontWeight="bold">{client.name}</Typography>
-                    <Typography variant="caption" color="textSecondary">{client.email}</Typography>
-                </Box>
-
-                <Box display="flex" alignItems="center" gap={2} flexGrow={1}>
-                    <TextField
-                        select
-                        label="Markup Type"
-                        value={type}
-                        onChange={handleChangeType}
-                        size="small"
-                        SelectProps={{ native: true }}
-                        sx={{ minWidth: 120 }}
-                    >
-                        <option value="PERCENTAGE">Percentage (%)</option>
-                        <option value="FLAT">Fixed Amount</option>
-                        <option value="COMBINED">Both (Combined)</option>
-                    </TextField>
-
-                    {(type === 'PERCENTAGE' || type === 'COMBINED') && (
-                        <TextField
-                            label="Percentage (%)"
-                            type="number"
-                            value={percentage}
-                            onChange={(e) => { setPercentage(e.target.value); setUnsaved(true); }}
-                            size="small"
-                            sx={{ width: 100 }}
-                        />
-                    )}
-
-                    {(type === 'FLAT' || type === 'COMBINED') && (
-                        <TextField
-                            label="Flat Fee (KD)"
-                            type="number"
-                            value={flat}
-                            onChange={(e) => { setFlat(e.target.value); setUnsaved(true); }}
-                            size="small"
-                            sx={{ width: 100 }}
-                        />
-                    )}
-
-                    <Button
-                        variant="contained"
-                        size="small"
-                        onClick={handleSave}
-                        disabled={!unsaved}
-                        sx={{ ml: 'auto' }}
-                    >
-                        Save
-                    </Button>
-                </Box>
-            </Box>
-        </Card>
+        <div style={{
+            padding: '12px',
+            background: 'var(--bg-tertiary)',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color)'
+        }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{client.name}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '8px', alignItems: 'end' }}>
+                <Select label="Type" value={type} onChange={e => setType(e.target.value)}>
+                    <option value="PERCENTAGE">% Only</option>
+                    <option value="FLAT">Flat Only</option>
+                    <option value="COMBINED">% + Flat</option>
+                </Select>
+                {(type !== 'FLAT') && (
+                    <Input label="%" type="number" value={percentage} onChange={e => setPercentage(e.target.value)} />
+                )}
+                {(type !== 'PERCENTAGE') && (
+                    <Input label="Flat" type="number" value={flat} onChange={e => setFlat(e.target.value)} />
+                )}
+                <Button variant="secondary" onClick={handleSave} style={{ height: '42px', marginBottom: '1px' }}>Save</Button>
+            </div>
+        </div>
     );
 };
 

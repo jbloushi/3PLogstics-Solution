@@ -140,30 +140,42 @@ const InfoRow = ({ label, value, icon }) => (
 );
 
 const AddressBlock = ({ title, data }) => (
-  <Card variant="outlined" sx={{ height: '100%', borderRadius: 2 }}>
+  <Card variant="outlined" sx={{
+    height: '100%',
+    borderRadius: 3,
+    bgcolor: '#141929',
+    borderColor: '#2a3347',
+    transition: 'all 0.2s',
+    '&:hover': {
+      borderColor: 'primary.main',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+    }
+  }}>
     <CardContent>
-      <Typography variant="subtitle2" color="textSecondary" gutterBottom textTransform="uppercase" letterSpacing={1}>
-        {title}
-      </Typography>
-      <Typography variant="h6" fontWeight="bold" gutterBottom>
+      <Box display="flex" alignItems="center" gap={1} mb={2}>
+        <LocationIcon color="primary" fontSize="small" />
+        <Typography variant="subtitle2" color="primary" textTransform="uppercase" letterSpacing={1} fontWeight="700">
+          {title}
+        </Typography>
+      </Box>
+      <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ color: '#fff' }}>
         {data?.contactPerson || data?.name || 'N/A'}
       </Typography>
-      <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         {data?.company}
       </Typography>
-      <Box display="flex" alignItems="flex-start" gap={1} mt={2}>
-        <LocationIcon fontSize="small" color="action" />
-        <Box>
-          <Typography variant="body2" fontWeight="500">
-            {data?.formattedAddress || data?.address}
-          </Typography>
-          {data?.city && <Typography variant="caption" color="textSecondary">{data.city}, {data.country}</Typography>}
-        </Box>
+
+      <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
+        <Typography variant="body2" fontWeight="500" color="#e2e8f0" sx={{ lineHeight: 1.6 }}>
+          {data?.formattedAddress || data?.address}
+        </Typography>
+        {data?.city && <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>{data.city}, {data.country}</Typography>}
       </Box>
+
       {(data?.phone || data?.email) && (
         <Box mt={2}>
-          {data.phone && <Typography variant="caption" display="block">📞 {data.phone}</Typography>}
-          {data.email && <Typography variant="caption" display="block">✉️ {data.email}</Typography>}
+          {data.phone && <Typography variant="caption" display="block" color="text.secondary">📞 {data.phone}</Typography>}
+          {data.email && <Typography variant="caption" display="block" color="text.secondary">✉️ {data.email}</Typography>}
         </Box>
       )}
     </CardContent>
@@ -308,134 +320,99 @@ const ShipmentDetails = ({ shipment, onUpdateLocation, updatingLocation, locatio
 
   return (
     <Box>
-      {/* 1. HEADER */}
-      <Paper elevation={0} sx={{
-        p: 3,
-        mb: 3,
-        borderRadius: 3,
-        border: '1px solid',
-        borderColor: 'divider',
-        background: `linear-gradient(to right, ${theme.palette.background.paper}, ${alpha(theme.palette.primary.main, 0.02)})`
-      }}>
-        <Grid container alignItems="center" justifyContent="space-between" spacing={2}>
-          <Grid item>
-            <Box display="flex" alignItems="center" gap={2} mb={1}>
-              <Typography variant="h4" fontWeight="800" sx={{ letterSpacing: -0.5 }}>
-                {shipment.trackingNumber}
-              </Typography>
-              <Chip
-                icon={statusIcons[shipment.status]}
-                label={formatStatus(shipment.status)}
-                color={statusColors[shipment.status]}
-                sx={{ px: 1, fontWeight: 'bold' }}
-              />
-            </Box>
-            <Typography variant="body2" color="textSecondary">
-              Created: {new Date(shipment.createdAt).toLocaleDateString()} • Owner: {shipment.user?.name || 'Unknown'}
-            </Typography>
-          </Grid>
-
-          <Grid item>
-            <Stack direction="row" spacing={1}>
-              {/* Staff Actions */}
-              {isStaff && (
-                <>
-                  <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setApprovalDialogOpen(true)}>
-                    Edit
-                  </Button>
-                  <Button variant="outlined" color="error" onClick={handleDelete}>
-                    Delete
-                  </Button>
-                </>
-              )}
-              {/* Client Edit (Restricted) */}
-              {isClient && canEdit && (
-                <Button variant="outlined" startIcon={<EditIcon />} onClick={() => setApprovalDialogOpen(true)}>
-                  Edit Details
-                </Button>
-              )}
-
-              {/* Driver Actions */}
-              {isDriver && (
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  startIcon={<TruckIcon />}
-                  onClick={() => {
-                    setStatusDialogData({ status: shipment.status, description: '' });
-                    setStatusDialogOpen(true);
-                  }}
-                >
-                  Update Status
-                </Button>
-              )}
-
-              {/* Common Actions */}
-              {shipment.labelUrl && (
-                <Button variant="outlined" startIcon={<PrintIcon />} onClick={() => handleOpenPdf(shipment.labelUrl)}>
-                  Label
-                </Button>
-              )}
-              <Button variant="outlined" startIcon={<ShareIcon />} onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/track/${shipment.trackingNumber}`);
-                alert('Link copied!');
-              }}>
-                Share
-              </Button>
-            </Stack>
-          </Grid>
-        </Grid>
-      </Paper>
-
-      <Grid container spacing={3}>
+      <Grid container spacing={4}>
         {/* 2. LEFT COLUMN: TABS & CONTENT (70%) */}
         <Grid item xs={12} lg={8}>
-          <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
+
+          {/* Custom Pill Tabs */}
+          <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.05)', mb: 3 }}>
             <Tabs
               value={activeTab}
               onChange={(e, v) => setActiveTab(v)}
-              textColor="primary"
-              indicatorColor="primary"
-              sx={{ px: 2, borderBottom: '1px solid', borderColor: 'divider', bgcolor: alpha(theme.palette.primary.main, 0.02) }}
+              sx={{
+                minHeight: 'auto',
+                '& .MuiTabs-indicator': { display: 'none' }
+              }}
             >
-              <Tab label="Overview" icon={<InfoIcon fontSize="small" />} iconPosition="start" />
-              <Tab label="Parcels" icon={<InventoryIcon fontSize="small" />} iconPosition="start" />
-              <Tab label="Activity" icon={<TimelineIcon fontSize="small" />} iconPosition="start" />
-              <Tab label="Documents" icon={<DescriptionIcon fontSize="small" />} iconPosition="start" />
-              {/* Management Tab for Staff Only */}
-              {isStaff && <Tab label="Management" icon={<AttachMoneyIcon fontSize="small" />} iconPosition="start" />}
+              {[
+                { label: 'Overview', icon: <InfoIcon fontSize="small" /> },
+                { label: 'Parcels', icon: <InventoryIcon fontSize="small" /> },
+                { label: 'Activity', icon: <TimelineIcon fontSize="small" /> },
+                { label: 'Documents', icon: <DescriptionIcon fontSize="small" /> },
+                ...(isStaff ? [{ label: 'Management', icon: <AttachMoneyIcon fontSize="small" /> }] : [])
+              ].map((tab, index) => (
+                <Tab
+                  key={index}
+                  label={tab.label}
+                  icon={tab.icon}
+                  iconPosition="start"
+                  sx={{
+                    minHeight: 'auto',
+                    minWidth: 'auto',
+                    py: 1,
+                    px: 2.5,
+                    mr: 1.5,
+                    borderRadius: 50,
+                    color: 'text.secondary',
+                    fontWeight: 600,
+                    transition: 'all 0.2s',
+                    '&.Mui-selected': {
+                      color: 'primary.main',
+                      bgcolor: 'rgba(0, 217, 184, 0.1)',
+                    },
+                    '&:hover': {
+                      color: 'text.primary',
+                      bgcolor: 'rgba(255,255,255,0.03)'
+                    }
+                  }}
+                />
+              ))}
             </Tabs>
+          </Box>
 
-            {/* TAB 0: OVERVIEW */}
-            <TabPanel value={activeTab} index={0}>
-              {/* Progress Bar */}
-              {['in_transit', 'out_for_delivery', 'picked_up'].includes(shipment.status) && (
-                <Box mb={4}>
-                  <Box display="flex" justifyContent="space-between" mb={1}>
-                    <Typography variant="caption" fontWeight="bold">Delivery Progress</Typography>
-                    <Typography variant="caption" fontWeight="bold">{progress}%</Typography>
-                  </Box>
-                  <LinearProgress variant="determinate" value={progress} sx={{ height: 8, borderRadius: 4 }} />
+          {/* TAB 0: OVERVIEW */}
+          <TabPanel value={activeTab} index={0}>
+            {/* Progress Bar */}
+            {['in_transit', 'out_for_delivery', 'picked_up'].includes(shipment.status) && (
+              <Box mb={4} sx={{ bgcolor: '#141929', p: 3, borderRadius: 3, border: '1px solid #2a3347' }}>
+                <Box display="flex" justifyContent="space-between" mb={1.5}>
+                  <Typography variant="caption" fontWeight="bold" color="text.secondary" textTransform="uppercase" letterSpacing={1}>Delivery Progress</Typography>
+                  <Typography variant="caption" fontWeight="bold" color="primary">{progress}%</Typography>
                 </Box>
-              )}
+                <LinearProgress
+                  variant="determinate"
+                  value={progress}
+                  sx={{
+                    height: 8,
+                    borderRadius: 4,
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    '& .MuiLinearProgress-bar': {
+                      borderRadius: 4,
+                      backgroundImage: 'linear-gradient(90deg, #00d9b8, #00b8d9)'
+                    }
+                  }}
+                />
+              </Box>
+            )}
 
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <AddressBlock title="Origin (Sender)" data={shipment.origin} />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <AddressBlock title="Destination (Recipient)" data={shipment.destination} />
-                </Grid>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <AddressBlock title="Origin (Sender)" data={shipment.origin} />
               </Grid>
+              <Grid item xs={12} md={6}>
+                <AddressBlock title="Destination (Recipient)" data={shipment.destination} />
+              </Grid>
+            </Grid>
 
-              <Box mt={4}>
-                <Typography variant="h6" fontWeight="bold" gutterBottom>Shipment Details</Typography>
+            <Box mt={4}>
+              <Typography variant="h6" fontWeight="bold" gutterBottom sx={{ color: '#fff', mb: 2 }}>Shipment Details</Typography>
+              <Box sx={{ bgcolor: '#141929', p: 3, borderRadius: 3, border: '1px solid #2a3347' }}>
                 <Grid container spacing={2}>
                   <Grid item xs={6} md={3}>
-                    <InfoRow label="Service Type" value={shipment.serviceType || 'Standard'} icon={<TruckIcon fontSize="small" />} />
+                    <InfoRow label="Service Type" value={shipment.serviceType || 'Standard'} icon={<TruckIcon fontSize="small" sx={{ color: 'primary.main' }} />} />
                   </Grid>
                   <Grid item xs={6} md={3}>
-                    <InfoRow label="Total Pieces" value={shipment.items?.length || 0} icon={<InventoryIcon fontSize="small" />} />
+                    <InfoRow label="Total Pieces" value={shipment.items?.length || 0} icon={<InventoryIcon fontSize="small" sx={{ color: 'primary.main' }} />} />
                   </Grid>
                   <Grid item xs={6} md={3}>
                     <InfoRow label="Total Weight" value={`${shipment.totalWeight || 0} kg`} />
@@ -445,83 +422,104 @@ const ShipmentDetails = ({ shipment, onUpdateLocation, updatingLocation, locatio
                   </Grid>
                 </Grid>
               </Box>
-            </TabPanel>
+            </Box>
+          </TabPanel>
 
-            {/* TAB 1: PARCELS */}
-            <TabPanel value={activeTab} index={1}>
-              <List>
+          {/* TAB 1: PARCELS */}
+          <TabPanel value={activeTab} index={1}>
+            <Box sx={{ bgcolor: '#141929', borderRadius: 3, border: '1px solid #2a3347', overflow: 'hidden' }}>
+              <List disablePadding>
                 {shipment.items?.map((item, i) => (
-                  <ListItem key={i} divider sx={{ px: 0 }}>
+                  <ListItem key={i} divider sx={{ px: 3, py: 2, borderColor: 'rgba(255,255,255,0.05)' }}>
                     <ListItemIcon>
-                      <InventoryIcon color="primary" />
+                      <Box sx={{ p: 1, bgcolor: 'rgba(0, 217, 184, 0.1)', borderRadius: 2, color: 'primary.main' }}>
+                        <InventoryIcon />
+                      </Box>
                     </ListItemIcon>
                     <ListItemText
-                      primary={item.description}
-                      secondary={`Weight: ${item.weight}kg • Vol: ${item.length}x${item.width}x${item.height}cm`}
+                      primary={<Typography fontWeight="600" color="text.primary">{item.description}</Typography>}
+                      secondary={<Typography variant="body2" color="text.secondary">Weight: {item.weight}kg • Vol: {item.length}x{item.width}x{item.height}cm</Typography>}
                     />
-                    <Chip label={`Qty: ${item.quantity}`} size="small" />
+                    <Chip label={`Qty: ${item.quantity}`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'text.primary', fontWeight: 600 }} />
                   </ListItem>
                 ))}
-                {shipment.items?.length === 0 && <Typography color="textSecondary">No items found.</Typography>}
+                {shipment.items?.length === 0 && <Box p={3}><Typography color="textSecondary">No items found.</Typography></Box>}
               </List>
-            </TabPanel>
+            </Box>
+          </TabPanel>
 
-            {/* TAB 2: ACTIVITY */}
-            <TabPanel value={activeTab} index={2}>
+          {/* TAB 2: ACTIVITY */}
+          <TabPanel value={activeTab} index={2}>
+            <Box sx={{ bgcolor: '#141929', p: 3, borderRadius: 3, border: '1px solid #2a3347' }}>
               <TrackingTimeline history={shipment.history || []} currentStatus={shipment.status} />
-            </TabPanel>
+            </Box>
+          </TabPanel>
 
-            {/* TAB 3: DOCUMENTS */}
-            <TabPanel value={activeTab} index={3}>
-              <Grid container spacing={2}>
-                {shipment.labelUrl && (
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                      <ListItem button onClick={() => handleOpenPdf(shipment.labelUrl)}>
-                        <ListItemIcon><DescriptionIcon color="error" /></ListItemIcon>
-                        <ListItemText primary="Shipping Label (PDF)" secondary="Click to download" />
-                      </ListItem>
-                    </Card>
-                  </Grid>
-                )}
-                {shipment.invoiceUrl && (
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                      <ListItem button onClick={() => handleOpenPdf(shipment.invoiceUrl)}>
-                        <ListItemIcon><DescriptionIcon color="primary" /></ListItemIcon>
-                        <ListItemText primary="Commercial Invoice" secondary="Pro forma invoice" />
-                      </ListItem>
-                    </Card>
-                  </Grid>
-                )}
-                {/* Placeholder for POD */}
-                {isStaff && (
-                  <Grid item xs={12} sm={6}>
-                    <Card variant="outlined" sx={{ borderRadius: 2 }}>
-                      <ListItem>
-                        <ListItemIcon><UploadIcon /></ListItemIcon>
-                        <ListItemText primary="Proof of Delivery" secondary="No POD uploaded yet" />
-                        <Button size="small">Upload</Button>
-                      </ListItem>
-                    </Card>
-                  </Grid>
-                )}
-              </Grid>
-            </TabPanel>
+          {/* TAB 3: DOCUMENTS */}
+          <TabPanel value={activeTab} index={3}>
+            <Grid container spacing={2}>
+              {shipment.labelUrl && (
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: '#141929', borderColor: '#2a3347' }}>
+                    <ListItem button onClick={() => handleOpenPdf(shipment.labelUrl)} sx={{ p: 2 }}>
+                      <ListItemIcon><DescriptionIcon color="error" /></ListItemIcon>
+                      <ListItemText
+                        primary={<Typography fontWeight="600" color="text.primary">Shipping Label (PDF)</Typography>}
+                        secondary="Click to download"
+                      />
+                    </ListItem>
+                  </Card>
+                </Grid>
+              )}
+              {/* Placeholder for POD */}
+              {isStaff && (
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: '#141929', borderColor: '#2a3347' }}>
+                    <ListItem sx={{ p: 2 }}>
+                      <ListItemIcon><UploadIcon /></ListItemIcon>
+                      <ListItemText
+                        primary={<Typography fontWeight="600" color="text.primary">Proof of Delivery</Typography>}
+                        secondary="No POD uploaded yet"
+                      />
+                      <Button size="small" sx={{ bgcolor: 'rgba(0, 217, 184, 0.1)', color: 'primary.main' }}>Upload</Button>
+                    </ListItem>
+                  </Card>
+                </Grid>
+              )}
+              {shipment.invoiceUrl && (
+                <Grid item xs={12} sm={6}>
+                  <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: '#141929', borderColor: '#2a3347' }}>
+                    <ListItem button onClick={() => handleOpenPdf(shipment.invoiceUrl)} sx={{ p: 2 }}>
+                      <ListItemIcon><DescriptionIcon color="primary" /></ListItemIcon>
+                      <ListItemText
+                        primary={<Typography fontWeight="600" color="text.primary">Commercial Invoice</Typography>}
+                        secondary="Pro forma invoice"
+                      />
+                    </ListItem>
+                  </Card>
+                </Grid>
+              )}
+            </Grid>
+          </TabPanel>
 
-            {/* TAB 4: MANAGEMENT (Staff Only) */}
-            {isStaff && (
-              <TabPanel value={activeTab} index={4}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
-                    <InfoRow label="Cost Price" value={`$${shipment.costPrice || 0}`} icon={<AttachMoneyIcon color="error" />} />
-                  </Grid>
+          {/* TAB 4: MANAGEMENT (Staff Only) */}
+          {isStaff && (
+            <TabPanel value={activeTab} index={4}>
+              <Box sx={{ bgcolor: '#141929', p: 3, borderRadius: 3, border: '1px solid #2a3347' }}>
+                <Grid container spacing={2} alignItems="center">
+                  {/* RESTRICTED: Cost Price only visible to Admin */}
+                  {user?.role === 'admin' && (
+                    <Grid item xs={12} md={6}>
+                      <InfoRow label="Cost Price" value={`$${shipment.costPrice || 0}`} icon={<AttachMoneyIcon color="error" />} />
+                    </Grid>
+                  )}
                   <Grid item xs={12} md={6}>
                     <InfoRow label="Sales Price" value={`$${shipment.price || 0}`} icon={<AttachMoneyIcon color="success" />} />
                   </Grid>
                   <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>Internal Notes (Not visible to client)</Typography>
-                    <Paper variant="outlined" sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
+                    <Typography variant="subtitle2" gutterBottom color="text.secondary">Internal Notes</Typography>
+                    <Paper variant="outlined" sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderColor: 'rgba(255,255,255,0.1)' }}>
                       <Typography variant="body2" color="textSecondary">
                         {shipment.internalNotes || 'No internal notes found.'}
                       </Typography>
@@ -533,28 +531,37 @@ const ShipmentDetails = ({ shipment, onUpdateLocation, updatingLocation, locatio
                       variant="outlined"
                       startIcon={<MyLocationIcon />}
                       onClick={() => setManualLocationDialogOpen(true)}
+                      sx={{ borderColor: '#2a3347', color: 'text.secondary' }}
                     >
                       Update Location Manually
                     </Button>
                   </Grid>
                 </Grid>
-              </TabPanel>
-            )}
-          </Paper>
+              </Box>
+            </TabPanel>
+          )}
         </Grid>
 
         {/* 3. RIGHT COLUMN: MAP (30%) */}
         <Grid item xs={12} lg={4}>
-          <Card elevation={0} sx={{ height: 500, borderRadius: 3, border: '1px solid', borderColor: 'divider', overflow: 'hidden', position: 'relative' }}>
+          <Card elevation={0} sx={{
+            height: 500,
+            borderRadius: 3,
+            border: '1px solid #2a3347',
+            overflow: 'hidden',
+            position: 'sticky',
+            top: 24,
+            bgcolor: '#141929'
+          }}>
             {/* Map Overlay Info */}
             <Box sx={{ position: 'absolute', top: 16, left: 16, right: 16, zIndex: 10 }}>
-              <Paper sx={{ p: 1.5, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1.5, boxShadow: 3 }}>
-                <Box sx={{ bgcolor: 'primary.light', p: 1, borderRadius: '50%', color: 'primary.main' }}>
+              <Paper sx={{ p: 1.5, borderRadius: 2, display: 'flex', alignItems: 'center', gap: 1.5, boxShadow: 3, bgcolor: 'rgba(20, 25, 41, 0.95)', backdropFilter: 'blur(8px)', border: '1px solid #2a3347' }}>
+                <Box sx={{ bgcolor: 'rgba(0, 217, 184, 0.1)', p: 1, borderRadius: '50%', color: 'primary.main' }}>
                   <LocationIcon fontSize="small" />
                 </Box>
                 <Box>
                   <Typography variant="caption" fontWeight="bold" color="textSecondary" display="block">CURRENT LOCATION</Typography>
-                  <Typography variant="body2" fontWeight="bold" noWrap>
+                  <Typography variant="body2" fontWeight="bold" noWrap color="text.primary">
                     {shipment.currentLocation?.address || shipment.origin?.city || 'Processing Center'}
                   </Typography>
                 </Box>
@@ -562,7 +569,7 @@ const ShipmentDetails = ({ shipment, onUpdateLocation, updatingLocation, locatio
             </Box>
 
             {/* The Map */}
-            <Box height="100%" bgcolor="#f3f4f6">
+            <Box height="100%" bgcolor="#0f121a">
               <LocationPicker
                 initialLocation={{
                   coordinates: shipment.currentLocation?.coordinates || shipment.origin?.coordinates || [0, 0],
@@ -583,7 +590,7 @@ const ShipmentDetails = ({ shipment, onUpdateLocation, updatingLocation, locatio
                   size="large"
                   onClick={onUpdateLocation} // Use the prop passed from TrackingPage
                   startIcon={<MyLocationIcon />}
-                  sx={{ boxShadow: 3 }}
+                  sx={{ boxShadow: '0 4px 14px rgba(0, 217, 184, 0.4)' }}
                 >
                   Share Live Location
                 </Button>

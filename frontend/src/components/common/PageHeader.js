@@ -29,7 +29,7 @@ const PageHeader = ({
                 <Breadcrumbs
                     separator={<NavigateNextIcon fontSize="small" />}
                     aria-label="breadcrumb"
-                    sx={{ mb: 1, '& .MuiLink-root': { color: 'text.secondary', fontSize: '0.875rem' } }}
+                    sx={{ mb: 1, '& .MuiLink-root': { color: '#9ca3af', fontSize: '0.875rem' } }}
                 >
                     {breadcrumbs.map((crumb, index) => (
                         <Link
@@ -56,9 +56,7 @@ const PageHeader = ({
                         <>
                             <Typography variant="h3" component="h1" fontWeight="800" gutterBottom sx={{
                                 letterSpacing: '-0.03em',
-                                background: `linear-gradient(45deg, ${theme.palette.text.primary}, ${theme.palette.text.secondary})`,
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
+                                color: '#e8eaf0'
                             }}>
                                 {title}
                             </Typography>

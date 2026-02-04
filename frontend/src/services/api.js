@@ -3,6 +3,13 @@ import axios from 'axios';
 // Use environment variable if available, otherwise use a relative URL that works in both development and production
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 
+// Debug: Log the API URL being used
+console.log('🔧 API Configuration:', {
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+  API_URL: API_URL,
+  NODE_ENV: process.env.NODE_ENV
+});
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -99,6 +106,27 @@ export const shipmentService = {
         error.message = `Failed to fetch shipment details for ${trackingNumber}`;
       }
 
+      throw error;
+    }
+  },
+
+  getAvailableCarriers: async () => {
+    try {
+      const response = await api.get('/shipments/carriers');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching carriers:', error);
+      throw error;
+    }
+  },
+
+  // Get Rate Quotes
+  getQuotes: async (quoteData) => {
+    try {
+      const response = await api.post('/shipments/quote', quoteData);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching quotes:', error);
       throw error;
     }
   },
@@ -207,13 +235,23 @@ export const shipmentService = {
       throw error;
     }
   },
-  // Submit to DHL (Carrier Confirmation)
-  submitToDhl: async (trackingNumber) => {
+  getCarriers: async () => {
     try {
-      const response = await api.post(`/shipments/${trackingNumber}/dhl`);
+      const response = await api.get('/shipments/carriers');
       return response.data;
     } catch (error) {
-      console.error(`Error submitting shipment ${trackingNumber} to DHL:`, error);
+      console.error('Error fetching carriers:', error);
+      throw error;
+    }
+  },
+
+  // Submit to DGR (Generic Carrier Booking)
+  submitToDgr: async (trackingNumber, carrierCode = 'DGR') => {
+    try {
+      const response = await api.post(`/shipments/${trackingNumber}/book`, { carrierCode });
+      return response.data;
+    } catch (error) {
+      console.error(`Error submitting shipment ${trackingNumber} to ${carrierCode}:`, error);
       throw error;
     }
   },

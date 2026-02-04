@@ -8,6 +8,9 @@ const { validationResult } = require('express-validator');
 const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 const Ledger = require('../models/ledger.model');
+const PricingService = require('../services/pricing.service');
+const ShipmentDraftService = require('../services/ShipmentDraftService');
+const ShipmentBookingService = require('../services/ShipmentBookingService');
 
 // Helper function to generate a tracking number
 const generateTrackingNumber = () => {
@@ -30,353 +33,76 @@ const calculateEstimatedDelivery = () => {
 // Create a new shipment
 exports.createShipment = async (req, res) => {
   try {
-    // Operations Smoothing: Clients can now create shipments directly with "Ready for Pickup" status
-    // Direct shipment creation is allowed for all authenticated users
-
-    // Enforce Pickup Request Flow for Clients - DISABLED for V2 Flow
-    /*
-    if (req.user.role === 'client') {
-      return res.status(403).json({
-        success: false,
-        error: 'Clients must use the Pickup Request flow. Direct shipment creation is restricted.'
-      });
-    }
-    */
-
-
     // Check MongoDB connection first
     if (mongoose.connection.readyState !== 1) {
-      logger.warn('MongoDB not connected during shipment creation, attempting to reconnect...');
-      try {
-        // Try to reconnect
-        const { connectDB } = require('../config/database');
-        await connectDB();
-        logger.info('MongoDB reconnected successfully for shipment creation');
-      } catch (connError) {
-        logger.error('Failed to reconnect to MongoDB for shipment creation:', connError);
-        return res.status(500).json({
-          success: false,
-          error: 'Database connection error. Please try again later.'
-        });
-      }
+      await require('../config/database').connectDB();
     }
 
-    // Extract input - support both sender/receiver (Wizard) and origin/destination (Legacy)
-    const { sender, receiver, origin: legacyOrigin, destination: legacyDestination, checkpoints, items: legacyItems, parcels, serviceCode, carrierCode } = req.body;
+    // Delegate to Service
+    const shipment = await ShipmentDraftService.createDraft(req.body, req.user);
 
-    logger.info('Create Shipment Body:', JSON.stringify(req.body, null, 2));
+    logger.info(`Shipment ${shipment.trackingNumber} created (Draft).`);
 
-    // Map parcels to items if provided, but prioritize distinct items if available
-    const items = (legacyItems && legacyItems.length > 0) ? legacyItems : parcels;
-
-    // Helper to sanitize address data and ensure required fields
-    const sanitizeAddress = (data) => {
-      if (!data) return null;
-      const clean = { ...data };
-
-      // Remove null coordinates
-      if (clean.latitude === null) delete clean.latitude;
-      if (clean.longitude === null) delete clean.longitude;
-
-      // Auto-generate formattedAddress if missing but components exist
-      if (!clean.formattedAddress && (clean.streetLines?.length || clean.city)) {
-        const parts = [
-          ...(clean.streetLines || []),
-          clean.city,
-          clean.state,
-          clean.postalCode,
-          clean.country || clean.countryCode
-        ].filter(Boolean);
-        clean.formattedAddress = parts.join(', ');
-      }
-
-      return clean;
-    };
-
-    const originData = sanitizeAddress(sender || legacyOrigin);
-    const destinationData = sanitizeAddress(receiver || legacyDestination);
-
-    const customer = req.body.customer || {
-      name: originData?.contactPerson,
-      email: originData?.email,
-      phone: originData?.phone
-    };
-
-    // Validate required fields
-    if (!originData || !originData.formattedAddress) {
-      logger.error('Missing Sender Address', { originData });
-      return res.status(400).json({
-        success: false,
-        error: 'Sender address is required. Please select from autocomplete or fill all address fields.'
-      });
-    }
-
-    if (!destinationData || !destinationData.formattedAddress) {
-      logger.error('Missing Receiver Address', { destinationData });
-      return res.status(400).json({
-        success: false,
-        error: 'Receiver address is required. Please select from autocomplete or fill all address fields.'
-      });
-    }
-
-    if (!customer.name || !customer.email) {
-      // Try to backfill from sender if missing
-      if (!originData?.contactPerson) {
-        logger.error('Missing Customer/Sender Details', { customer, originData });
-        return res.status(400).json({
-          success: false,
-          error: 'Customer/Sender with name and email is required'
-        });
-      }
-    }
-
-    // Process checkpoints if provided
-    let validatedCheckpoints = [];
-    if (checkpoints && Array.isArray(checkpoints) && checkpoints.length > 0) {
-      // Validate each checkpoint
-      for (const checkpoint of checkpoints) {
-        if (!checkpoint.location || !checkpoint.location.formattedAddress) {
-          return res.status(400).json({
-            success: false,
-            error: 'Each checkpoint must have a location address'
-          });
-        }
-
-        if (!checkpoint.name) {
-          return res.status(400).json({
-            success: false,
-            error: 'Each checkpoint must have a name'
-          });
-        }
-
-        validatedCheckpoints.push({
-          location: checkpoint.location,
-          name: checkpoint.name,
-          estimatedArrival: checkpoint.estimatedArrival || null,
-          reached: false,
-          notes: checkpoint.notes || ''
-        });
-      }
-    }
-
-    // Create new shipment
-    const shipment = new Shipment({
-      trackingNumber: generateTrackingNumber(),
-      origin: originData,
-      destination: destinationData,
-      checkpoints: validatedCheckpoints,
-      currentLocation: originData, // Start at origin
-      status: req.body.status && ['draft', 'pending', 'ready_for_pickup', 'picked_up'].includes(req.body.status) ? req.body.status : 'ready_for_pickup',
-      estimatedDelivery: req.body.estimatedDelivery || calculateEstimatedDelivery(),
-      customer: {
-        name: customer.name,
-        email: customer.email,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone || '',
-        vatNo: customer.vatNo,
-        eori: customer.eori,
-        taxId: customer.taxId,
-        traderType: customer.traderType
-      },
-      remarks: req.body.remarks,
-      reference: req.body.reference || sender?.reference || '',
-      items: items || [],
-      // Allow Staff/Admin to create on behalf of a client
-      user: (req.user && ['staff', 'admin'].includes(req.user.role) && req.body.userId)
-        ? req.body.userId
-        : (req.user ? req.user._id : null),
-      history: [{
-        location: originData,
-        status: req.body.status && ['draft', 'pending', 'ready_for_pickup', 'picked_up'].includes(req.body.status) ? req.body.status : 'ready_for_pickup',
-        description: 'Shipment created',
-        timestamp: new Date()
-      }],
-      price: req.body.price,
-      currency: req.body.currency,
-      // New fields
-      parcels: req.body.parcels || [],
-      incoterm: req.body.incoterm || 'DAP',
-      dangerousGoods: req.body.dangerousGoods || { contains: false },
-      exportReason: req.body.exportReason || 'Sale',
-      // Explicitly add missing fields
-      gstPaid: req.body.gstPaid || false,
-      payerOfVat: req.body.payerOfVat || 'receiver',
-      palletCount: req.body.palletCount || 0,
-      packageMarks: req.body.packageMarks || '',
-      receiverReference: req.body.receiverReference || req.body.receiver?.reference || '',
-      serviceCode: req.body.serviceCode,
-      plannedDate: req.body.plannedDate,
-      shipperAccount: req.body.shipperAccount,
-      labelSettings: req.body.labelSettings
-    });
-
-    // Determine target user (Paying Entity)
-    // If Staff/Admin is creating on behalf of a user, use that user's ID
-    const shipmentPrice = parseFloat(req.body.price || 0);
-    let targetUserId = req.user._id;
-    if (['staff', 'admin'].includes(req.user.role) && req.body.userId) {
-      targetUserId = req.body.userId;
-    }
-
-    // Fetch Target User and Organization
-    const currentUser = await User.findById(targetUserId).populate('organization');
-
-    if (!currentUser) throw new Error('User (Paying Entity) not found');
-
-    // Determine financial entity (Organization or User fallback)
-    let payingEntity = currentUser;
-    let orgContext = null;
-
-    if (currentUser.organization) {
-      const Organisation = require('../models/organization.model');
-      payingEntity = await Organisation.findById(currentUser.organization._id);
-      orgContext = payingEntity;
-    } else {
-      logger.warn(`User ${currentUser._id} has no organization. Using personal balance.`);
-    }
-
-    // Check availability: balance + creditLimit
-    // Note: Balance is typically DEBITED (lowered), so we check if (balance + limit) >= price
-    // Logic assumes balance is strictly positive for cash, negative if allowed? 
-    // Current system: Balance is funds available. Credit Limit is overdraft allowed.
-    const availableFunds = (payingEntity.balance || 0) + (payingEntity.creditLimit || 0);
-
-    // Blocking logic (except for drafts or if price is 0)
-    const isNotDraft = shipment.status !== 'draft';
-    if (isNotDraft && shipmentPrice > 0 && availableFunds < shipmentPrice) {
-      return res.status(402).json({
-        success: false,
-        error: 'Insufficient credit balance in Organization account.',
-        data: { balance: payingEntity.balance, creditLimit: payingEntity.creditLimit, required: shipmentPrice }
-      });
-    }
-
-    // Deduct balance
-    if (isNotDraft && shipmentPrice > 0) {
-      payingEntity.balance = (payingEntity.balance || 0) - shipmentPrice;
-      await payingEntity.save();
-
-      shipment.paid = true;
-      if (orgContext) shipment.organization = orgContext._id; // Link shipment to Org
-
-      // Create Ledger Entry
-      await Ledger.create({
-        user: currentUser._id, // Who created it
-        // TODO: Add organisation: orgContext._id to schema
-        shipment: shipment._id,
-        amount: shipmentPrice,
-        type: 'DEBIT',
-        category: 'SHIPMENT_FEE',
-        description: `Shipment Fee: ${shipment.trackingNumber}`,
-        balanceAfter: payingEntity.balance,
-        reference: shipment.trackingNumber,
-        metadata: { organizationId: orgContext ? orgContext._id.toString() : null }
-      });
-    }
-
-    // --- DHL integration side-effect (outside transaction if possible, or handle cleanup) ---
-    // For simplicity in this env, we keep it inside but we must be careful. 
-    // If DHL fails, the transaction will catch it and rollback the balance deduction.
-    if (serviceCode && (carrierCode === 'DHL' || !carrierCode) && !req.body.skipCarrierCreation) {
-      // ... (keep existing DHL logic but ensure it uses the tracking number if needed)
-      const dhlData = {
-        sender: {
-          postalCode: originData.postalCode || '12345',
-          city: originData.city || 'Kuwait',
-          countryCode: originData.countryCode || 'KW',
-          streetLines: originData.streetLines?.length ? originData.streetLines : [originData.formattedAddress],
-          phone: originData.phone || '1234567',
-          email: originData.email,
-          contactPerson: originData.contactPerson,
-          traderType: originData.traderType,
-          vatNumber: originData.vatNumber,
-          eoriNumber: originData.eoriNumber,
-          taxId: originData.taxId
-        },
-        receiver: {
-          postalCode: destinationData.postalCode || '12345',
-          city: destinationData.city || 'Berlin',
-          countryCode: destinationData.countryCode || 'DE',
-          streetLines: destinationData.streetLines?.length ? destinationData.streetLines : [destinationData.formattedAddress],
-          phone: destinationData.phone || '1234567',
-          email: destinationData.email,
-          contactPerson: destinationData.contactPerson,
-          traderType: destinationData.traderType,
-          vatNumber: destinationData.vatNumber,
-          eoriNumber: destinationData.eoriNumber,
-          taxId: destinationData.taxId
-        },
-        parcels: req.body.parcels,
-        items: items,
-        currency: req.body.currency,
-        incoterm: req.body.incoterm,
-        dangerousGoods: req.body.dangerousGoods,
-        exportReason: req.body.exportReason,
-        serviceCode: serviceCode,
-        gstPaid: req.body.gstPaid,
-        payerOfVat: req.body.payerOfVat,
-        palletCount: req.body.palletCount,
-        packageMarks: req.body.packageMarks,
-        receiverReference: req.body.receiverReference || req.body.receiver?.reference,
-        shipperAccount: req.body.shipperAccount,
-        labelSettings: req.body.labelSettings
-      };
-
-      const carrier = CarrierFactory.getAdapter('DHL');
-      const labelInfo = await carrier.createShipment(dhlData, serviceCode);
-
-      shipment.trackingNumber = labelInfo.trackingNumber;
-      shipment.labelUrl = labelInfo.labelUrl;
-      shipment.dhlConfirmed = true;
-      shipment.dhlTrackingNumber = labelInfo.trackingNumber;
-      if (labelInfo.awbUrl) shipment.awbUrl = labelInfo.awbUrl;
-      if (labelInfo.invoiceUrl) shipment.invoiceUrl = labelInfo.invoiceUrl;
-    }
-
-    // Save Shipment
-    savedShipment = await shipment.save();
-
-    // Log success
-    logger.info(`Shipment ${savedShipment.trackingNumber} created and paid.`);
-
-
-    res.status(201).json({
+    res.status(200).json({
       success: true,
-      data: savedShipment,
-      message: 'Shipment created and paid successfully'
+      data: shipment,
+      message: 'Shipment created successfully'
     });
+
   } catch (error) {
-    logger.error('Error creating shipment:', error);
-
-    // Provide more specific error messages based on the error type
-    let errorMessage = 'Failed to create shipment';
-
-    if (error.name === 'ValidationError') {
-      logger.error('Validation Errors:', JSON.stringify(error.errors, null, 2));
-      errorMessage = 'Invalid shipment data: ' + Object.values(error.errors).map(e => e.message).join(', ');
-    } else if (error.name === 'MongoServerError' && error.code === 11000) {
-      errorMessage = 'Duplicate tracking number. Please try again.';
-    } else if (error.name === 'MongoNetworkError') {
-      errorMessage = 'Network error connecting to database. Please try again later.';
-    }
-
-    res.status(error.name === 'ValidationError' ? 400 : 500).json({
+    logger.error(`Error creating shipment: ${error.message}`, {
+      stack: error.stack,
+      body: req.body,
+      userId: req.user?._id
+    });
+    res.status(400).json({ // Using 400 for validation/business errors from service
       success: false,
-      error: errorMessage,
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
 
-// Get rate quotes from DHL
+// Get available carriers
+exports.getAvailableCarriers = (req, res) => {
+  try {
+    const carriers = CarrierFactory.getAvailableCarriers();
+    res.status(200).json({
+      success: true,
+      data: carriers
+    });
+  } catch (error) {
+    logger.error('Error fetching carriers:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch carriers'
+    });
+  }
+};
+
+
+
+// Get rate quotes from DGR
 exports.getQuotes = async (req, res) => {
   try {
-    const carrier = CarrierFactory.getAdapter('DHL');
+    const carrierCode = req.body.carrierCode || 'DGR';
+    const carrier = CarrierFactory.getAdapter(carrierCode);
     const rawQuotes = await carrier.getRates(req.body);
 
-    // 3PL Profit Engine Logic (User-Level Markup)
+    // 3PL Profit Engine Logic (Target User Markup)
     let markup = req.user?.markup;
+
+    // If Admin/Staff is quoting on behalf of a user, fetch that user's markup
+    if (['staff', 'admin'].includes(req.user.role) && req.body.userId) {
+      try {
+        const targetUser = await User.findById(req.body.userId).populate('organization');
+        if (targetUser) {
+          markup = targetUser.markup;
+        }
+      } catch (err) {
+        logger.warn(`Failed to fetch target user ${req.body.userId} for markup`, err);
+      }
+    }
 
     // Default Fallback
     if (!markup) {
@@ -385,52 +111,17 @@ exports.getQuotes = async (req, res) => {
 
     const markupQuotes = rawQuotes.map(quote => {
       const basePrice = Number(quote.totalPrice);
-      let finalPrice = basePrice;
-      let surchargeLabel = '0%';
-
-      if (markup.type === 'PERCENTAGE' || markup.type === 'COMBINED') {
-        const pct = markup.percentageValue || 0;
-        finalPrice += basePrice * (pct / 100);
-        surchargeLabel = `${pct}%`;
-      }
-
-      if (markup.type === 'FLAT' || markup.type === 'COMBINED') {
-        const flat = markup.flatValue || 0;
-        finalPrice += flat;
-        surchargeLabel += (surchargeLabel !== '0%' ? ` + ${flat} KD` : `${flat} KD Flat`);
-      }
-
-      // Fallback description cleanup
-      if (surchargeLabel.startsWith('0% +')) surchargeLabel = surchargeLabel.replace('0% + ', '');
-
-      // Legacy Formula support (if needed, or deprecate)
-      if (markup.type === 'FORMULA' && markup.formula) {
-        // Safe evaluation of simple formulas 
-        // Example: "base * 1.1 + 10"
-        try {
-          // eslint-disable-next-line no-new-func
-          const safeEval = new Function('base', `return ${markup.formula}`);
-          finalPrice = safeEval(basePrice);
-          surchargeLabel = 'Custom';
-        } catch (e) {
-          finalPrice = basePrice * 1.15; // Fallback
-          surchargeLabel = 'Error (Fallback 15%)';
-        }
-      }
+      const calculation = PricingService.calculateFinalPrice(basePrice, markup);
 
       return {
         ...quote,
-        totalPrice: finalPrice.toFixed(3),
-        // If staff/admin, show rawPrice; else hide it or null it
-        rawPrice: (req.user.role === 'staff' || req.user.role === 'admin') ? basePrice.toFixed(3) : undefined,
-        surcharge: surchargeLabel
+        totalPrice: Number(calculation.finalPrice.toFixed(3)),
+        currency: quote.currency || 'KWD',
+        // RESTRICTED: Only Admins can see the raw carrier price
+        carrierCost: req.user.role === 'admin' ? basePrice : undefined,
+        markupAmount: req.user.role === 'admin' ? calculation.markupAmount : undefined
       };
     });
-
-    // Remove legacy fallback used to define markup here.
-    // Instead we rely on the implementation above.
-    // Ensure we handle case where user is not populated or org is missing
-
 
     res.status(200).json({
       success: true,
@@ -438,7 +129,29 @@ exports.getQuotes = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching quotes:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch quotes' });
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Lists all available carriers and their implementation status.
+ */
+exports.getAvailableCarriers = async (req, res) => {
+  try {
+    const carriers = CarrierFactory.getAvailableCarriers();
+    res.status(200).json({
+      success: true,
+      data: carriers
+    });
+  } catch (error) {
+    logger.error('Error getting available carriers:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 };
 
@@ -454,6 +167,12 @@ exports.getShipmentByTrackingNumber = async (req, res) => {
         success: false,
         error: 'Shipment not found'
       });
+    }
+
+    // RESTRICTED: Hide sensitive cost data from non-admins
+    if (req.user.role !== 'admin') {
+      shipment.costPrice = undefined;
+      shipment.markup = undefined;
     }
 
     res.status(200).json({
@@ -555,6 +274,35 @@ exports.getShipmentHistory = async (req, res) => {
       success: false,
       error: 'Failed to fetch shipment history',
       details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Submit to Carrier (Staff Only)
+exports.bookWithCarrier = async (req, res) => {
+  try {
+    const { trackingNumber } = req.params;
+    const { carrierCode } = req.body;
+
+    // Find shipment
+    const shipment = await Shipment.findOne({ trackingNumber });
+    if (!shipment) {
+      return res.status(404).json({ success: false, error: 'Shipment not found' });
+    }
+
+    // Call Booking Service
+    const result = await ShipmentBookingService.bookShipment(trackingNumber, carrierCode);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+      message: `Shipment successfully booked with ${result.carrierCode}`
+    });
+  } catch (error) {
+    logger.error('Error booking shipment:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 };
@@ -676,6 +424,14 @@ exports.getAllShipments = async (req, res) => {
 
     // Get total count for pagination info
     const totalCount = await Shipment.countDocuments(query);
+
+    // RESTRICTED: Hide sensitive cost data from non-admins
+    if (req.user.role !== 'admin') {
+      shipments.forEach(s => {
+        s.costPrice = undefined;
+        s.markup = undefined;
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -1790,177 +1546,30 @@ exports.updateShipment = async (req, res) => {
 exports.submitToDhl = async (req, res) => {
   try {
     const { trackingNumber } = req.params;
-    const shipment = await Shipment.findOne({ trackingNumber });
 
-    if (!shipment) {
-      return res.status(404).json({ success: false, error: 'Shipment not found' });
-    }
+    // Delegate to Service
+    // Note: ShipmentBookingService handles Idempotency, Transaction, and Ledger
+    const result = await ShipmentBookingService.bookShipment(trackingNumber, req.user); // Should we pass req.user? Yes, for ledger.
 
-    if (shipment.dhlConfirmed) {
-      return res.status(400).json({ success: false, error: 'Shipment already submitted to DHL' });
-    }
-
-    // --- Financial Check for Manual Approval ---
-    if (!shipment.paid && (shipment.price || 0) > 0) {
-      const session = await mongoose.startSession();
-      session.startTransaction();
-      try {
-        const user = await User.findById(shipment.user).session(session);
-        const price = shipment.price || 0;
-        const available = (user.balance || 0) + (user.creditLimit || 0);
-
-        if (available < price) {
-          await session.abortTransaction();
-          return res.status(402).json({
-            success: false,
-            error: 'Insufficient balance to approve this shipment.',
-            data: { balance: user.balance, required: price }
-          });
-        }
-
-        // Deduct
-        user.balance = (user.balance || 0) - price;
-        await user.save({ session });
-
-        shipment.paid = true;
-        await shipment.save({ session });
-
-        // Ledger
-        await Ledger.create([{
-          user: user._id,
-          shipment: shipment._id,
-          amount: price,
-          type: 'DEBIT',
-          category: 'SHIPMENT_FEE',
-          description: `Manual Approval Payment: ${shipment.trackingNumber}`,
-          balanceAfter: user.balance,
-          reference: shipment.trackingNumber
-        }], { session });
-
-        await session.commitTransaction();
-        logger.info(`Shipment ${shipment.trackingNumber} paid via manual approval.`);
-      } catch (error) {
-        await session.abortTransaction();
-        throw error;
-      } finally {
-        session.endSession();
-      }
-    }
-
-    // DEBUG: Log the raw shipment origin/destination to see what we have
-    // logger.info(`[DHL-DEBUG] Origin: ${JSON.stringify(shipment.origin)}`);
-    // logger.info(`[DHL-DEBUG] Destination: ${JSON.stringify(shipment.destination)}`);
-
-    // Prepare data for DHL Service
-    // Ensure fallback values to prevent 'undefined' errors
-    // Prepare data for DHL Service
-    const origin = shipment.origin || {};
-    const destination = shipment.destination || {};
-    const customer = shipment.customer || {};
-
-    const dhlData = {
-      sender: {
-        postalCode: origin.postalCode || '12345',
-        city: origin.city || 'Kuwait City',
-        countryCode: origin.countryCode || 'KW',
-        streetLines: [origin.formattedAddress || origin.address || 'Address Line 1'],
-        company: origin.company || origin.contactPerson || 'Sender',
-        contactPerson: origin.contactPerson || 'Sender',
-        phone: origin.phone || origin.fullPhone || '12345678',
-        email: origin.email || 'sender@email.com',
-
-        // Map Tax IDs - Prioritize Customer object (where frontend sends it), fallback to origin
-        vatNumber: customer.vatNo || origin.vatNumber || '',
-        eoriNumber: customer.eori || origin.eoriNumber || '',
-        taxId: customer.taxId || origin.taxId || '',
-
-        reference: shipment.reference || ''
-      },
-      receiver: {
-        postalCode: destination.postalCode || '12345',
-        city: destination.city || 'Dubai',
-        countryCode: destination.countryCode || 'AE',
-        streetLines: [destination.formattedAddress || destination.address || 'Address Line 1'],
-        company: destination.company || destination.contactPerson || 'Receiver',
-        contactPerson: destination.contactPerson || 'Receiver',
-        phone: destination.phone || destination.fullPhone || '12345678',
-        email: destination.email || 'receiver@email.com',
-        vatNumber: destination.vatNumber || '',
-        reference: destination.reference || ''
-      },
-      // Pass raw arrays, service layer handles backward compatibility
-      parcels: shipment.parcels,
-      items: shipment.items,
-
-      // New fields
-      currency: shipment.currency,
-      incoterm: shipment.incoterm,
-      dangerousGoods: shipment.dangerousGoods,
-      exportReason: shipment.exportReason,
-      remarks: shipment.remarks, // Pass remarks for Invoice
-
-      // Dynamic date and service
-      shipmentDate: shipment.plannedDate,
-      serviceCode: shipment.serviceCode || 'P',
-
-      // Explicitly pass new DHL fields
-      gstPaid: shipment.gstPaid,
-      payerOfVat: shipment.payerOfVat,
-      palletCount: shipment.palletCount,
-      packageMarks: shipment.packageMarks,
-      receiverReference: shipment.receiverReference
-    };
-
-    // DEBUG: Deep Audit of EORI/Tax fields before adapter call
-    const audit = {
-      sender: { vat: shipment.origin?.vatNumber, eori: shipment.origin?.eoriNumber, tax: shipment.origin?.taxId },
-      receiver: { vat: shipment.destination?.vatNumber, eori: shipment.destination?.eoriNumber, tax: shipment.destination?.taxId },
-      customer: { vat: shipment.customer?.vatNo, eori: shipment.customer?.eori, tax: shipment.customer?.taxId }
-    };
-    logger.info('[DHL-DATA-AUDIT] Final fields before normalization:', JSON.stringify(audit, null, 2));
-
-    // DEBUG: Log the constructed payload
-    logger.info(`[DHL-DEBUG] Constructed Payload: ${JSON.stringify(dhlData, null, 2)}`);
-
-    const carrier = CarrierFactory.getAdapter('DHL');
-    const dhlResult = await carrier.createShipment(dhlData, dhlData.serviceCode);
-
-    shipment.trackingNumber = dhlResult.trackingNumber;
-    shipment.dhlTrackingNumber = dhlResult.trackingNumber;
-    shipment.labelUrl = dhlResult.labelUrl;
-    shipment.awbUrl = dhlResult.awbUrl;
-    shipment.invoiceUrl = dhlResult.invoiceUrl;
-    shipment.dhlConfirmed = true;
-    shipment.status = 'created'; // As requested
-
-    // Log event
-    shipment.history.push({
-      location: shipment.currentLocation,
-      status: shipment.status,
-      description: `Submitted to DHL. Tracking: ${dhlResult.trackingNumber}`,
-      timestamp: new Date()
-    });
-
-    await shipment.save();
+    logger.info(`Shipment ${trackingNumber} booked via Service.`);
 
     res.status(200).json({
       success: true,
-      data: shipment,
-      message: 'Shipment submitted to DHL successfully'
+      data: result.shipment,
+      message: result.message || 'Shipment booked successfully'
     });
 
   } catch (error) {
     logger.error('Error submitting to DHL:', error);
-    // Log the stack trace for easier debugging
-    console.error('[DHL-FAIL-STACK]', error.stack);
 
-    // Check if it's an axios error with response data
-    const dhlError = error.response?.data || error.message;
-    console.error('[DHL-FAIL-RESPONSE]', JSON.stringify(dhlError, null, 2));
+    // Differentiate user errors vs system errors if possible
+    const status = error.message.includes('not found') ? 404 :
+      error.message.includes('already booked') ? 400 :
+        error.message.includes('Pricing data invalid') ? 400 : 500;
 
-    res.status(500).json({
+    res.status(status).json({
       success: false,
-      error: typeof dhlError === 'object' ? JSON.stringify(dhlError) : dhlError
+      error: error.message
     });
   }
 };

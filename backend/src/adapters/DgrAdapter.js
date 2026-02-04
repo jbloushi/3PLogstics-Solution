@@ -7,12 +7,12 @@ const CarrierAdapter = require('./CarrierAdapter');
 const { normalizeShipment } = require('../utils/shipmentNormalizer');
 const { dhlApiKey, dhlApiSecret, dhlAccountNumber } = require('../config/config');
 
-class DhlAdapter extends CarrierAdapter {
+class DgrAdapter extends CarrierAdapter {
     constructor() {
         // Validate required credentials
         if (!dhlApiKey || !dhlApiSecret) {
             throw new Error(
-                'DHL API credentials are required. Please set DHL_API_KEY and DHL_API_SECRET environment variables.'
+                'DGR (DHL) API credentials are required. Please set DHL_API_KEY and DHL_API_SECRET environment variables.'
             );
         }
 
@@ -67,8 +67,8 @@ class DhlAdapter extends CarrierAdapter {
      * @param {Object} shipment - Normalized Shipment
      */
     async validate(shipment) {
-        const { validateDhlInvoiceData } = require('../services/dhl-payload-builder');
-        return validateDhlInvoiceData(shipment);
+        const { validateDgrInvoiceData } = require('../services/dgr-payload-builder');
+        return validateDgrInvoiceData(shipment);
     }
 
 
@@ -81,16 +81,17 @@ class DhlAdapter extends CarrierAdapter {
         const shipment = normalizeShipment(shipmentData);
 
         // --- TEMP FALLBACK FOR RATES (Preserving existing behavior) ---
-        // TODO: Implement actual DHL Rate Request in Phase 3
+        // TODO: Implement actual DGR Rate Request in Phase 3
         return [
-            { serviceName: 'DHL Express Worldwide', serviceCode: 'P', carrierCode: 'DHL', totalPrice: 15.000, currency: 'KWD', deliveryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() },
-            { serviceName: 'DHL Express 12:00', serviceCode: 'Y', carrierCode: 'DHL', totalPrice: 22.500, currency: 'KWD', deliveryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString() },
+            { serviceName: 'DGR Express Worldwide', serviceCode: 'P', carrierCode: 'DGR', totalPrice: 15.000, currency: 'KWD', deliveryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() },
+            { serviceName: 'DGR Express 12:00', serviceCode: 'Y', carrierCode: 'DGR', totalPrice: 22.500, currency: 'KWD', deliveryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString() },
         ];
     }
 
     /**
-     * @param {Object} shipmentData - Raw or partial shipment data
-     * @param {string} serviceCode
+     * @param {Object} shipmentData - Normalized shipment data
+     * @param {string} serviceCode - Carrier service code
+     * @returns {Promise<import('../services/dto/CarrierTypes').ShipmentBookingResult>}
      */
     async createShipment(shipmentData, serviceCode) {
         const shipment = normalizeShipment(shipmentData);
@@ -98,11 +99,11 @@ class DhlAdapter extends CarrierAdapter {
         const isInternational = shipment.sender.countryCode !== shipment.receiver.countryCode;
 
         // --- Delegate Payload Construction to Builder ---
-        const { buildDhlShipmentPayload } = require('../services/dhl-payload-builder');
+        const { buildDgrShipmentPayload } = require('../services/dgr-payload-builder');
 
         let payload;
         try {
-            payload = buildDhlShipmentPayload(shipment, {
+            payload = buildDgrShipmentPayload(shipment, {
                 accountNumber: this.config.accountNumber
             });
         } catch (error) {
@@ -110,14 +111,37 @@ class DhlAdapter extends CarrierAdapter {
             throw error;
         }
 
-        console.log('📦 DHL Adapter Payload:', JSON.stringify(payload, null, 2));
+        console.log('📦 DGR Adapter Payload:', JSON.stringify(payload, null, 2));
         try {
-            require('fs').writeFileSync('debug_last_dhl_payload.json', JSON.stringify(payload, null, 2));
+            require('fs').writeFileSync('debug_last_dgr_payload.json', JSON.stringify(payload, null, 2));
         } catch (e) { console.error('Error writing debug payload', e); }
+
+        const CarrierLog = require('../models/CarrierLog');
+        const startTime = Date.now();
+        let responseData = null;
+        let responseStatus = 0;
+        let errorData = null;
 
         try {
             const res = await axios.post(`${this.config.baseUrl}/shipments`, payload, { headers: this.getAuthHeader() });
-            console.log('📦 DHL Response:', JSON.stringify(res.data, null, 2));
+
+            responseStatus = res.status;
+            responseData = res.data;
+
+            // Log Success
+            await CarrierLog.create({
+                user: shipmentData.user, // Ensure we pass this from service
+                shipment: shipmentData._id,
+                carrier: 'DGR',
+                endpoint: 'createShipment',
+                requestPayload: payload,
+                responsePayload: res.data,
+                statusCode: res.status,
+                success: true,
+                durationMs: Date.now() - startTime
+            });
+
+            console.log('📦 DGR Response:', JSON.stringify(res.data, null, 2));
 
             // Extract Documents
             let labelBase64, awbBase64, invoiceBase64;
@@ -137,8 +161,25 @@ class DhlAdapter extends CarrierAdapter {
                 rawResponse: res.data
             };
         } catch (error) {
-            console.error('DHL Adapter Error:', error.response?.data || error.message);
-            throw new Error(`DHL Error: ${JSON.stringify(error.response?.data?.detail || error.message)}`);
+            responseStatus = error.response?.status || 500;
+            errorData = error.response?.data || error.message;
+
+            // Log Failure
+            await CarrierLog.create({
+                user: shipmentData.user,
+                shipment: shipmentData._id,
+                carrier: 'DGR',
+                endpoint: 'createShipment',
+                requestPayload: payload,
+                responsePayload: errorData,
+                statusCode: responseStatus,
+                success: false,
+                error: JSON.stringify(errorData),
+                durationMs: Date.now() - startTime
+            }).catch(e => console.error('Failed to save CarrierLog:', e));
+
+            console.error('DGR Adapter Error:', errorData);
+            throw new Error(`DGR Error: ${JSON.stringify(errorData.detail || errorData)}`);
         }
     }
 
@@ -148,7 +189,7 @@ class DhlAdapter extends CarrierAdapter {
                 headers: this.getAuthHeader(),
                 params: { trackingView: 'all-checkpoints' }
             });
-            // DHL API often nested under 'shipments' array
+            // DGR (DHL) API often nested under 'shipments' array
             const shipment = res.data.shipments?.[0] || res.data;
             return {
                 status: shipment.status?.statusCode,
@@ -161,10 +202,10 @@ class DhlAdapter extends CarrierAdapter {
                 }))
             };
         } catch (error) {
-            console.error('DHL Tracking Error:', error.response?.data || error.message);
-            throw new Error(`DHL Tracking Error: ${error.message}`);
+            console.error('DGR Tracking Error:', error.response?.data || error.message);
+            throw new Error(`DGR Tracking Error: ${error.message}`);
         }
     }
 }
 
-module.exports = DhlAdapter;
+module.exports = DgrAdapter;

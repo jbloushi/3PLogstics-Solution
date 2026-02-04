@@ -72,8 +72,8 @@ const userSchema = new mongoose.Schema({
     carrierConfig: {
         preferredCarrier: {
             type: String,
-            enum: ['DHL', 'FEDEX', 'UPS', 'MOCK'],
-            default: 'DHL'
+            enum: ['DGR', 'DHL', 'FEDEX', 'UPS', 'MOCK'],
+            default: 'DGR'
         },
         // Trade / Tax IDs
         taxId: { type: String, trim: true }, // General Tax ID

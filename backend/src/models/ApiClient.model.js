@@ -19,8 +19,8 @@ const ApiClientSchema = new mongoose.Schema({
     },
     allowedCarriers: [{
         type: String,
-        enum: ['DHL', 'FEDEX', 'UPS'],
-        default: ['DHL']
+        enum: ['DGR', 'DHL', 'FEDEX', 'UPS'],
+        default: ['DGR']
     }],
     webhookUrl: {
         type: String,

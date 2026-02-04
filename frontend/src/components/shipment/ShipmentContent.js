@@ -58,14 +58,14 @@ const ShipmentContent = ({
                     <FormControl fullWidth size="small">
                         <InputLabel>Packaging Type</InputLabel>
                         <Select
-                            value={packagingType}
+                            value={packagingType || 'user'}
                             label="Packaging Type"
                             onChange={(e) => setPackagingType(e.target.value)}
                         >
                             <MenuItem value="user">My Own Packaging</MenuItem>
                             <MenuItem value="CP">Custom Packaging</MenuItem>
-                            <MenuItem value="EE">DHL Express Envelope</MenuItem>
-                            <MenuItem value="OD">Other DHL Packaging</MenuItem>
+                            <MenuItem value="EE">DGR Express Envelope</MenuItem>
+                            <MenuItem value="OD">Other DGR Packaging</MenuItem>
                         </Select>
                     </FormControl>
                 </Box>

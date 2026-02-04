@@ -1,24 +1,73 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
 import { useShipment } from '../context/ShipmentContext';
 import {
-  Box,
-  Container,
-  Typography,
-  Grid,
+  PageHeader,
+  Card,
   Button,
-  CircularProgress,
-  Alert,
-  useTheme,
-} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-
+  StatusPill,
+  Loader,
+  Alert
+} from '../ui';
 import ShipmentDetails from '../components/ShipmentDetails';
+
+// --- Styled Components ---
+
+const HeroSection = styled.div`
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 32px;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--accent-primary);
+        box-shadow: 0 0 20px 2px var(--accent-primary);
+    }
+`;
+
+const HeroGrid = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 24px;
+`;
+
+const TrackingTitle = styled.h1`
+    font-family: 'Outfit', sans-serif;
+    font-size: 48px;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0;
+    line-height: 1.1;
+`;
+
+const MetaInfo = styled.div`
+    display: flex;
+    gap: 24px;
+    margin-top: 12px;
+    color: var(--text-secondary);
+    font-size: 14px;
+`;
+
+const ActionStack = styled.div`
+    display: flex;
+    gap: 12px;
+`;
 
 const TrackingPage = () => {
   const { trackingNumber } = useParams();
   const navigate = useNavigate();
-  const theme = useTheme();
   const fetchedRef = useRef(false);
 
   const {
@@ -104,17 +153,14 @@ const TrackingPage = () => {
     }
   };
 
-  // Fetch shipment data on component mount or when tracking number changes
+  // Fetch shipment data on component mount
   useEffect(() => {
     if (!trackingNumber) return;
-
-    // Reset ref when tracking number changes to allow re-fetch
     fetchedRef.current = false;
 
     const fetchShipmentData = async () => {
       if (fetchedRef.current) return;
       fetchedRef.current = true;
-
       try {
         await getShipment(trackingNumber);
       } catch (error) {
@@ -127,94 +173,74 @@ const TrackingPage = () => {
 
   if (loading && !shipment) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <Loader size="48px" />
+      </div>
     );
   }
 
-  if (error) {
+  if (error || (!shipment && !loading)) {
     return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
+      <div style={{ maxWidth: '800px', margin: '40px auto' }}>
+        <Alert type="error" title="Error">
+          {error || 'Shipment not found.'}
         </Alert>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/')}
-        >
-          Back to Home
-        </Button>
-      </Container>
-    );
-  }
-
-  if (!shipment && !loading) {
-    return (
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          Shipment not found or data is loading...
-        </Alert>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<ArrowBackIcon />}
-          onClick={() => navigate('/')}
-        >
-          Back to Home
-        </Button>
-      </Container>
+        <div style={{ marginTop: '24px' }}>
+          <Button variant="primary" onClick={() => navigate('/')}>
+            Back to Home
+          </Button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box mb={4}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+    <div>
+      <PageHeader
+        title="Shipment Details"
+        description={`Tracking Number: ${shipment.trackingNumber}`}
+        action={
           <Button
-            onClick={() => navigate('/')}
-            startIcon={<ArrowBackIcon />}
-          >
-            Back to Home
-          </Button>
-          <Button
-            variant="outlined"
+            variant="primary"
             onClick={() => window.open(`${process.env.REACT_APP_API_URL}/shipments/${shipment.trackingNumber}/label`, '_blank')}
           >
             Print Label
           </Button>
-        </Box>
+        }
+        secondaryAction={
+          <Button variant="secondary" onClick={() => navigate('/shipments')}>
+            Back to List
+          </Button>
+        }
+      />
 
-        <Typography variant="h3" component="h1" gutterBottom fontWeight="900" sx={{
-          background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-          backgroundClip: 'text',
-          textFillColor: 'transparent',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          letterSpacing: '-0.02em',
-          mb: 0.5
-        }}>
-          Shipment Tracking
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary" mb={4} sx={{ fontWeight: 500 }}>
-          Tracking Number: <Box component="span" sx={{ fontFamily: 'monospace', bgcolor: 'action.hover', px: 1, py: 0.5, borderRadius: 1 }}>{shipment.trackingNumber}</Box>
-        </Typography>
+      <HeroSection>
+        <HeroGrid>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+              <TrackingTitle>{shipment.trackingNumber}</TrackingTitle>
+              <StatusPill status={shipment.status} />
+            </div>
 
-        <Grid container spacing={3}>
-          {/* Shipment Details Section */}
-          <Grid item xs={12}>
-            <ShipmentDetails
-              shipment={shipment}
-              onUpdateLocation={handleUpdateLocation}
-              updatingLocation={updatingLocation}
-              locationError={locationError}
-            />
-          </Grid>
-        </Grid>
-      </Box>
-    </Container>
+            <MetaInfo>
+              <span>Created: {new Date(shipment.createdAt).toLocaleDateString()}</span>
+              <span>Owner: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{shipment.user?.name || 'Unknown'}</span></span>
+            </MetaInfo>
+          </div>
+
+          <ActionStack>
+            {/* Placeholder for Edit/Delete if needed in future, currently readonly view mostly */}
+          </ActionStack>
+        </HeroGrid>
+      </HeroSection>
+
+      <ShipmentDetails
+        shipment={shipment}
+        onUpdateLocation={handleUpdateLocation}
+        updatingLocation={updatingLocation}
+        locationError={locationError}
+      />
+    </div>
   );
 };
 

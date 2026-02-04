@@ -15,6 +15,7 @@ import {
   ListItemIcon,
   Typography,
   Divider,
+  Chip,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
@@ -25,17 +26,22 @@ import ContactSupportIcon from '@mui/icons-material/ContactSupport';
 import LoginIcon from '@mui/icons-material/Login';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import PersonIcon from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles';
 import { useAuth } from '../../context/AuthContext';
-import { Chip } from '@mui/material';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
-  borderRadius: theme.shape.borderRadius * 4,
-  backgroundColor: alpha(theme.palette.common.white, 0.9), // Keeping it distinct
-  boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+  borderRadius: 10,
+  backgroundColor: '#1a2035',
+  border: '1px solid #2a3347',
+  transition: 'all 0.2s ease',
   '&:hover': {
-    backgroundColor: alpha(theme.palette.common.white, 1),
+    borderColor: '#00d9b8',
+  },
+  '&:focus-within': {
+    borderColor: '#00d9b8',
+    boxShadow: '0 0 0 3px rgba(0, 217, 184, 0.1)',
   },
   marginRight: theme.spacing(2),
   marginLeft: 0,
@@ -43,7 +49,7 @@ const Search = styled('div')(({ theme }) => ({
   [theme.breakpoints.up('sm')]: {
     marginLeft: theme.spacing(3),
     width: 'auto',
-    minWidth: '400px', // Wide search bar
+    minWidth: '400px',
   },
 }));
 
@@ -55,29 +61,38 @@ const SearchIconWrapper = styled('div')(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: theme.palette.text.secondary,
+  color: '#9ca3af',
 }));
 
 const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
+  color: '#e8eaf0',
   width: '100%',
   '& .MuiInputBase-input': {
     padding: theme.spacing(1.5, 1, 1.5, 0),
-    paddingLeft: `calc(1em + ${theme.spacing(4)})`, // Space for icon
+    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
     transition: theme.transitions.create('width'),
     width: '100%',
+    fontSize: '14px',
+    '&::placeholder': {
+      color: '#9ca3af',
+      opacity: 1,
+    }
   },
 }));
 
-const ActionButton = styled(Button)(({ theme }) => ({
-  borderRadius: 8, // Slightly rounded
-  padding: theme.spacing(1, 3),
-  boxShadow: 'none',
-  fontWeight: 600,
-  textTransform: 'none',
+const UserIconWrapper = styled(Box)(({ theme }) => ({
+  width: 38,
+  height: 38,
+  borderRadius: '50%',
+  backgroundColor: '#1a2035',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  transition: 'all 0.2s ease',
   '&:hover': {
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-  },
+    backgroundColor: '#2a3347',
+  }
 }));
 
 const Header = () => {
@@ -114,24 +129,22 @@ const Header = () => {
     <AppBar
       position="sticky"
       color="transparent"
-      elevation={0} // Flat, blends with background
+      elevation={0}
       sx={{
-        bgcolor: 'transparent',
-        backdropFilter: 'none',
-        pt: 2,
-        pb: 1,
-        // Make sure it sits above/next to content properly? 
-        // In the new layout, Header is inside the main content area usually.
+        bgcolor: '#141929',
+        backdropFilter: 'blur(10px)',
+        borderBottom: '1px solid #2a3347',
+        py: 1,
       }}
     >
-      <Toolbar>
+      <Toolbar sx={{ px: 4 }}>
         {/* Search Bar */}
         <Search>
           <SearchIconWrapper>
             <SearchIcon />
           </SearchIconWrapper>
           <StyledInputBase
-            placeholder="Search shipment id, tracking number..."
+            placeholder="Search..."
             inputProps={{ 'aria-label': 'search' }}
           />
         </Search>
@@ -141,40 +154,54 @@ const Header = () => {
 
         {/* Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* Credits Display */}
+          {/* Balance Display */}
           {user && (
-            <Chip
-              icon={<AccountBalanceWalletIcon style={{ color: '#2e7d32' }} />}
-              label={`${parseFloat(user.balance || 0).toFixed(3)} KD`}
-              variant="outlined"
+            <Box
               sx={{
-                fontWeight: 700,
-                color: 'success.main',
-                borderColor: 'success.light',
-                bgcolor: alpha(theme.palette.success.main, 0.05),
-                px: 1,
-                borderRadius: '8px',
-                height: '40px',
-                '& .MuiChip-label': { fontSize: '1rem' }
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 1,
+                bgcolor: 'rgba(0, 217, 184, 0.1)',
+                borderRadius: 2,
+                fontWeight: 600,
+                fontSize: '14px',
+                color: '#00d9b8',
               }}
-            />
+            >
+              <AccountBalanceWalletIcon sx={{ fontSize: 20 }} />
+              {parseFloat(user.balance || 0).toFixed(3)} KD
+            </Box>
           )}
 
           {/* New Shipment Button */}
-          <ActionButton
+          <Button
             variant="contained"
             color="primary"
             startIcon={<AddIcon />}
             component={RouterLink}
-            to="/create" // Route to wizard
+            to="/create"
+            sx={{
+              borderRadius: 2.5,
+              px: 3,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              fontSize: '14px',
+            }}
           >
             New Shipment
-          </ActionButton>
+          </Button>
 
           {/* User Menu */}
-          <IconButton onClick={handleOpenUserMenu} sx={{ p: 0 }}>
-            <Avatar alt={user?.name} src={user?.avatar} />
-          </IconButton>
+          <UserIconWrapper onClick={handleOpenUserMenu}>
+            {user?.avatar ? (
+              <Avatar alt={user?.name} src={user?.avatar} sx={{ width: 38, height: 38 }} />
+            ) : (
+              <PersonIcon sx={{ color: '#9ca3af', fontSize: 20 }} />
+            )}
+          </UserIconWrapper>
           <Menu
             sx={{ mt: '45px' }}
             id="menu-appbar"

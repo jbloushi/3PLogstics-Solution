@@ -1,55 +1,100 @@
-import React from 'react';
-import { Container, Button, Box, Grid } from '@mui/material';
+import React, { useState } from 'react';
+import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
-import AddIcon from '@mui/icons-material/Add';
+import { PageHeader, Card } from '../ui';
 import ShipmentList from '../components/ShipmentList';
-import PageHeader from '../components/common/PageHeader';
-import AIInsightsCard from '../components/common/AIInsightsCard';
 
-// Example Static Insights for now (as requested: static/rule-based)
-const SHIPMENT_INSIGHTS = [
-    { type: 'warning', message: '3 shipments explicitly delayed due to weather in CreateShipment region.' },
-    { type: 'success', message: 'On-time delivery rate is up 12% this week.' },
-    { type: 'info', message: 'You have 5 shipments ready for pickup today.' }
-];
+const Container = styled.div`
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 32px;
+  min-height: 100vh;
+  animation: fadeIn 0.4s ease;
 
-const ShipmentsPage = () => {
-    const navigate = useNavigate();
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+const StatusGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 40px;
+`;
+
+const OverviewCard = styled.div`
+    background: var(--bg-secondary);
+    border: 1px solid ${props => props.$active ? props.$color : 'var(--border-color)'};
+    padding: 20px;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+
+    &:hover {
+        transform: translateY(-3px);
+        border-color: ${props => props.$color};
+        box-shadow: 0 4px 20px -5px ${props => `${props.$color}33`};
+    }
+`;
+
+const Count = styled.div`
+    font-family: 'Outfit', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+`;
+
+const Label = styled.div`
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+`;
+
+const StatusOverview = () => {
+    const [activeStatus, setActiveStatus] = useState('All');
+
+    // Mock counts for now, or could pass from parent
+    const statuses = [
+        { label: 'All', count: 124, color: '#00d9b8' },
+        { label: 'Pending', count: 12, color: '#fbbf24' },
+        { label: 'Picked Up', count: 8, color: '#818cf8' },
+        { label: 'In Transit', count: 45, color: '#38bdf8' },
+        { label: 'Delivered', count: 56, color: '#34d399' },
+        { label: 'Exceptions', count: 3, color: '#f87171' },
+    ];
 
     return (
-        <Container maxWidth="xl" sx={{ py: 4, minHeight: '100vh' }}>
-            {/* 1. Header with Title + Single CTA */}
+        <StatusGrid>
+            {statuses.map(status => (
+                <OverviewCard
+                    key={status.label}
+                    $color={status.color}
+                    $active={activeStatus === status.label}
+                    onClick={() => setActiveStatus(status.label)}
+                >
+                    <Count>{status.count}</Count>
+                    <Label>{status.label}</Label>
+                </OverviewCard>
+            ))}
+        </StatusGrid>
+    );
+};
+
+const ShipmentsPage = () => {
+    return (
+        <Container>
             <PageHeader
                 title="Shipments"
                 description="Manage consignment lifecycle, track deliveries, and handle exceptions."
-                breadcrumbs={[
-                    { label: 'Dashboard', href: '/' },
-                    { label: 'Shipments', href: '/shipments' }
-                ]}
-                action={
-                    <Button
-                        variant="contained"
-                        size="large"
-                        startIcon={<AddIcon />}
-                        onClick={() => navigate('/create-shipment')}
-                        sx={{
-                            borderRadius: 50,
-                            px: 3,
-                            fontWeight: 'bold',
-                            boxShadow: '0 4px 14px 0 rgba(0,0,0,0.3)'
-                        }}
-                    >
-                        New Shipment
-                    </Button>
-                }
             />
 
-            {/* 6. AI Insights (Beta) */}
-            <Box mb={4}>
-                <AIInsightsCard insights={SHIPMENT_INSIGHTS} />
-            </Box>
+            <StatusOverview />
 
-            {/* Main List (includes KPI Strip and Toolbar) */}
             <ShipmentList />
         </Container>
     );

@@ -1,29 +1,179 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, CircularProgress, Alert, Container, Card, CardContent, List, ListItem, ListItemText, ListItemAvatar, Avatar, IconButton, Divider, Chip } from '@mui/material';
+import styled, { keyframes } from 'styled-components';
 import QrScanner from 'react-qr-scanner';
 import { shipmentService } from '../services/api';
-import DomainVerificationIcon from '@mui/icons-material/DomainVerification'; // Warehouse Icon
-import CameraswitchIcon from '@mui/icons-material/Cameraswitch';
-import WarehouseIcon from '@mui/icons-material/Warehouse';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import PageHeader from '../components/common/PageHeader';
+import {
+    PageHeader,
+    Card,
+    Button,
+    StatusPill,
+    Loader,
+    Alert
+} from '../ui';
+
+// --- Icons ---
+const WarehouseIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8" />
+        <path d="M6 6h12v11H6z" />
+        <path d="M3 6h18" />
+        <path d="M8 21v-5h8v5" />
+    </svg>
+);
+
+const CameraSwitchIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" />
+        <circle cx="12" cy="12" r="3" />
+    </svg>
+);
+
+const RefreshIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2" />
+    </svg>
+);
+
+// --- Styled Components ---
+
+const Container = styled.div`
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+`;
+
+const ScannerCard = styled(Card)`
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto 32px auto;
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+`;
+
+const ScannerViewport = styled.div`
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    background: #000;
+    height: 350px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+    margin-bottom: 24px;
+    
+    video {
+        object-fit: cover !important;
+    }
+`;
+
+const scanAnimation = keyframes`
+    0% { top: 10%; opacity: 0; }
+    50% { opacity: 1; }
+    100% { top: 90%; opacity: 0; }
+`;
+
+const ScanLine = styled.div`
+    position: absolute;
+    width: 80%;
+    height: 2px;
+    background: var(--accent-secondary, #3b82f6);
+    top: 50%;
+    left: 10%;
+    box-shadow: 0 0 8px var(--accent-secondary, #3b82f6);
+    animation: ${scanAnimation} 2s infinite ease-in-out;
+    pointer-events: none;
+`;
+
+const Overlay = styled.div`
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border: 50px solid rgba(0,0,0,0.6);
+`;
+
+const TargetBox = styled.div`
+    position: absolute;
+    width: 70%;
+    height: 250px;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+`;
+
+const IncomingList = styled(Card)`
+    max-width: 600px;
+    margin: 0 auto;
+`;
+
+const ListHeader = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color);
+    
+    h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+`;
+
+const ListContent = styled.div`
+    max-height: 400px;
+    overflow-y: auto;
+`;
+
+const ListItem = styled.div`
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    
+    &:hover {
+        background: var(--bg-secondary);
+    }
+    
+    &:last-child {
+        border-bottom: none;
+    }
+`;
+
+const ItemIcon = styled.div`
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--accent-secondary, #3b82f6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+`;
+
+// --- Main Component ---
 
 const WarehouseScanPage = () => {
     const [scanResult, setScanResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
-    const [cameraFacingMode, setCameraFacingMode] = useState('environment'); // 'environment' (rear) or 'user' (front)
+    const [cameraFacingMode, setCameraFacingMode] = useState('environment');
     const [isScanning, setIsScanning] = useState(true);
     const [incomingShipments, setIncomingShipments] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Fetch lists: 'picked_up' are incoming to warehouse
     const fetchIncomingShipments = async () => {
         setRefreshing(true);
         try {
-            // We want shipments that are 'picked_up' (on the way to warehouse)
-            // or maybe 'ready_for_pickup' if the driver skipped the scan (allowing warehouse to override)
             const response = await shipmentService.getAllShipments({ status: 'picked_up' });
             if (response.success && Array.isArray(response.data)) {
                 setIncomingShipments(response.data);
@@ -48,13 +198,10 @@ const WarehouseScanPage = () => {
                 try {
                     const json = JSON.parse(text);
                     if (json.tracking) trackingNumber = json.tracking;
-                } catch (e) {
-                    // Not JSON
-                }
-                console.log('Scanned:', trackingNumber);
+                } catch (e) { }
+
                 await processInbound(trackingNumber);
             } catch (err) {
-                console.error('Scan Error', err);
                 setError('Invalid QR Code format');
                 setScanResult(null);
                 setTimeout(() => setIsScanning(true), 2000);
@@ -77,12 +224,11 @@ const WarehouseScanPage = () => {
             const response = await shipmentService.warehouseScan(trackingNumber);
             if (response.success) {
                 setSuccessMsg(`Shipment ${trackingNumber} Processed Successfully!`);
-                fetchIncomingShipments(); // Refresh list
+                fetchIncomingShipments();
             } else {
                 setError(response.error || 'Failed to update shipment');
             }
         } catch (err) {
-            console.error('Warehouse Scan Error:', err);
             if (err.response && err.response.status === 404) {
                 setError(`Shipment not found: ${trackingNumber}. Ensure it's a valid label.`);
             } else {
@@ -105,194 +251,113 @@ const WarehouseScanPage = () => {
     };
 
     return (
-        <Container maxWidth="md" sx={{ py: 4 }}>
+        <Container>
             <PageHeader
                 title="Warehouse Inbound"
                 description="Scan incoming shipments to confirm arrival at facility."
-                breadcrumbs={[
-                    { label: 'Dashboard', href: '/' },
-                    { label: 'Operations', href: '#' },
-                    { label: 'Warehouse Scan', href: '/warehouse/scan' }
-                ]}
+                secondaryAction={
+                    <Button variant="secondary" onClick={() => window.location.href = '/dashboard'}>
+                        Dashboard
+                    </Button>
+                }
             />
 
-            <Card sx={{ textAlign: 'center', borderRadius: 4, overflow: 'visible', maxWidth: 600, mx: 'auto', mb: 4 }}>
-                <CardContent sx={{ p: 4 }}>
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>{error}</Alert>
-                    )}
+            <ScannerCard>
+                {error && (
+                    <div style={{ marginBottom: '24px' }}>
+                        <Alert type="error" title="Error">{error}</Alert>
+                    </div>
+                )}
 
-                    {successMsg ? (
-                        <Box sx={{ py: 8 }}>
-                            <Box sx={{
-                                position: 'relative',
-                                display: 'inline-flex',
-                                mb: 3
-                            }}>
-                                <Box sx={{
-                                    position: 'absolute',
-                                    inset: -20,
-                                    borderRadius: '50%',
-                                    bgcolor: (theme) => theme.palette.info.main,
-                                    opacity: 0.2,
-                                    animation: 'pulse 2s infinite'
-                                }} />
-                                <DomainVerificationIcon color="info" sx={{ fontSize: 80 }} />
-                            </Box>
-
-                            <Typography variant="h5" color="info.main" gutterBottom fontWeight="800">
-                                Inbound Processed
-                            </Typography>
-                            <Typography variant="body1" color="text.secondary" paragraph>
-                                {successMsg}
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                size="large"
-                                onClick={resetScanner}
-                                sx={{ mt: 2, borderRadius: 50, px: 6 }}
-                                autoFocus
-                            >
-                                Scan Next
-                            </Button>
-                        </Box>
-                    ) : (
-                        <Box>
-                            {/* Scanner Viewport */}
-                            <Box sx={{
-                                position: 'relative',
-                                overflow: 'hidden',
-                                borderRadius: 3,
-                                bgcolor: '#000',
-                                height: 350,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5)',
-                                mb: 3
-                            }}>
-                                {loading && (
-                                    <Box sx={{ position: 'absolute', zIndex: 10, bgcolor: 'rgba(0,0,0,0.7)', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                                        <CircularProgress color="primary" />
-                                        <Typography sx={{ mt: 2, color: 'white', fontWeight: 600 }}>Processing...</Typography>
-                                    </Box>
-                                )}
-
-                                {isScanning ? (
-                                    <QrScanner
-                                        delay={300}
-                                        onError={handleError}
-                                        onScan={handleScan}
-                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                        constraints={{
-                                            video: { facingMode: cameraFacingMode }
-                                        }}
-                                    />
-                                ) : (
-                                    <Typography color="white">Paused</Typography>
-                                )}
-
-                                {/* Overlay Elements */}
-                                <Box sx={{
-                                    position: 'absolute',
-                                    top: 0, left: 0, right: 0, bottom: 0,
-                                    border: '50px solid rgba(0,0,0,0.6)',
-                                    pointerEvents: 'none'
-                                }} />
-                                <Box sx={{
-                                    position: 'absolute',
-                                    width: '70%',
-                                    height: 250,
-                                    border: '2px solid rgba(255, 255, 255, 0.5)',
-                                    borderRadius: 2,
-                                    boxShadow: '0 0 15px rgba(0,0,0,0.5)',
-                                    pointerEvents: 'none'
-                                }} />
-                                <Box sx={{
-                                    position: 'absolute',
-                                    width: '80%',
-                                    height: '2px',
-                                    bgcolor: 'info.main', // Blue for warehouse
-                                    top: '50%',
-                                    boxShadow: '0 0 8px blue',
-                                    animation: 'scan 2s infinite ease-in-out'
-                                }} />
-                                <style>
-                                    {`
-                                    @keyframes scan {
-                                        0% { top: 20%; opacity: 0; }
-                                        50% { opacity: 1; }
-                                        100% { top: 80%; opacity: 0; }
-                                    }
-                                    @keyframes pulse {
-                                        0% { transform: scale(0.95); opacity: 0.5; }
-                                        70% { transform: scale(1.1); opacity: 0; }
-                                        100% { transform: scale(0.95); opacity: 0; }
-                                    }
-                                    `}
-                                </style>
-                            </Box>
-
-                            <Button
-                                variant="outlined"
-                                startIcon={<CameraswitchIcon />}
-                                onClick={toggleCamera}
-                                disabled={loading || !!successMsg}
-                                sx={{ borderRadius: 50, px: 3 }}
-                            >
-                                Switch Camera
-                            </Button>
-
-                            {scanResult && !successMsg && !loading && !error && (
-                                <Typography variant="caption" display="block" mt={2} color="text.secondary">
-                                    Last Scanned: {scanResult}
-                                </Typography>
+                {successMsg ? (
+                    <div style={{ padding: '32px 0' }}>
+                        <div style={{
+                            width: '80px', height: '80px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)',
+                            color: '#3b82f6', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            marginBottom: '24px'
+                        }}>
+                            <WarehouseIcon />
+                        </div>
+                        <h2 style={{ fontSize: '24px', margin: '0 0 16px 0' }}>Inbound Processed</h2>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>{successMsg}</p>
+                        <Button variant="primary" onClick={resetScanner} style={{ paddingLeft: '32px', paddingRight: '32px' }}>
+                            Scan Next
+                        </Button>
+                    </div>
+                ) : (
+                    <>
+                        <ScannerViewport>
+                            {loading && (
+                                <div style={{ position: 'absolute', inset: 0, zIndex: 10, background: 'rgba(0,0,0,0.7)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Loader color="white" />
+                                    <span style={{ color: 'white', marginTop: '16px', fontWeight: 600 }}>Processing...</span>
+                                </div>
                             )}
-                        </Box>
-                    )}
-                </CardContent>
-            </Card>
 
-            {/* List of Incoming Shipments */}
-            <Card sx={{ borderRadius: 4, maxWidth: 600, mx: 'auto' }}>
-                <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6" fontWeight="bold">Incoming from Drivers</Typography>
-                    <IconButton onClick={fetchIncomingShipments} disabled={refreshing}>
+                            {isScanning ? (
+                                <QrScanner
+                                    delay={300}
+                                    onError={handleError}
+                                    onScan={handleScan}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                    constraints={{ video: { facingMode: cameraFacingMode } }}
+                                />
+                            ) : (
+                                <div style={{ color: 'white' }}>Paused</div>
+                            )}
+
+                            <Overlay />
+                            <TargetBox />
+                            <ScanLine />
+                        </ScannerViewport>
+
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', alignItems: 'center' }}>
+                            <Button width="auto" variant="secondary" onClick={toggleCamera}>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <CameraSwitchIcon /> Switch Camera
+                                </div>
+                            </Button>
+                        </div>
+
+                        {scanResult && !successMsg && !loading && !error && (
+                            <div style={{ marginTop: '16px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                Last Scanned: {scanResult}
+                            </div>
+                        )}
+                    </>
+                )}
+            </ScannerCard>
+
+            <IncomingList>
+                <ListHeader>
+                    <h3>Incoming from Drivers</h3>
+                    <Button variant="ghost" onClick={fetchIncomingShipments} disabled={refreshing} style={{ padding: '8px' }}>
                         <RefreshIcon />
-                    </IconButton>
-                </Box>
-                <Divider />
-                <List>
+                    </Button>
+                </ListHeader>
+                <ListContent>
                     {incomingShipments.length === 0 ? (
-                        <Box p={4} textAlign="center">
-                            <Typography color="text.secondary">No shipments currently en route from drivers.</Typography>
-                        </Box>
+                        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                            No shipments currently en route from drivers.
+                        </div>
                     ) : (
                         incomingShipments.map((shipment) => (
-                            <React.Fragment key={shipment.trackingNumber}>
-                                <ListItem
-                                    button
-                                    onClick={() => processInbound(shipment.trackingNumber)} // Manual Override
-                                    secondaryAction={
-                                        <Chip label="Pick Up Confirmed" color="warning" size="small" variant="outlined" />
-                                    }
-                                >
-                                    <ListItemAvatar>
-                                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                                            <WarehouseIcon />
-                                        </Avatar>
-                                    </ListItemAvatar>
-                                    <ListItemText
-                                        primary={shipment.trackingNumber}
-                                        secondary={`${shipment.origin?.city || 'Origin'} → ${shipment.destination?.city || 'Dest'}`}
-                                    />
-                                </ListItem>
-                                <Divider component="li" />
-                            </React.Fragment>
+                            <ListItem key={shipment.trackingNumber} onClick={() => processInbound(shipment.trackingNumber)}>
+                                <ItemIcon>
+                                    <WarehouseIcon />
+                                </ItemIcon>
+                                <div style={{ flexGrow: 1 }}>
+                                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{shipment.trackingNumber}</div>
+                                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                        {shipment.origin?.city || 'Origin'} → {shipment.destination?.city || 'Dest'}
+                                    </div>
+                                </div>
+                                <StatusPill status="in_transit">Incoming</StatusPill>
+                            </ListItem>
                         ))
                     )}
-                </List>
-            </Card>
+                </ListContent>
+            </IncomingList>
         </Container>
     );
 };

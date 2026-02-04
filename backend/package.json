@@ -28,6 +28,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb-memory-server": "^11.0.1",
     "mongoose": "^8.15.2",
+    "uuid": "^13.0.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {

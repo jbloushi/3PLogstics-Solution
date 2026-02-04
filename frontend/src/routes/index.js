@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import TrackingPage from '../pages/TrackingPage';
 import CreateShipmentPage from '../pages/CreateShipmentPage';
-import DhlShipmentWizard from '../pages/DhlShipmentWizard';
+import DgrShipmentWizard from '../pages/DgrShipmentWizard';
 import ShipmentWizardV2 from '../pages/ShipmentWizardV2';
 import AboutPage from '../pages/AboutPage';
 import ContactPage from '../pages/ContactPage';
@@ -11,7 +11,8 @@ import NotFoundPage from '../pages/NotFoundPage';
 import LoginPage from '../pages/LoginPage';
 import SignupPage from '../pages/SignupPage';
 import SettingsPage from '../pages/SettingsPage';
-import ProfilePage from '../pages/ProfilePage';
+// import ProfilePage from '../pages/ProfilePage'; // Deprecated
+import AddressBookPage from '../pages/AddressBookPage';
 import AdminUsersPage from '../pages/AdminUsersPage';
 import AdminOrganizationsPage from '../pages/AdminOrganizationsPage';
 import PublicLocationPage from '../pages/PublicLocationPage';
@@ -23,6 +24,7 @@ import DriverPickupPage from '../pages/DriverPickupPage';
 import WarehouseScanPage from '../pages/WarehouseScanPage';
 import InConstructionPage from '../pages/InConstructionPage';
 import FinancePage from '../pages/FinancePage';
+import ShipmentDetailsPage from '../pages/ShipmentDetailsPage';
 
 
 
@@ -55,6 +57,15 @@ const AppRoutes = () => {
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/" element={<LoginPage />} />
+
+      <Route path="/" element={<LoginPage />} />
+
+      {/* Standalone Driver Route (No Sidebar) */}
+      <Route path="/driver/pickup" element={
+        <ProtectedRoute allowedRoles={['driver', 'admin', 'staff']}>
+          <DriverPickupPage />
+        </ProtectedRoute>
+      } />
 
       <Route element={<Layout />}>
         <Route path="dashboard" element={
@@ -98,10 +109,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         } />
 
-        {/* Legacy DHL wizard at /create-legacy */}
         <Route path="create-legacy" element={
           <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
-            <DhlShipmentWizard />
+            <DgrShipmentWizard />
           </ProtectedRoute>
         } />
 
@@ -115,14 +125,7 @@ const AppRoutes = () => {
         <Route path="tracking/:trackingNumber" element={<RedirectToShipment />} />
         <Route path="shipment/:trackingNumber" element={
           <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
-            <TrackingPage />
-          </ProtectedRoute>
-        } />
-
-        {/* Driver Tools */}
-        <Route path="driver/pickup" element={
-          <ProtectedRoute allowedRoles={['driver', 'admin', 'staff']}>
-            <DriverPickupPage />
+            <ShipmentDetailsPage />
           </ProtectedRoute>
         } />
 
@@ -160,9 +163,9 @@ const AppRoutes = () => {
             <SettingsPage />
           </ProtectedRoute>
         } />
-        <Route path="profile" element={
+        <Route path="address-book" element={
           <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
-            <ProfilePage />
+            <AddressBookPage />
           </ProtectedRoute>
         } />
 

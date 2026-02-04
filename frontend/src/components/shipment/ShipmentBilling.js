@@ -29,7 +29,7 @@ const ShipmentBilling = ({
                         <FormControl fullWidth size="small">
                             <InputLabel>Reason for Export</InputLabel>
                             <Select
-                                value={exportReason}
+                                value={exportReason || 'sale'}
                                 label="Reason for Export"
                                 onChange={(e) => setExportReason(e.target.value)}
                             >
@@ -80,7 +80,7 @@ const ShipmentBilling = ({
                         <FormControl fullWidth size="small">
                             <InputLabel>Incoterm (Who pays duties?)</InputLabel>
                             <Select
-                                value={incoterm}
+                                value={incoterm || 'DAP'}
                                 label="Incoterm (Who pays duties?)"
                                 onChange={(e) => setIncoterm(e.target.value)}
                             >
@@ -94,7 +94,7 @@ const ShipmentBilling = ({
                         <FormControl fullWidth size="small">
                             <InputLabel>Payer of VAT/GST</InputLabel>
                             <Select
-                                value={payerOfVat}
+                                value={payerOfVat || 'receiver'}
                                 label="Payer of VAT/GST"
                                 onChange={(e) => setPayerOfVat(e.target.value)}
                             >
@@ -131,7 +131,7 @@ const ShipmentBilling = ({
                         <FormControl fullWidth size="small">
                             <InputLabel>Label Format</InputLabel>
                             <Select
-                                value={labelFormat}
+                                value={labelFormat || 'pdf'}
                                 label="Label Format"
                                 onChange={(e) => setLabelFormat(e.target.value)}
                             >

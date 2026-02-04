@@ -1,87 +1,130 @@
 import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import {
-    Container,
-    Paper,
-    Typography,
-    TextField,
-    Button,
-    Box,
-    Link,
-    Alert,
-    CircularProgress,
-    InputAdornment,
-    IconButton,
-    Checkbox,
-    FormControlLabel,
-    Collapse,
-    Fade
-} from '@mui/material';
+import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
-import { styled } from '@mui/material/styles';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import DeveloperModeIcon from '@mui/icons-material/DeveloperMode';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import { Button, Input, Alert, Toggle } from '../ui';
 
-// Premium Gradient Background
-const FullPageGradient = styled(Box)(({ theme }) => ({
-    minHeight: '100vh',
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: theme.palette.mode === 'dark'
-        ? `radial-gradient(circle at 15% 50%, ${theme.palette.primary.dark}33 0%, transparent 25%),
-           radial-gradient(circle at 85% 30%, ${theme.palette.secondary.dark}33 0%, transparent 25%),
-           linear-gradient(135deg, #0f172a 0%, #1e293b 100%)`
-        : `radial-gradient(circle at 15% 50%, ${theme.palette.primary.light}22 0%, transparent 25%),
-           radial-gradient(circle at 85% 30%, ${theme.palette.secondary.light}22 0%, transparent 25%),
-           linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)`,
-    backgroundSize: 'cover',
-    padding: theme.spacing(2)
-}));
+// --- Styled Components ---
 
-// Frosted Glass Card
-const LoginCard = styled(Paper)(({ theme }) => ({
-    padding: theme.spacing(5),
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    borderRadius: 24,
-    width: '100%',
-    maxWidth: 420,
-    boxShadow: '0px 20px 40px rgba(0, 0, 0, 0.2)', // Deep diffuse shadow
-    backdropFilter: 'blur(20px)',
-    border: '1px solid rgba(255, 255, 255, 0.08)',
-    backgroundColor: theme.palette.mode === 'dark'
-        ? 'rgba(30, 41, 59, 0.7)'
-        : 'rgba(255, 255, 255, 0.8)',
-    transition: 'transform 0.3s ease-in-out',
-    '&:hover': {
-        transform: 'translateY(-4px)'
+const FullPageGradient = styled.div`
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 15% 50%, rgba(0, 217, 184, 0.1) 0%, transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 25%),
+                linear-gradient(135deg, #0a0e1a 0%, #1e293b 100%); /* Fallback to dark theme assumption for premium feel */
+    background-size: cover;
+    padding: 16px;
+`;
+
+const LoginCard = styled.div`
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 24px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(30, 41, 59, 0.7);
+    transition: transform 0.3s ease-in-out;
+
+    &:hover {
+        transform: translateY(-4px);
     }
-}));
+`;
 
-const BrandLogo = styled(Box)(({ theme }) => ({
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing(3),
-    color: '#fff',
-    boxShadow: `0 8px 16px ${theme.palette.primary.main}66`
-}));
+const BrandLogo = styled.div`
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary, #3b82f6));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(0, 217, 184, 0.4);
+    font-size: 32px;
+`;
+
+const Title = styled.h1`
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+    color: #fff;
+`;
+
+const Subtitle = styled.p`
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    text-align: center;
+`;
+
+const Form = styled.form`
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+`;
+
+const LinkText = styled(RouterLink)`
+    color: var(--accent-primary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    transition: opacity 0.2s;
+
+    &:hover {
+        opacity: 0.8;
+    }
+`;
+
+const DevOptionsButton = styled.button`
+    background: transparent;
+    border: 1px dashed var(--border-color);
+    color: var(--text-secondary);
+    width: 100%;
+    padding: 8px;
+    border-radius: 8px;
+    margin-top: 16px;
+    cursor: pointer;
+    font-size: 12px;
+    
+    &:hover {
+        border-color: var(--text-secondary);
+        color: var(--text-primary);
+    }
+`;
+
+const DevPanel = styled.div`
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+`;
+
+const QuickLoginGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+`;
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
     const [showDevOptions, setShowDevOptions] = useState(false);
-    const [rememberMe, setRememberMe] = useState(false);
+
+    // Note: 'rememberMe' state existed but wasn't doing anything logic-wise in the original code beyond UI toggle.
+    // Keeping it simple for this V2 refactor unless explicitly needed.
 
     const { login, loading, error, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -98,8 +141,8 @@ const LoginPage = () => {
 
     const handleLogin = async (emailInput, passInput) => {
         try {
-            const loggedInUser = await login(emailInput, passInput);
-            navigate(loggedInUser.role === 'driver' ? '/driver/pickup' : '/dashboard');
+            await login(emailInput, passInput);
+            // Redirection handled by useEffect
         } catch (err) {
             // Error handled by helper
         }
@@ -112,125 +155,92 @@ const LoginPage = () => {
 
     return (
         <FullPageGradient>
-            <Container maxWidth="xs" disableGutters>
-                <Fade in={true} timeout={800}>
-                    <LoginCard elevation={0}>
-                        {/* Brand Header */}
-                        <BrandLogo>
-                            <LockOutlinedIcon fontSize="large" />
-                        </BrandLogo>
+            <LoginCard>
+                <BrandLogo>
+                    <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </BrandLogo>
 
-                        <Typography variant="h4" gutterBottom fontWeight="800" sx={{ letterSpacing: '-0.5px' }}>
-                            Solution Name
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 4, textAlign: 'center' }}>
-                            Secure access for authorized personnel
-                        </Typography>
+                <Title>3PLogistics Solution</Title>
+                <Subtitle>Secure access for authorized personnel</Subtitle>
 
-                        {error && (
-                            <Alert severity="error" sx={{ width: '100%', mb: 3, borderRadius: 2 }}>
-                                {error}
-                            </Alert>
+                {error && (
+                    <div style={{ width: '100%', marginBottom: '24px' }}>
+                        <Alert type="error" title="Login Failed">
+                            {error}
+                        </Alert>
+                    </div>
+                )}
+
+                <Form onSubmit={handleSubmit}>
+                    <Input
+                        label="Email Address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@company.com"
+                        required
+                        autoFocus
+                    />
+                    <Input
+                        label="Password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter your password"
+                        required
+                    />
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <LinkText to="/forgot-password">
+                            Forgot password?
+                        </LinkText>
+                    </div>
+
+                    <Button
+                        variant="primary"
+                        type="submit"
+                        disabled={loading}
+                        style={{ width: '100%', marginTop: '8px' }}
+                    >
+                        {loading ? 'Signing In...' : 'Sign In'}
+                    </Button>
+                </Form>
+
+                <div style={{ marginTop: '24px', textAlign: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Don't have an account? </span>
+                    <LinkText to="/signup">Sign Up</LinkText>
+                </div>
+
+                {/* Dev Options Toggle */}
+                {isDev && (
+                    <>
+                        <DevOptionsButton onClick={() => setShowDevOptions(!showDevOptions)}>
+                            {showDevOptions ? 'Hide Developer Options' : 'Show Developer Options'}
+                        </DevOptionsButton>
+
+                        {showDevOptions && (
+                            <DevPanel>
+                                <div style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                                    Quick Login (Dev Only)
+                                </div>
+                                <QuickLoginGrid>
+                                    {['admin', 'staff', 'client', 'driver'].map((role) => (
+                                        <Button
+                                            key={role}
+                                            variant="secondary"
+                                            onClick={() => handleLogin(`${role}@demo.com`, 'password123')}
+                                            style={{ textTransform: 'capitalize', fontSize: '12px', padding: '6px' }}
+                                        >
+                                            {role}
+                                        </Button>
+                                    ))}
+                                </QuickLoginGrid>
+                            </DevPanel>
                         )}
-
-                        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                label="Email Address"
-                                autoComplete="email"
-                                autoFocus
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                InputProps={{
-                                    sx: { borderRadius: 3 }
-                                }}
-                            />
-                            <TextField
-                                margin="normal"
-                                required
-                                fullWidth
-                                label="Password"
-                                type={showPassword ? 'text' : 'password'}
-                                autoComplete="current-password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                InputProps={{
-                                    sx: { borderRadius: 3 },
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <IconButton
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                edge="end"
-                                            >
-                                                {showPassword ? <VisibilityOff /> : <Visibility />}
-                                            </IconButton>
-                                        </InputAdornment>
-                                    )
-                                }}
-                            />
-
-                            <Box display="flex" justifyContent="space-between" alignItems="center" mt={1}>
-                                <FormControlLabel
-                                    control={<Checkbox value="remember" color="primary" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} />}
-                                    label={<Typography variant="body2" color="text.secondary">Remember me</Typography>}
-                                />
-                                <Link component={RouterLink} to="/forgot-password" variant="body2" fontWeight="600" color="primary" sx={{ textDecoration: 'none' }}>
-                                    Forgot password?
-                                </Link>
-                            </Box>
-
-                            <Button
-                                type="submit"
-                                fullWidth
-                                variant="contained"
-                                size="large"
-                                sx={{ mt: 4, mb: 3, py: 1.5, borderRadius: 50, fontSize: '1rem', fontWeight: 'bold' }}
-                                disabled={loading}
-                            >
-                                {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
-                            </Button>
-
-                            {/* Dev Options Toggle */}
-                            {isDev && (
-                                <Box mt={2}>
-                                    <Button
-                                        fullWidth
-                                        size="small"
-                                        startIcon={<DeveloperModeIcon fontSize="small" />}
-                                        onClick={() => setShowDevOptions(!showDevOptions)}
-                                        sx={{ color: 'text.secondary', opacity: 0.7 }}
-                                    >
-                                        {showDevOptions ? 'Hide Developer Options' : 'Developer Options'}
-                                    </Button>
-
-                                    <Collapse in={showDevOptions}>
-                                        <Box mt={2} p={2} bgcolor="background.paper" borderRadius={2} border={1} borderColor="divider">
-                                            <Typography variant="caption" color="text.secondary" display="block" mb={1} fontWeight="bold">
-                                                QUICK LOGIN (DEV ONLY)
-                                            </Typography>
-                                            <Box display="grid" gridTemplateColumns="1fr 1fr" gap={1}>
-                                                {['admin', 'staff', 'client', 'driver'].map((role) => (
-                                                    <Button
-                                                        key={role}
-                                                        variant="outlined"
-                                                        size="small"
-                                                        onClick={() => handleLogin(`${role}@demo.com`, 'password123')}
-                                                        sx={{ justifyContent: 'flex-start', textTransform: 'capitalize' }}
-                                                    >
-                                                        {role}
-                                                    </Button>
-                                                ))}
-                                            </Box>
-                                        </Box>
-                                    </Collapse>
-                                </Box>
-                            )}
-                        </Box>
-                    </LoginCard>
-                </Fade>
-            </Container>
+                    </>
+                )}
+            </LoginCard>
         </FullPageGradient>
     );
 };

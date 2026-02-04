@@ -94,7 +94,7 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                         <Grid item xs={12} md={4}>
                             <TextField
                                 fullWidth
-                                label="DHL Service Code"
+                                label="DGR Service Code"
                                 value={dangerousGoods.serviceCode || ''}
                                 onChange={(e) => handleChange('serviceCode', e.target.value)}
                                 color="error"
@@ -107,7 +107,7 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                         <Grid item xs={12} md={4}>
                             <TextField
                                 fullWidth
-                                label="DHL Content ID"
+                                label="DGR Content ID"
                                 value={dangerousGoods.contentId || ''}
                                 onChange={(e) => handleChange('contentId', e.target.value)}
                                 color="error"

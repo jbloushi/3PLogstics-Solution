@@ -10,7 +10,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 /**
- * DHL-Style Tracking Timeline Component
+ * DGR-Style Tracking Timeline Component
  * 
  * Displays shipment history as a vertical timeline with:
  * - Date grouping

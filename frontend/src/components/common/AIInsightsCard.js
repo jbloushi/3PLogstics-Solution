@@ -46,9 +46,9 @@ const AIInsightsCard = ({ insights = [], loading = false }) => {
                         </Typography>
                     </Box>
                     <Chip
-                        label="BETA"
+                        label="DEMO"
                         size="small"
-                        color="secondary"
+                        color="warning"
                         variant="outlined"
                         sx={{ fontWeight: 'bold', fontSize: '0.7rem', height: 20 }}
                     />

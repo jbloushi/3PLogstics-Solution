@@ -15,12 +15,12 @@ const normalizeDigits = (val) => (val || '').replace(/\D/g, '');
 const formatWeight = (num) => Number(Number(num || 0).toFixed(3));
 
 /**
- * Validates the order data for DHL Invoice requirements (Pre-flight).
+ * Validates the order data for DGR Invoice requirements (Pre-flight).
  * Returns an array of error strings.
  * @param {Object} order - The normalized order object
  * @returns {string[]} errors
  */
-function validateShipmentForDhl(order) {
+function validateShipmentForDgr(order) {
     const errors = [];
     const { sender, receiver, items, dangerousGoods } = order;
 
@@ -95,7 +95,7 @@ function composeItemDescription(item, dangerousGoods) {
     }
 
     // Sanitize
-    return desc.replace(/[\r\n]+/g, ' ').substring(0, 75); // DHL often has line limits
+    return desc.replace(/[\r\n]+/g, ' ').substring(0, 75); // DGR often has line limits
 }
 
 // Helper to split address into max 3 lines of 45 chars
@@ -201,7 +201,7 @@ function buildExportDeclaration(order, config = {}) {
                     order.packageMarks ? `Package Marks: ${order.packageMarks}` : '',
                     sender.taxId ? `Shipper TaxID: ${sender.taxId}` : '',
                     receiver.taxId ? `Receiver TaxID: ${receiver.taxId}` : ''
-                ].filter(Boolean).join(' | ').substring(0, 300) // DHL Limit
+                ].filter(Boolean).join(' | ').substring(0, 300) // DGR Limit
             ],
             customerReferences: [
                 { typeCode: 'CU', value: order.reference || order.sender?.reference },
@@ -217,7 +217,7 @@ function buildExportDeclaration(order, config = {}) {
 }
 
 /**
- * Builds Dangerous Goods VAS strictly according to DHL MyDHL API v3.1.2
+ * Builds Dangerous Goods VAS strictly according to DGR MyDHL API v3.1.2
  * @param {Object} dg 
  * @returns {Array} valueAddedServices
  */
@@ -254,15 +254,15 @@ const buildDangerousGoodsValueAddedServices = (dg) => {
 };
 
 /**
- * Builds the full DHL Shipment Payload.
+ * Builds the full DGR Shipment Payload.
  * @param {Object} order - Normalized order/shipment data
  * @param {Object} config - Configuration options (account numbers etc)
  */
-function buildDhlShipmentPayload(order, config = {}) {
+function buildDgrShipmentPayload(order, config = {}) {
     // 1. Validate (Pre-flight)
-    const errors = validateShipmentForDhl(order);
+    const errors = validateShipmentForDgr(order);
     if (errors.length > 0) {
-        throw new Error(`DHL Validation Failed: ${errors.join('; ')}`);
+        throw new Error(`DGR Validation Failed: ${errors.join('; ')}`);
     }
 
     const { sender, receiver, packages } = order;
@@ -270,7 +270,7 @@ function buildDhlShipmentPayload(order, config = {}) {
     // Calculate total declared value and validate currency consistency
     const currencies = new Set(order.items.map(i => i.currency || 'KWD'));
     if (currencies.size > 1) {
-        throw new Error(`DHL Invoice requires a single currency. Mixed currencies found: ${Array.from(currencies).join(', ')}`);
+        throw new Error(`DGR Invoice requires a single currency. Mixed currencies found: ${Array.from(currencies).join(', ')}`);
     }
     const detectedCurrency = currencies.values().next().value || 'KWD';
 
@@ -302,7 +302,7 @@ function buildDhlShipmentPayload(order, config = {}) {
 
     // Label Format Mapping
     // Frontend: 'pdf', 'zpl'
-    // DHL API: 'pdf', 'zpl', 'lp2', 'epl'
+    // DGR API: 'pdf', 'zpl', 'lp2', 'epl'
     const labelFormat = order.labelSettings?.format || 'pdf';
 
     const payload = {
@@ -424,8 +424,8 @@ function buildDhlShipmentPayload(order, config = {}) {
 }
 
 module.exports = {
-    buildDhlShipmentPayload,
+    buildDgrShipmentPayload,
     buildExportDeclaration,
-    validateShipmentForDhl,
-    validateDhlInvoiceData: validateShipmentForDhl // Alias for compatibility
+    validateShipmentForDgr,
+    validateDgrInvoiceData: validateShipmentForDgr // Alias for compatibility
 };

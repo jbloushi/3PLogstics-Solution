@@ -19,7 +19,7 @@ import { useAuth } from '../context/AuthContext';
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 // Autosave key for localStorage
-const AUTOSAVE_KEY = 'dhl_shipment_wizard_draft';
+const AUTOSAVE_KEY = 'dgr_shipment_wizard_draft';
 
 // Phone country codes with flags - comprehensive list
 const phoneCodes = [
@@ -126,10 +126,10 @@ const initialParcel = {
     height: '',
 };
 
-// Volume weight factor (DHL uses 5000 for international, 6000 for domestic)
+// Volume weight factor (DGR uses 5000 for international, 6000 for domestic)
 const VOLUME_FACTOR = 5000;
 
-const DhlShipmentWizard = () => {
+const DgrShipmentWizard = () => {
     const navigate = useNavigate();
     const { enqueueSnackbar } = useSnackbar();
     const { user } = useAuth();
@@ -424,7 +424,7 @@ const DhlShipmentWizard = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    // Fetch rates from DHL
+    // Fetch rates from DGR
     const fetchRates = async () => {
         setRatesLoading(true);
         try {
@@ -794,57 +794,42 @@ const DhlShipmentWizard = () => {
             {ratesLoading ? (
                 <Box display="flex" justifyContent="center" p={4}>
                     <CircularProgress />
-                    <Typography sx={{ ml: 2 }}>Fetching DHL rates...</Typography>
+                    <Typography sx={{ ml: 2 }}>Fetching DGR rates...</Typography>
                 </Box>
-            ) : availableRates.length === 0 ? (
+            ) : (availableRates.length === 0) ? (
                 <Alert severity="warning">
-                    No shipping services available for this route. Please check addresses.
+                    No DGR services available for this route.
                 </Alert>
             ) : (
-                <RadioGroup
-                    value={selectedService?.serviceCode || ''}
-                    onChange={(e) => {
-                        const service = availableRates.find(r => r.serviceCode === e.target.value);
-                        setSelectedService(service);
-                    }}
-                >
+                <Grid container spacing={2}>
                     {availableRates.map((rate, index) => (
-                        <Card
-                            key={index}
-                            sx={{
-                                mb: 2,
-                                border: selectedService?.serviceCode === rate.serviceCode ? 2 : 1,
-                                borderColor: selectedService?.serviceCode === rate.serviceCode ? 'primary.main' : 'grey.300'
-                            }}
-                        >
-                            <CardContent>
-                                <FormControlLabel
-                                    value={rate.serviceCode}
-                                    control={<Radio />}
-                                    label={
-                                        <Box ml={1}>
-                                            <Box display="flex" justifyContent="space-between" alignItems="center">
-                                                <Typography variant="subtitle1" fontWeight="bold">
-                                                    {rate.serviceName}
-                                                </Typography>
-                                                <Chip
-                                                    label={`${rate.currency} ${rate.totalPrice?.toFixed(2) || 'N/A'}`}
-                                                    color="primary"
-                                                />
-                                            </Box>
-                                            {rate.deliveryDate && (
-                                                <Typography variant="caption" color="textSecondary">
-                                                    Est. Delivery: {new Date(rate.deliveryDate).toLocaleDateString()}
-                                                </Typography>
-                                            )}
+                        <Grid item xs={12} key={index}>
+                            <Card
+                                sx={{
+                                    cursor: 'pointer',
+                                    border: selectedService?.serviceCode === rate.serviceCode ? '2px solid' : '1px solid',
+                                    borderColor: selectedService?.serviceCode === rate.serviceCode ? 'primary.main' : 'divider',
+                                    bgcolor: selectedService?.serviceCode === rate.serviceCode ? 'primary.50' : 'background.paper'
+                                }}
+                                onClick={() => setSelectedService(rate)}
+                            >
+                                <CardContent>
+                                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                                        <Box>
+                                            <Typography variant="h6" color="primary">{rate.serviceName}</Typography>
+                                            <Typography variant="body2" color="textSecondary">
+                                                Carrier: {rate.carrierCode} | Estimated Delivery: {rate.deliveryDate ? new Date(rate.deliveryDate).toLocaleDateString() : 'N/A'}
+                                            </Typography>
                                         </Box>
-                                    }
-                                    sx={{ width: '100%', m: 0 }}
-                                />
-                            </CardContent>
-                        </Card>
+                                        <Typography variant="h5" fontWeight="bold">
+                                            {rate.totalPrice?.toFixed(3)} {rate.currency}
+                                        </Typography>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        </Grid>
                     ))}
-                </RadioGroup>
+                </Grid>
             )}
             {errors.service && <Alert severity="error" sx={{ mt: 2 }}>{errors.service}</Alert>}
         </Box>
@@ -1069,7 +1054,7 @@ const DhlShipmentWizard = () => {
                 <CardContent sx={{ p: 4 }}>
                     <Typography variant="h4" gutterBottom fontWeight="bold">
                         <LocalShippingIcon sx={{ mr: 2, fontSize: 40, verticalAlign: 'middle' }} />
-                        Create DHL Shipment
+                        Create DGR Shipment
                     </Typography>
                     <Typography color="textSecondary" gutterBottom>
                         {user?.email} • Auto-saving draft
@@ -1121,4 +1106,4 @@ const DhlShipmentWizard = () => {
     );
 };
 
-export default DhlShipmentWizard;
+export default DgrShipmentWizard;

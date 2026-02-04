@@ -355,7 +355,7 @@ const AddressPanel = ({
                         />
                     </Grid>
 
-                    {/* DHL References and VAT */}
+                    {/* DGR References and VAT */}
                     <Grid item xs={isSender ? 12 : 6}>
                         <TextField
                             fullWidth
@@ -376,7 +376,7 @@ const AddressPanel = ({
                             value={value.vatNumber || ''}
                             onChange={(e) => updateField('vatNumber', e.target.value)}
                             disabled={disabled}
-                            placeholder="Required for DHL"
+                            placeholder="Required for DGR"
                             error={!!errors.receiverVat} // Only error for Receiver currently or add senderVat error
                             helperText={errors.receiverVat}
                         />

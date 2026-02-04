@@ -8,8 +8,8 @@ const StatusPill = ({ status, ...props }) => {
     const getStatusColor = (status) => {
         const s = (status || '').toLowerCase();
         if (['delivered', 'completed', 'paid', 'active', 'success'].includes(s)) return 'success';
-        if (['pending', 'updated', 'draft', 'scheduled', 'processing', 'ready_for_pickup'].includes(s)) return 'warning';
-        if (['in_transit', 'shipped', 'out_for_delivery', 'created', 'picked_up'].includes(s)) return 'info';
+        if (['pending', 'updated', 'draft', 'processing'].includes(s)) return 'warning';
+        if (['in_transit', 'shipped', 'out_for_delivery', 'created', 'picked_up', 'ready_for_pickup', 'scheduled'].includes(s)) return 'info';
         if (['exception', 'cancelled', 'failed', 'overdue', 'inactive'].includes(s)) return 'error';
         return 'default';
     };

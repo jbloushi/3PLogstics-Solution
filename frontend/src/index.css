@@ -1,4 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap');
+
+:root {
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #141929;
+  --bg-tertiary: #1a2035;
+  --accent-primary: #00d9b8;
+  --accent-warning: #ffa726;
+  --accent-error: #ef5350;
+  --accent-info: #42a5f5;
+  --text-primary: #e8eaf0;
+  --text-secondary: #9ca3af;
+  --border-color: #2a3347;
+}
 
 * {
   box-sizing: border-box;
@@ -13,14 +26,15 @@ html {
 
 body {
   margin: 0;
-  font-family: 'Nunito', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0f172a;
-  color: #f1f5f9;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100%;
+  overflow-x: hidden;
 }
 
 code {
@@ -35,30 +49,46 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: var(--bg-primary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #3a4557;
 }
 
-/* Smooth transitions for theme changes */
+/* Smooth transitions */
 .MuiPaper-root,
 .MuiCard-root,
 .MuiAppBar-root,
 .MuiButton-root {
-  transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 
 /* Improve focus styles for accessibility */
 :focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease;
 }
 
 /* Disable blue highlight on mobile tap */

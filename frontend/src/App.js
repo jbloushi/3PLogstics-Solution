@@ -6,6 +6,7 @@ import theme from './theme';
 import AppRoutes from './routes';
 import { AuthProvider } from './context/AuthContext';
 import { ShipmentProvider } from './context/ShipmentContext';
+import './ui/tokens.css'; // Import Design System Tokens
 
 // Configure React Router future flags
 const routerFutureConfig = {

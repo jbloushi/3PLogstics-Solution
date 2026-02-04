@@ -1,27 +1,33 @@
-const DhlAdapter = require('../adapters/DhlAdapter');
+const DgrAdapter = require('../adapters/DgrAdapter');
 
 /**
  * Factory class to get the appropriate carrier adapter
  */
 class CarrierFactory {
+    /**
+     * List of carriers that have active implementations.
+     */
+    static getAvailableCarriers() {
+        return [
+            { code: 'DGR', name: 'DGR Express', active: true },
+            { code: 'FEDEX', name: 'FedEx', active: false },
+            { code: 'UPS', name: 'UPS', active: false }
+        ];
+    }
 
     /**
      * Get a carrier adapter instance
-     * @param {string} carrierCode - 'DHL', 'FEDEX', 'UPS' (Case insensitive)
+     * @param {string} carrierCode - 'DGR', 'FEDEX', 'UPS' (Case insensitive)
      * @param {Object} config - Optional configuration overrides
      * @returns {Object} Carrier Adapter Instance
      */
     static getAdapter(carrierCode, config = {}) {
-        const code = (carrierCode || 'DHL').toUpperCase();
+        const code = (carrierCode || 'DGR').toUpperCase();
 
         switch (code) {
-            case 'DHL':
-                // In Phase 1, we reuse the existing DhlAdapter.
-                // Note: DhlService is a singleton wrapper around DhlAdapter.
-                // For proper factory pattern, we should instantiate DhlAdapter directly 
-                // but ensure it has the right config.
-                // For now, let's return a new instance of DhlAdapter to allow per-request config if needed.
-                const adapter = new DhlAdapter();
+            case 'DGR':
+            case 'DHL': // Backward compatibility for any lingering DB refs
+                const adapter = new DgrAdapter();
                 if (Object.keys(config).length > 0) {
                     adapter.config = { ...adapter.config, ...config };
                 }

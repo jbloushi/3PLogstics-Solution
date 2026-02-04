@@ -1,505 +1,412 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { shipmentService } from '../services/api';
-import {
-  Box,
-  Card,
-  Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Pagination,
-  IconButton,
-  Button,
-  Stack,
-  Tooltip,
-  useTheme,
-  alpha,
-  TextField,
-  InputAdornment,
-  Menu,
-  MenuItem,
-  Divider,
-  Tabs,
-  Tab
-} from '@mui/material';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
+import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
-import LoginIcon from '@mui/icons-material/Login';
-import SearchIcon from '@mui/icons-material/Search';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import DownloadIcon from '@mui/icons-material/Download';
-import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import DateRangeIcon from '@mui/icons-material/DateRange';
-import DescriptionIcon from '@mui/icons-material/Description';
-import DeleteIcon from '@mui/icons-material/Delete';
-
+import { shipmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import StatusPill from './common/StatusPill';
-import EmptyState from './common/EmptyState';
-import { TableSkeleton } from './common/SkeletonLoader';
-import ShipmentsKPIStrip from './ShipmentsKPIStrip';
+import { TableWrapper, Table, Thead, Tbody, Tr, Th, Td, Button, Input, Modal, StatusPill } from '../ui'; // Added StatusPill
 import { generateWaybillPDF } from '../utils/pdfGenerator';
 import ShipmentApprovalDialog from './ShipmentApprovalDialog';
 
-const ITEMS_PER_PAGE = 10;
+// --- Styled Components ---
+
+const Toolbar = styled.div`
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+`;
+
+const FilterTabs = styled.div`
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 16px;
+`;
+
+const Tab = styled.div`
+  padding: 12px 4px;
+  cursor: pointer;
+  font-weight: ${props => props.$active ? '600' : '500'};
+  color: ${props => props.$active ? 'var(--accent-primary)' : 'var(--text-secondary)'};
+  border-bottom: 2px solid ${props => props.$active ? 'var(--accent-primary)' : 'transparent'};
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+`;
+
+const CountBadge = styled.span`
+  background: ${props => props.$active ? 'rgba(0, 217, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)'};
+  color: ${props => props.$active ? 'var(--accent-primary)' : 'var(--text-secondary)'};
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+`;
+
+const ActionMenu = styled.div`
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 0;
+  z-index: 10;
+  min-width: 180px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+`;
+
+const MenuItem = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+
+  &:hover {
+    background: var(--bg-primary);
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  }
+`;
+
+const MenuSeparator = styled.div`
+  padding: 4px 16px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 4px 0;
+  opacity: 0.7;
+`;
+
+const PaginationContainer = styled.div`
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  background: var(--bg-secondary);
+  border-radius: 0 0 16px 16px;
+`;
+
+const PageBtn = styled.button`
+  background: ${props => props.$active ? 'var(--accent-primary)' : 'transparent'};
+  color: ${props => props.$active ? '#0a0e1a' : 'var(--text-secondary)'};
+  border: 1px solid ${props => props.$active ? 'var(--accent-primary)' : 'var(--border-color)'};
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 600;
+
+  &:hover:not(:disabled) {
+    border-color: var(--accent-primary);
+    color: ${props => props.$active ? '#0a0e1a' : 'var(--accent-primary)'};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+`;
 
 const ShipmentList = () => {
-  const theme = useTheme();
-  const [shipments, setShipments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
 
-  // Menu State
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedShipmentForDownload, setSelectedShipmentForDownload] = useState(null);
+  const [shipments, setShipments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('active');
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
-  // Approval Dialog State
+  // Dropdown State
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const menuRef = useRef(null);
+
+  // Approval State
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [selectedShipmentForApproval, setSelectedShipmentForApproval] = useState(null);
 
-  const handleOpenPdf = (dataUrl) => {
-    if (!dataUrl) return;
-
-    // Check if it's already a blob or http url
-    if (dataUrl.startsWith('http') || dataUrl.startsWith('blob')) {
-      window.open(dataUrl, '_blank');
-      return;
-    }
-
-    // Convert Base64 Data URI to Blob to bypass "Not allowed to navigate top frame to data URL"
-    try {
-      const arr = dataUrl.split(',');
-      const mime = arr[0].match(/:(.*?);/)[1];
-      const bstr = atob(arr[1]);
-      let n = bstr.length;
-      const u8arr = new Uint8Array(n);
-      while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-      }
-      const blob = new Blob([u8arr], { type: mime });
-      const blobUrl = URL.createObjectURL(blob);
-      window.open(blobUrl, '_blank');
-    } catch (e) {
-      console.error("PDF Open Error:", e);
-      // Fallback
-      window.open(dataUrl, '_blank');
-    }
-  };
-
-  const handleDeleteShipment = async (trackingNumber) => {
-    if (window.confirm('Are you sure you want to delete this shipment? This action cannot be undone.')) {
-      try {
-        await shipmentService.deleteShipment(trackingNumber);
-        fetchShipments();
-      } catch (err) {
-        console.error("Delete failed", err);
-        alert("Failed to delete shipment: " + err.message);
-      }
-    }
-  };
-
+  // Fetch Data
   const fetchShipments = async () => {
     try {
       setLoading(true);
-      setError(null);
       const response = await shipmentService.getAllShipments();
-      const allShipments = Array.isArray(response) ? response : (response?.data || []);
-      setShipments(allShipments);
+      setShipments(Array.isArray(response) ? response : (response?.data || []));
     } catch (err) {
-      console.error('Error fetching shipments:', err);
-      setError(err.message || 'Failed to fetch shipments');
-      setShipments([]);
+      console.error('Fetch error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchShipments();
-    } else {
-      setLoading(false);
-    }
+    if (isAuthenticated) fetchShipments();
   }, [isAuthenticated]);
 
-  // View Mode State
-  const [viewMode, setViewMode] = useState('active'); // 'active', 'pending', 'delivered', 'all'
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  // Filtering Logic
+
+  // Filter Logic
   const filteredShipments = useMemo(() => {
     return shipments.filter(shipment => {
-      // 1. View Mode Filter
-      if (viewMode === 'active') {
-        // Active: Created (Label Gen), In Transit, Out for Delivery
-        if (!['created', 'in_transit', 'out_for_delivery'].includes(shipment.status)) return false;
-      } else if (viewMode === 'pending') {
-        // Pending: Draft, Pending, Exception, Updated, Ready for Pickup
-        if (!['draft', 'pending', 'exception', 'updated', 'ready_for_pickup'].includes(shipment.status)) return false;
-      } else if (viewMode === 'delivered') {
-        if (shipment.status !== 'delivered') return false;
-      }
+      // View Mode
+      if (viewMode === 'active' && !['created', 'in_transit', 'out_for_delivery'].includes(shipment.status)) return false;
+      if (viewMode === 'pending' && !['draft', 'pending', 'updated', 'ready_for_pickup', 'picked_up'].includes(shipment.status)) return false;
+      if (viewMode === 'delivered' && shipment.status !== 'delivered') return false;
 
-      // 2. Status Filter
-      if (statusFilter !== 'all') {
-        if (statusFilter === 'exception') {
-          if (!['cancelled', 'returned', 'failed_delivery', 'exception'].includes(shipment.status)) return false;
-        } else if (statusFilter === 'pending_group') {
-          // Group Filter: Draft, Pending, Updated, Ready
-          if (!['draft', 'pending', 'updated', 'ready_for_pickup'].includes(shipment.status)) return false;
-        } else if (shipment.status !== statusFilter) {
-          return false;
-        }
-      }
-
-      // 3. Search Query
+      // Search
       if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesTracking = shipment.trackingNumber?.toLowerCase().includes(query);
-        const matchesCustomer = shipment.customer?.name?.toLowerCase().includes(query);
-        const matchesCity = shipment.destination?.city?.toLowerCase().includes(query);
-        return matchesTracking || matchesCustomer || matchesCity;
+        const q = searchQuery.toLowerCase();
+        return (
+          shipment.trackingNumber?.toLowerCase().includes(q) ||
+          shipment.customer?.name?.toLowerCase().includes(q) ||
+          shipment.destination?.city?.toLowerCase().includes(q)
+        );
       }
-
       return true;
     });
-  }, [shipments, statusFilter, searchQuery, viewMode]);
-
-  // Approval Handlers
-  const handleApproveClick = (shipment) => {
-    setSelectedShipmentForApproval(shipment);
-    setApprovalDialogOpen(true);
-  };
-
-  const handleApprovalComplete = () => {
-    fetchShipments();
-    setApprovalDialogOpen(false);
-    setSelectedShipmentForApproval(null);
-  };
+  }, [shipments, viewMode, searchQuery]);
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredShipments.length / ITEMS_PER_PAGE);
   const currentShipments = filteredShipments.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
-  const handlePageChange = (event, value) => {
-    setPage(value);
+  // Handlers
+  const handleDownloadLabel = async (shipment) => {
+    await generateWaybillPDF(shipment);
+    setOpenMenuId(null);
   };
 
-  const handleDownloadMenuOpen = (event, shipment) => {
-    event.stopPropagation();
-    setSelectedShipmentForDownload(shipment);
-    setAnchorEl(event.currentTarget);
-  };
+  const handleOpenPdf = (url) => {
+    if (!url) return;
 
-  const handleDownloadMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedShipmentForDownload(null);
-  };
-
-  const handleDownloadLabel = async () => {
-    if (selectedShipmentForDownload) {
-      await generateWaybillPDF(selectedShipmentForDownload);
-    }
-    handleDownloadMenuClose();
-  };
-
-  const handleDownloadCarrierLabel = async () => {
-    if (selectedShipmentForDownload?.labelUrl) {
-      handleOpenPdf(selectedShipmentForDownload.labelUrl);
-    } else if (selectedShipmentForDownload?.awbUrl) {
-      handleOpenPdf(selectedShipmentForDownload.awbUrl);
+    if (url.startsWith('data:')) {
+      try {
+        // Convert Base64 Data URI to Blob to avoid URL length limits and ensure proper rendering
+        const arr = url.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } catch (e) {
+        console.error('Error opening PDF data URI:', e);
+        window.open(url, '_blank'); // Fallback
+      }
     } else {
-      alert("Carrier Label not available");
+      window.open(url, '_blank');
     }
-    handleDownloadMenuClose();
+    setOpenMenuId(null);
   };
 
-  const handleDownloadInvoice = async () => {
-    if (selectedShipmentForDownload?.invoiceUrl) {
-      handleOpenPdf(selectedShipmentForDownload.invoiceUrl);
-    } else {
-      alert("Commercial Invoice not available");
+  const handleDelete = async (tracking) => {
+    if (window.confirm("Delete this shipment?")) {
+      await shipmentService.deleteShipment(tracking);
+      fetchShipments();
     }
-    handleDownloadMenuClose();
   };
-
-  if (loading) return <TableSkeleton rows={8} />;
-
-  if (!isAuthenticated) return (
-    <EmptyState
-      title="Login Required"
-      description="Please sign in to view your shipments."
-      icon={<LoginIcon />}
-      action={<Button variant="contained" onClick={() => navigate('/login')}>Login</Button>}
-    />
-  );
-
-  if (error) return (
-    <EmptyState
-      title="Error Loading Shipments"
-      description={error}
-      icon={<LocalShippingIcon />}
-      action={<Button onClick={fetchShipments}>Retry</Button>}
-    />
-  );
 
   return (
-    <Box>
-      {/* 2. KPI Strip */}
-      <ShipmentsKPIStrip
-        shipments={shipments}
-        currentFilter={statusFilter}
-        onFilterChange={setStatusFilter}
-      />
-
+    <div>
       {/* Tabs */}
-      <Box sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs
-          value={viewMode}
-          onChange={(e, newValue) => setViewMode(newValue)}
-          aria-label="shipment tabs"
-          variant="scrollable"
-          scrollButtons="auto"
-        >
+      <FilterTabs>
+        {[
+          { id: 'active', label: 'Active', count: shipments.filter(s => ['created', 'in_transit', 'out_for_delivery'].includes(s.status)).length },
+          { id: 'pending', label: 'Pending', count: shipments.filter(s => ['draft', 'pending', 'updated', 'ready_for_pickup'].includes(s.status)).length },
+          { id: 'delivered', label: 'Delivered', count: shipments.filter(s => s.status === 'delivered').length },
+          { id: 'all', label: 'All', count: shipments.length }
+        ].map(tab => (
           <Tab
-            label={`Active (${shipments.filter(s => ['created', 'in_transit', 'out_for_delivery'].includes(s.status)).length})`}
-            value="active"
-          />
-          <Tab
-            label={`Pending (${shipments.filter(s => ['draft', 'pending', 'exception', 'updated', 'ready_for_pickup'].includes(s.status)).length})`}
-            value="pending"
-          />
-          <Tab
-            label={`Delivered (${shipments.filter(s => s.status === 'delivered').length})`}
-            value="delivered"
-          />
-          <Tab label="All Shipments" value="all" />
-        </Tabs>
-      </Box>
+            key={tab.id}
+            $active={viewMode === tab.id}
+            onClick={() => { setViewMode(tab.id); setPage(1); }}
+          >
+            {tab.label}
+            <CountBadge $active={viewMode === tab.id}>{tab.count}</CountBadge>
+          </Tab>
+        ))}
+      </FilterTabs>
 
-      <Card sx={{ borderRadius: 4, overflow: 'hidden', border: `1px solid ${theme.palette.divider}` }}>
-
-        {/* 3. Toolbar */}
-        <Box p={2} display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
-          <Stack direction="row" spacing={2} sx={{ flex: 1, minWidth: 300 }}>
-            <TextField
-              size="small"
-              placeholder="Search tracking, customer, city..."
-              fullWidth
+      {/* List Container */}
+      <div style={{ borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
+        {/* Search Bar */}
+        <Toolbar>
+          <div style={{ flex: 1, maxWidth: '400px' }}>
+            <Input
+              placeholder="Search shipments..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              InputProps={{
-                startAdornment: <InputAdornment position="start"><SearchIcon color="action" /></InputAdornment>,
-                sx: { borderRadius: 3 }
-              }}
             />
-          </Stack>
-          <Stack direction="row" spacing={1}>
-            <Button startIcon={<FilterListIcon />} variant="outlined" sx={{ borderRadius: 3 }}>
-              Filters
-            </Button>
-            <Button startIcon={<DateRangeIcon />} variant="outlined" sx={{ borderRadius: 3 }}>
-              Date
-            </Button>
-          </Stack>
-        </Box>
+          </div>
+        </Toolbar>
 
-        {/* 4. Smart Table */}
-        {filteredShipments.length === 0 ? (
-          <EmptyState
-            title="No Shipments Found"
-            description={searchQuery ? "Try adjusting your search filters." : "No shipments match this status."}
-            icon={<LocalShippingIcon />}
-            action={searchQuery && <Button onClick={() => setSearchQuery('')}>Clear Search</Button>}
-          />
-        ) : (
-          <>
-            <TableContainer sx={{ maxHeight: 600 }}>
-              <Table stickyHeader sx={{ minWidth: 900 }}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ bgcolor: 'background.paper' }}>Tracking Info</TableCell>
-                    <TableCell sx={{ bgcolor: 'background.paper' }}>Route</TableCell>
-                    <TableCell sx={{ bgcolor: 'background.paper' }}>Customer</TableCell>
-                    <TableCell sx={{ bgcolor: 'background.paper' }}>Status</TableCell>
-                    <TableCell sx={{ bgcolor: 'background.paper' }}>Timeline</TableCell>
-                    <TableCell align="right" sx={{ bgcolor: 'background.paper' }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {currentShipments.map((shipment) => (
-                    <TableRow
-                      key={shipment.trackingNumber || shipment._id}
-                      hover
-                      sx={{ cursor: 'pointer', bgcolor: viewMode === 'pending' ? alpha(theme.palette.warning.light, 0.05) : 'inherit' }}
-                      onClick={() => navigate(`/shipment/${shipment.trackingNumber}`)}
-                    >
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <LocalShippingIcon color={viewMode === 'pending' ? 'warning' : 'primary'} fontSize="small" />
-                          <Box>
-                            <Typography variant="subtitle2" fontWeight="bold" color={viewMode === 'pending' ? 'warning.dark' : 'primary'}>
-                              {shipment.trackingNumber}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {shipment.serviceCode || 'Standard'}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <Box>
-                            <Typography variant="body2" fontWeight="600">{shipment.origin?.city}</Typography>
-                            <Typography variant="caption" display="block">{shipment.origin?.countryCode}</Typography>
-                          </Box>
-                          <Typography color="text.secondary">→</Typography>
-                          <Box>
-                            <Typography variant="body2" fontWeight="600">{shipment.destination?.city}</Typography>
-                            <Typography variant="caption" display="block">{shipment.destination?.countryCode}</Typography>
-                          </Box>
-                        </Stack>
-                      </TableCell>
-                      <TableCell>
-                        <Box>
-                          <Typography variant="body2">{shipment.customer?.name || 'Unknown'}</Typography>
-                          <Typography variant="caption" color="text.secondary">{shipment.customer?.phone}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <StatusPill status={shipment.status} />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {shipment.estimatedDelivery
-                            ? new Date(shipment.estimatedDelivery).toLocaleDateString()
-                            : 'Pending'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">Est. Delivery</Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <Tooltip title="Docs">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleDownloadMenuOpen(e, shipment)}
-                              color="default"
-                            >
-                              <DownloadIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+        <TableWrapper style={{ border: 'none', borderRadius: 0 }}>
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>Tracking Info</Th>
+                <Th>Route</Th>
+                <Th>Customer</Th>
+                <Th>Status</Th>
+                <Th>Est. Delivery</Th>
+                <Th style={{ textAlign: 'right' }}>Actions</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {loading ? (
+                <Tr><Td colSpan="6" style={{ textAlign: 'center' }}>Loading...</Td></Tr>
+              ) : currentShipments.map(shipment => (
+                <Tr
+                  key={shipment._id}
+                  onClick={() => navigate(`/shipment/${shipment.trackingNumber}`)}
+                >
+                  <Td>
+                    <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{shipment.trackingNumber}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{shipment.serviceCode || 'Standard'}</div>
+                  </Td>
+                  <Td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontWeight: '600' }}>{shipment.origin?.city}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>→</span>
+                      <span style={{ fontWeight: '600' }}>{shipment.destination?.city}</span>
+                    </div>
+                  </Td>
+                  <Td>
+                    <div>{shipment.customer?.name}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{shipment.customer?.phone}</div>
+                  </Td>
+                  <Td><StatusPill status={shipment.status} /></Td>
+                  <Td>{shipment.estimatedDelivery ? new Date(shipment.estimatedDelivery).toLocaleDateString() : '—'}</Td>
+                  <Td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setOpenMenuId(openMenuId === shipment._id ? null : shipment._id)}
+                        style={{ padding: '6px 12px', fontSize: '13px' }}
+                      >
+                        Actions
+                      </Button>
 
-                          {/* Delete Button (Client Only) */}
-                          {user?.role === 'client' &&
-                            ['pending', 'exception', 'updated', 'ready_for_pickup'].includes(shipment.status) && (
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={(e) => { e.stopPropagation(); handleDeleteShipment(shipment.trackingNumber); }}
-                                sx={{ mr: 1 }}
+                      {/* Dropdown Menu */}
+                      {openMenuId === shipment._id && (
+                        <ActionMenu ref={menuRef}>
+                          <MenuItem onClick={() => handleDownloadLabel(shipment)}>
+                            Label
+                          </MenuItem>
+                          {(user?.role === 'admin' || user?.role === 'staff') && (
+                            <>
+                              <MenuSeparator>
+                                ---- {shipment.carrier?.toUpperCase() || 'CARRIER'} ----
+                              </MenuSeparator>
+
+                              <MenuItem
+                                disabled={!shipment.labelUrl}
+                                onClick={() => handleOpenPdf(shipment.labelUrl)}
                               >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            )}
-
-                          {(user?.role === 'client' && ['pending', 'exception', 'updated', 'ready_for_pickup'].includes(shipment.status)) ||
-                            ((user?.role === 'staff' || user?.role === 'admin') && viewMode === 'pending') ? (
-                            <Button
-                              variant="contained"
-                              color={user?.role === 'client' ? "primary" : "warning"}
-                              size="small"
-                              sx={{ borderRadius: 4, minWidth: 120 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleApproveClick(shipment);
-                              }}
-                            >
-                              {user?.role === 'client' ? "Edit Details" : "Approve & Book"}
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              sx={{ borderRadius: 4, minWidth: 60 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/shipment/${shipment.trackingNumber}`);
-                              }}
-                            >
-                              View
-                            </Button>
+                                AWB / Label
+                              </MenuItem>
+                              <MenuItem
+                                disabled={!shipment.invoiceUrl}
+                                onClick={() => handleOpenPdf(shipment.invoiceUrl)}
+                              >
+                                Invoice
+                              </MenuItem>
+                              {['pending', 'draft', 'updated', 'ready_for_pickup', 'picked_up'].includes(shipment.status) && (
+                                <MenuItem
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    setSelectedShipmentForApproval(shipment);
+                                    setApprovalDialogOpen(true);
+                                  }}
+                                >
+                                  Approve / Edit
+                                </MenuItem>
+                              )}
+                            </>
                           )}
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                          {['pending', 'draft'].includes(shipment.status) && (
+                            <MenuItem
+                              onClick={() => handleDelete(shipment.trackingNumber)}
+                              style={{ color: 'var(--accent-error)' }}
+                            >
+                              Delete
+                            </MenuItem>
+                          )}
+                        </ActionMenu>
+                      )}
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+              {!loading && currentShipments.length === 0 && (
+                <Tr><Td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>No shipments found.</Td></Tr>
+              )}
+            </Tbody>
+          </Table>
+        </TableWrapper>
 
-            {totalPages > 1 && (
-              <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: `1px solid ${theme.palette.divider}` }}>
-                <Pagination
-                  count={totalPages}
-                  page={page}
-                  onChange={handlePageChange}
-                  color="primary"
-                  shape="rounded"
-                />
-              </Box>
-            )}
-          </>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <PaginationContainer>
+            <PageBtn disabled={page === 1} onClick={() => setPage(p => p - 1)}>&lt;</PageBtn>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+              <PageBtn key={p} $active={p === page} onClick={() => setPage(p)}>{p}</PageBtn>
+            ))}
+            <PageBtn disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>&gt;</PageBtn>
+          </PaginationContainer>
         )}
-      </Card>
+      </div>
 
-      {/* Approval Dialog */}
       <ShipmentApprovalDialog
         open={approvalDialogOpen}
         onClose={() => setApprovalDialogOpen(false)}
         shipment={selectedShipmentForApproval}
-        onShipmentUpdated={handleApprovalComplete}
+        onShipmentUpdated={() => {
+          setApprovalDialogOpen(false);
+          fetchShipments();
+        }}
       />
-
-      {/* Download Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleDownloadMenuClose}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <MenuItem onClick={handleDownloadLabel}>
-          <DescriptionIcon fontSize="small" sx={{ mr: 1 }} /> System Label
-        </MenuItem>
-
-        {(user?.role === 'admin' || user?.role === 'staff') && (
-          <>
-            <Divider />
-            <Typography variant="caption" sx={{ px: 2, py: 0.5, display: 'block', color: 'text.secondary', fontWeight: 'bold' }}>
-              Carrier
-            </Typography>
-            <MenuItem
-              onClick={handleDownloadCarrierLabel}
-              disabled={!selectedShipmentForDownload?.labelUrl}
-            >
-              <DescriptionIcon fontSize="small" sx={{ mr: 1 }} /> Carrier AWB / Label
-            </MenuItem>
-            <MenuItem
-              onClick={handleDownloadInvoice}
-              disabled={!selectedShipmentForDownload?.invoiceUrl}
-            >
-              <DescriptionIcon fontSize="small" sx={{ mr: 1 }} /> Carrier Invoice
-            </MenuItem>
-          </>
-        )}
-      </Menu>
-
-    </Box>
+    </div>
   );
 };
 

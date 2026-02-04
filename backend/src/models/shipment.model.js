@@ -206,6 +206,42 @@ const shipmentSchema = new mongoose.Schema({
     signatureName: String,
     signatureTitle: String
   },
+  // --- REFACTOR v2: Financial Safety ---
+  pricingSnapshot: {
+    carrierRate: Number, // Raw rate from carrier (Hidden from client)
+    markup: Number,      // Calculated markup amount
+    totalPrice: Number,  // Final price to user (carrier + markup)
+    currency: String,
+    rateHash: String,    // Simple hash to detect changes
+    expiresAt: Date,
+    rulesVersion: { type: String, default: 'v1' }
+  },
+
+  // --- REFACTOR v2: Idempotency & History ---
+  bookingAttempts: [{
+    attemptId: { type: String, required: true }, // UUID
+    status: {
+      type: String,
+      enum: ['pending', 'succeeded', 'failed'],
+      required: true
+    },
+    carrierShipmentId: String,
+    error: String, // Sanitized error message
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+  }],
+
+  // --- REFACTOR v2: Document Storage Abstraction ---
+  documents: [{
+    type: { type: String, enum: ['label', 'waybill', 'invoice', 'customs'], required: true },
+    format: { type: String, default: 'pdf' },
+    url: String, // Signed URL or pseudo-url
+    storageKey: String, // S3 Key or File Path
+    mime: String,
+    size: Number,
+    createdAt: { type: Date, default: Date.now }
+  }],
+
   paid: {
     type: Boolean,
     default: false,

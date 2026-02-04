@@ -1,10 +1,52 @@
-import React from 'react';
-import {
-    Grid, Paper, Typography, TextField, FormControl,
-    InputLabel, Select, MenuItem, FormControlLabel,
-    Switch, Box
-} from '@mui/material';
-import AddressPanel from '../AddressPanel';
+import React, { useEffect, useState } from 'react';
+import styled from 'styled-components';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
+import { Card, Select, Input, AddressPanel, WizardHeader } from '../../ui';
+import Toggle from '../../ui/components/Toggle';
+
+const PageContainer = styled.div`
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 16px;
+`;
+
+const TopControls = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+
+  @media (min-width: 768px) {
+    grid-template-columns: 1fr 1fr auto;
+  }
+`;
+
+const AddressGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  margin-bottom: 32px;
+
+  @media (min-width: 768px) {
+    grid-template-columns: 1fr 1fr;
+  }
+`;
+
+const StaffControls = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-base);
+
+  @media (min-width: 768px) {
+    grid-template-columns: 1fr 1fr;
+  }
+`;
 
 const ShipmentSetup = ({
     sender, setSender,
@@ -13,113 +55,139 @@ const ShipmentSetup = ({
     plannedDate, setPlannedDate,
     pickupRequired, setPickupRequired,
     errors,
-    isStaff, clients, selectedClient, onClientChange
+    isStaff, clients, selectedClient, onClientChange,
+    availableCarriers, selectedCarrier, onCarrierChange
 }) => {
+    const { user } = useAuth();
+    const [savedAddresses, setSavedAddresses] = useState([]);
+
+    // Fetch saved addresses
+    useEffect(() => {
+        const fetchAddresses = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (isStaff) {
+                    // Fetch all client addresses for staff
+                    const res = await axios.get('/api/users', { // Should technically filter or use dedicated endpoint
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    // Flatten addresses
+                    const allAddrs = res.data.data.flatMap(u =>
+                        (u.addresses || []).map(a => ({
+                            ...a,
+                            label: `${a.label || 'Addr'} (${u.name})`
+                        }))
+                    );
+                    setSavedAddresses(allAddrs);
+                } else {
+                    // Client: Use own profile addresses
+                    if (user && user.addresses) {
+                        setSavedAddresses(user.addresses);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load address book', err);
+            }
+        };
+        if (user) fetchAddresses();
+    }, [isStaff, user]);
+
+    // Inject saved addresses into sender/receiver state for the panel to use
+    // Note: Ideally we pass 'savedAddresses' as a separate prop to AddressPanel
+    // but AddressPanel expects values object. We can pass it via values.savedAddresses
+    // or better, add a new prop to AddressPanel.
+    // I updated AddressPanel to use `values.savedAddresses` logic in the previous step,
+    // so I will pass it nicely.
+
     return (
-        <Grid container spacing={3}>
-            {/* Top Bar: Service Configuration */}
-            <Grid item xs={12}>
-                <Paper sx={{ p: 2, mb: 1, border: '1px solid #e0e0e0', bgcolor: 'background.paper' }}>
-                    <Grid container spacing={3} alignItems="center">
-                        {/* Staff Client Selector */}
-                        {isStaff && (
-                            <Grid item xs={12}>
-                                <FormControl fullWidth size="small" sx={{ bgcolor: '#e8f5e9' }}>
-                                    <InputLabel>Create Shipment For (Client)</InputLabel>
-                                    <Select
-                                        value={selectedClient}
-                                        label="Create Shipment For (Client)"
-                                        onChange={(e) => onClientChange(e.target.value)}
-                                    >
-                                        <MenuItem value="">
-                                            <em>Myself (Staff/Admin)</em>
-                                        </MenuItem>
-                                        {clients && clients.map((client) => (
-                                            <MenuItem key={client._id} value={client._id}>
-                                                {client.name} {client.organization ? `(${client.organization.name})` : ''} - {client.email}
-                                            </MenuItem>
-                                        ))}
-                                    </Select>
-                                </FormControl>
-                            </Grid>
-                        )}
+        <PageContainer>
+            {/* Disabled WizardHeader to avoid duplication with parent ShipmentWizardV2 */}
+            {/* <WizardHeader 
+                title="Create New Shipment"
+                currentStep={1}
+                totalSteps={5}
+                timeEstimate="5-8 min"
+            /> */}
 
-                        <Grid item xs={12} md={3}>
-                            <FormControl fullWidth size="small">
-                                <InputLabel>Shipment Type</InputLabel>
-                                <Select
-                                    value={shipmentType}
-                                    label="Shipment Type"
-                                    onChange={(e) => setShipmentType(e.target.value)}
-                                >
-                                    <MenuItem value="package">Package (Dutiable)</MenuItem>
-                                    <MenuItem value="documents">Documents (Non-Dutiable)</MenuItem>
-                                </Select>
-                            </FormControl>
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                            <TextField
-                                fullWidth
-                                label="Planned Ship Date"
-                                type="date"
-                                size="small"
-                                value={plannedDate}
-                                onChange={(e) => setPlannedDate(e.target.value)}
-                                InputLabelProps={{ shrink: true }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={3}>
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={pickupRequired}
-                                        onChange={(e) => setPickupRequired(e.target.checked)}
-                                        color="primary"
-                                    />
-                                }
-                                label={
-                                    <Box>
-                                        <Typography variant="body2" fontWeight="bold">Pickup Required?</Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {pickupRequired ? 'Driver will collect' : 'I will drop off'}
-                                        </Typography>
-                                    </Box>
-                                }
-                            />
-                        </Grid>
-                    </Grid>
-                </Paper>
-            </Grid>
+            {/* Staff Only Controls */}
+            {isStaff && (
+                <StaffControls>
+                    <Select
+                        label="Create Shipment For (Client)"
+                        value={selectedClient || ''}
+                        onChange={(e) => onClientChange(e.target.value)}
+                    >
+                        <option value="">Myself (Staff/Admin)</option>
+                        {clients && clients.map((client) => (
+                            <option key={client._id} value={client._id}>
+                                {client.name} {client.organization ? `(${client.organization.name})` : ''} - {client.email}
+                            </option>
+                        ))}
+                    </Select>
 
-            {/* Left Column: Sender (Shipper) */}
-            <Grid item xs={12} md={6}>
-                <Box height="100%">
-                    <AddressPanel
-                        type="sender"
-                        value={sender}
-                        onChange={setSender}
-                        errors={errors}
-                        onCopy={() => setReceiver({ ...sender })}
-                        title="Shipper (From)"
-                        isStaff={isStaff}
+                    <Select
+                        label="Carrier Adapter"
+                        value={selectedCarrier || 'DGR'}
+                        onChange={(e) => onCarrierChange(e.target.value)}
+                    >
+                        {availableCarriers.map((carrier) => (
+                            <option key={carrier.code} value={carrier.code} disabled={!carrier.active}>
+                                {carrier.name} {!carrier.active && '(Inactive)'}
+                            </option>
+                        ))}
+                    </Select>
+                </StaffControls>
+            )}
+
+            {/* Top Controls */}
+            <TopControls>
+                <Select
+                    label="Shipment Type"
+                    value={shipmentType || 'package'}
+                    onChange={(e) => setShipmentType(e.target.value)}
+                >
+                    <option value="package">Package (Dutiable)</option>
+                    <option value="documents">Documents (Non-Dutiable)</option>
+                </Select>
+
+                <Input
+                    label="Planned Ship Date"
+                    type="date"
+                    value={plannedDate}
+                    onChange={(e) => setPlannedDate(e.target.value)}
+                />
+
+                <div style={{ marginTop: 'auto' }}>
+                    <Toggle
+                        label="Pickup Required?"
+                        subLabel={pickupRequired ? 'Driver will collect' : 'I will drop off'}
+                        checked={pickupRequired}
+                        onChange={setPickupRequired}
                     />
-                </Box>
-            </Grid>
+                </div>
+            </TopControls>
 
-            {/* Right Column: Receiver (Consignee) */}
-            <Grid item xs={12} md={6}>
-                <Box height="100%">
-                    <AddressPanel
-                        type="receiver"
-                        value={receiver}
-                        onChange={setReceiver}
-                        errors={errors}
-                        title="Receiver (To)"
-                        isStaff={isStaff}
-                    />
-                </Box>
-            </Grid>
-        </Grid>
+            {/* Address Panels */}
+            <AddressGrid>
+                <AddressPanel
+                    title="SHIPPER (From)"
+                    variant="shipper"
+                    values={{ ...sender, savedAddresses }}
+                    onChange={setSender}
+                    errors={errors}
+                    onCopy={() => setReceiver({ ...sender })}
+                    isStaff={isStaff}
+                />
+                <AddressPanel
+                    title="RECEIVER (To)"
+                    variant="receiver"
+                    values={{ ...receiver, savedAddresses }}
+                    onChange={setReceiver}
+                    errors={errors}
+                    isStaff={isStaff}
+                />
+            </AddressGrid>
+        </PageContainer>
     );
 };
 

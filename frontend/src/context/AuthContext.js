@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 const AuthContext = createContext();
 
@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
             setError(null);
-            const res = await axios.post('/api/auth/login', { email, password });
+            const res = await api.post('/auth/login', { email, password });
 
             const { token, data } = res.data;
             localStorage.setItem('token', token);
@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
         try {
             setLoading(true);
             setError(null);
-            const res = await axios.post('/api/auth/signup', userData);
+            const res = await api.post('/auth/signup', userData);
 
             const { token, data } = res.data;
             localStorage.setItem('token', token);
@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const res = await axios.get('/api/users/me', {
+            const res = await api.get('/users/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             // Fix: Controller returns { data: userObject }, not { data: { user: userObject } }

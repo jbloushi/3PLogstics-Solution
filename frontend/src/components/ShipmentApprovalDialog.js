@@ -1,20 +1,57 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions,
-    Button, Grid, Typography, Box, Stack, Divider,
-    TextField, CircularProgress, Alert, IconButton
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import CloseIcon from '@mui/icons-material/Close';
-import VerifiedIcon from '@mui/icons-material/Verified';
-import BlockIcon from '@mui/icons-material/Block';
-import ReplayIcon from '@mui/icons-material/Replay';
-import InfoIcon from '@mui/icons-material/Info';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-
-import AddressPanel from './AddressPanel';
+import styled from 'styled-components';
 import { shipmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { Modal, Button, AddressPanel, Input, Select, Alert, Loader, Card } from '../ui';
+
+const TwoCol = styled.div`
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+    @media(min-width: 768px) {
+        grid-template-columns: 1fr 1fr;
+    }
+`;
+
+const SectionHeader = styled.div`
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 24px 0 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border-color);
+    }
+`;
+
+const Row = styled.div`
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+    align-items: center;
+`;
+
+const IndexCircle = styled.div`
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+`;
 
 const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) => {
     const { user } = useAuth();
@@ -24,32 +61,33 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [editMode, setEditMode] = useState(false);
+    const [availableCarriers, setAvailableCarriers] = useState([]);
+    const [bookingCarrier, setBookingCarrier] = useState('DGR');
 
     useEffect(() => {
         if (shipment) {
-            console.log("📦 Dialog Opened. Shipment Data:", shipment);
-            // ... (keep logs)
-
-            // Deep copy and ensure arrays exist
+            // Deep copy and safe defaults
             const data = JSON.parse(JSON.stringify(shipment));
-            if (!data.parcels) data.parcels = []; // Fallback empty
+            if (!data.parcels) data.parcels = [];
             if (!data.items) data.items = [];
             if (!data.incoterm) data.incoterm = 'DAP';
             if (!data.currency) data.currency = 'KWD';
             if (!data.dangerousGoods) data.dangerousGoods = { contains: false };
 
             setFormData(data);
-            // Auto-enable edit mode for clients if they are opening this
-            setEditMode(isClient);
+            setEditMode(isClient); // Auto edit for clients
             setError(null);
+
+            if (!isClient) {
+                shipmentService.getCarriers().then(res => {
+                    if (res.success) setAvailableCarriers(res.data);
+                }).catch(err => console.error("Carrier Fetch Failed", err));
+            }
         }
     }, [shipment, open, isClient]);
 
     const handleAddressChange = (type, newData) => {
-        setFormData(prev => ({
-            ...prev,
-            [type]: newData
-        }));
+        setFormData(prev => ({ ...prev, [type]: newData }));
     };
 
     const handleParcelChange = (index, field, value) => {
@@ -76,10 +114,9 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
     };
 
     const validate = () => {
-        // Basic validation before booking
         if (!formData.origin.streetLines?.[0] && !formData.origin.formattedAddress) return "Sender Address missing";
         if (!formData.destination.streetLines?.[0] && !formData.destination.formattedAddress) return "Receiver Address missing";
-        if (!formData.items || formData.items.length === 0) return "No parcels defined";
+        if (!formData.items || formData.items.length === 0) return "No items defined";
         return null;
     };
 
@@ -90,12 +127,11 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
             return;
         }
 
-        if (!isClient && !window.confirm("Are you sure you want to book this shipment with DHL? This action cannot be undone.")) return;
+        if (!isClient && !window.confirm(`Confirm booking with ${bookingCarrier}?`)) return;
 
         setLoading(true);
         setError(null);
         try {
-            // 1. Update details
             await shipmentService.updateShipmentDetails(shipment.trackingNumber, {
                 origin: formData.origin,
                 destination: formData.destination,
@@ -104,346 +140,208 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
                 incoterm: formData.incoterm,
                 currency: formData.currency,
                 dangerousGoods: formData.dangerousGoods,
-                // If client edits a draft, keep it draft unless they explicitly submit.
-                // If they edit a pending/exception/ready/updated shipment, mark as 'updated' for staff review.
                 status: (isClient && shipment.status === 'draft') ? 'draft' : 'updated'
             });
 
-            // 2. Book with DHL (ONLY IF NOT CLIENT)
             if (!isClient) {
-                await shipmentService.submitToDhl(shipment.trackingNumber);
+                await shipmentService.submitToDgr(shipment.trackingNumber, bookingCarrier);
             }
 
             onShipmentUpdated();
-            onClose();
+            // Modal closes via parent callback usually, but here we invoke onClose too just in case
         } catch (err) {
-            console.error(err);
             setError(err.response?.data?.error || err.message || "Operation Failed");
         } finally {
             setLoading(false);
         }
     };
 
-    const handleRequestChanges = async () => {
-        const reason = prompt("Please enter reason for requesting changes:");
-        if (!reason) return;
-
+    const handleReject = async () => {
+        if (!window.confirm("Reject and Cancel shipment?")) return;
         setLoading(true);
         try {
-            await shipmentService.updateShipmentDetails(shipment.trackingNumber, {
-                status: 'draft',
-                description: `Changes Requested: ${reason}`
-            });
+            await shipmentService.updateShipmentDetails(shipment.trackingNumber, { status: 'cancelled', description: 'Rejected by Staff' });
             onShipmentUpdated();
-            onClose();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) { setError(err.message); } finally { setLoading(false); }
     };
 
     const handleFlagReview = async () => {
-        const reason = prompt("Enter note for the client (Flags as 'Exception/Review'):");
+        const reason = prompt("Enter reason for review:");
         if (!reason) return;
-
         setLoading(true);
         try {
-            await shipmentService.updateShipmentDetails(shipment.trackingNumber, {
-                status: 'exception',
-                description: `Flagged for Review: ${reason}`
-            });
+            await shipmentService.updateShipmentDetails(shipment.trackingNumber, { status: 'exception', description: `Flagged: ${reason}` });
             onShipmentUpdated();
-            onClose();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleReject = async () => {
-        if (!window.confirm("Are you sure you want to REJECT and CANCEL this shipment?")) return;
-
-        setLoading(true);
-        try {
-            await shipmentService.updateShipmentDetails(shipment.trackingNumber, {
-                status: 'cancelled',
-                description: 'Shipment Rejected by Staff'
-            });
-            onShipmentUpdated();
-            onClose();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) { setError(err.message); } finally { setLoading(false); }
     };
 
     if (!shipment || !formData) return null;
 
+    const totalPrice = parseFloat(formData.price || shipment.price || 0);
+    const balance = (isClient ? user?.balance : shipment.user?.balance) || 0;
+    const credit = (isClient ? user?.creditLimit : shipment.user?.creditLimit) || 0;
+    const availableFunds = balance + credit;
+    const hasFunds = availableFunds >= totalPrice;
+
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                    <Typography variant="h6">{isClient ? "Edit Shipment Details" : `Approve Shipment: ${shipment.trackingNumber}`}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        {isClient ? "Update your shipment details before processing." : "Review details before Carrier Booking"}
-                    </Typography>
-                </Box>
-                <Box>
-                    <Button
-                        startIcon={editMode ? <CloseIcon /> : <EditIcon />}
-                        onClick={() => setEditMode(!editMode)}
-                        sx={{ mr: 2 }}
-                    >
-                        {editMode ? "Stop Editing" : "Edit Details"}
-                    </Button>
-                    <IconButton onClick={onClose}><CloseIcon /></IconButton>
-                </Box>
-            </DialogTitle>
-
-            <DialogContent dividers>
-                {/* Status/History Note Display */}
-                {isClient && shipment.history?.length > 0 && (
-                    ['exception', 'draft', 'pending', 'updated'].includes(shipment.status)
-                ) && (
-                        <Alert severity={shipment.status === 'exception' ? 'error' : 'info'} sx={{ mb: 2 }}>
-                            <Typography variant="subtitle2" fontWeight="bold">
-                                {shipment.status === 'exception' ? 'Attention Needed:' : 'Latest Activity:'}
-                            </Typography>
-                            <Typography variant="body2">
-                                {shipment.history[shipment.history.length - 1].description}
-                                <br />
-                                <Typography variant="caption" color="text.secondary">
-                                    {new Date(shipment.history[shipment.history.length - 1].timestamp).toLocaleString()}
-                                </Typography>
-                            </Typography>
-                        </Alert>
-                    )}
-
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-                <Grid container spacing={3}>
-                    {/* ... (Address Panels - same) */}
-                    <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle2" gutterBottom color="primary">SHIPPER</Typography>
-                        <AddressPanel
-                            type="sender"
-                            value={formData.origin}
-                            onChange={(val) => handleAddressChange('origin', val)}
-                            readOnly={!editMode}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle2" gutterBottom color="primary">RECEIVER</Typography>
-                        <AddressPanel
-                            type="receiver"
-                            value={formData.destination}
-                            onChange={(val) => handleAddressChange('destination', val)}
-                            readOnly={!editMode}
-                        />
-                    </Grid>
-
-                    <Grid item xs={12}>
-                        <Divider sx={{ my: 2 }}>SHIPMENT CONFIGURATION</Divider>
-                        <Grid container spacing={2}>
-                            <Grid item xs={6} md={3}>
-                                <TextField
-                                    select
-                                    label="Incoterm"
-                                    fullWidth size="small"
-                                    value={formData.incoterm || 'DAP'}
-                                    onChange={(e) => handleGlobalChange('incoterm', e.target.value)}
-                                    disabled={!editMode}
-                                    SelectProps={{ native: true }}
-                                >
-                                    <option value="DAP">DAP (Delivered at Place)</option>
-                                    <option value="DDP">DDP (Duty Paid)</option>
-                                </TextField>
-                            </Grid>
-                            <Grid item xs={6} md={3}>
-                                <TextField
-                                    select
-                                    label="Currency"
-                                    fullWidth size="small"
-                                    value={formData.currency || 'KWD'}
-                                    onChange={(e) => handleGlobalChange('currency', e.target.value)}
-                                    disabled={!editMode}
-                                    SelectProps={{ native: true }}
-                                >
-                                    <option value="KWD">KWD (KD)</option>
-                                    <option value="USD">USD ($)</option>
-                                    <option value="EUR">EUR (€)</option>
-                                    <option value="GBP">GBP (£)</option>
-                                </TextField>
-                            </Grid>
-                            <Grid item xs={12} md={6} display="flex" gap={2} alignItems="center">
-                                <Typography variant="body2">Dangerous Goods:</Typography>
-                                <Button
-                                    variant={formData.dangerousGoods?.contains ? "contained" : "outlined"}
-                                    color={formData.dangerousGoods?.contains ? "error" : "inherit"}
-                                    size="small"
-                                    onClick={() => handleDGChange('contains', !formData.dangerousGoods?.contains)}
-                                    disabled={!editMode}
-                                >
-                                    {formData.dangerousGoods?.contains ? "YES (Hazardous)" : "NO"}
-                                </Button>
-                                {formData.dangerousGoods?.contains && (
-                                    <TextField
-                                        label="UN Code" size="small"
-                                        value={formData.dangerousGoods?.code || ''}
-                                        onChange={(e) => handleDGChange('code', e.target.value)}
-                                        disabled={!editMode}
-                                    />
-                                )}
-                            </Grid>
-                        </Grid>
-                    </Grid>
-
-                    <Grid item xs={12}>
-                        <Divider sx={{ my: 2 }}>PARCELS (Physical)</Divider>
-                        {formData.parcels.map((parcel, i) => (
-                            <Box key={i} display="flex" gap={2} mb={1} alignItems="center">
-                                <Typography variant="body2" sx={{ width: 30 }}>#{i + 1}</Typography>
-                                <TextField
-                                    label="Desc" size="small" fullWidth
-                                    value={parcel.description || ''}
-                                    onChange={(e) => handleParcelChange(i, 'description', e.target.value)}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="Weight (kg)" size="small" sx={{ width: 100 }}
-                                    type="number"
-                                    value={parcel.weight}
-                                    onChange={(e) => handleParcelChange(i, 'weight', parseFloat(e.target.value))}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="L" size="small" sx={{ width: 70 }} type="number"
-                                    value={parcel.dimensions?.length || parcel.length}
-                                    onChange={(e) => handleParcelChange(i, 'length', parseFloat(e.target.value))}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="W" size="small" sx={{ width: 70 }} type="number"
-                                    value={parcel.dimensions?.width || parcel.width}
-                                    onChange={(e) => handleParcelChange(i, 'width', parseFloat(e.target.value))}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="H" size="small" sx={{ width: 70 }} type="number"
-                                    value={parcel.dimensions?.height || parcel.height}
-                                    onChange={(e) => handleParcelChange(i, 'height', parseFloat(e.target.value))}
-                                    disabled={!editMode}
-                                />
-                            </Box>
-                        ))}
-                        {/* Optional: Add Button logic could go here, omitting for brevity */}
-                    </Grid>
-
-                    <Grid item xs={12}>
-                        <Divider sx={{ my: 2 }}>ITEMS (Customs)</Divider>
-                        {formData.items.map((item, i) => (
-                            <Box key={i} display="flex" gap={2} mb={1} alignItems="center">
-                                <Typography variant="body2" sx={{ width: 30 }}>#{i + 1}</Typography>
-                                <TextField
-                                    label="Description" size="small" fullWidth
-                                    value={item.description}
-                                    onChange={(e) => handleItemChange(i, 'description', e.target.value)}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="Qty" size="small" sx={{ width: 80 }}
-                                    type="number"
-                                    value={item.quantity}
-                                    onChange={(e) => handleItemChange(i, 'quantity', parseInt(e.target.value))}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="Value" size="small" sx={{ width: 100 }}
-                                    type="number"
-                                    value={item.declaredValue}
-                                    onChange={(e) => handleItemChange(i, 'declaredValue', parseFloat(e.target.value))}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="HS Code" size="small" sx={{ width: 100 }}
-                                    value={item.hsCode || ''}
-                                    onChange={(e) => handleItemChange(i, 'hsCode', e.target.value)}
-                                    disabled={!editMode}
-                                />
-                                <TextField
-                                    label="Origin" size="small" sx={{ width: 70 }}
-                                    value={item.countryOfOrigin || 'CN'}
-                                    onChange={(e) => handleItemChange(i, 'countryOfOrigin', e.target.value)}
-                                    disabled={!editMode}
-                                />
-                            </Box>
-                        ))}
-                    </Grid>
-                </Grid>
-            </DialogContent>
-
-            <DialogActions sx={{ p: 3, justifyContent: 'space-between' }}>
-                <Stack direction="row" spacing={1}>
+        <Modal
+            isOpen={open}
+            onClose={onClose}
+            title={isClient ? `Edit Shipment #${shipment.trackingNumber}` : `Approve Shipment #${shipment.trackingNumber}`}
+            width="1000px"
+            footer={
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
                     {!isClient && (
-                        <>
-                            <Button
-                                color="error"
-                                startIcon={<BlockIcon />}
-                                onClick={handleReject}
-                                disabled={loading}
-                            >
-                                Reject
-                            </Button>
-                            <Button
-                                color="warning"
-                                startIcon={<ReplayIcon />}
-                                onClick={handleRequestChanges}
-                                disabled={loading}
-                            >
-                                Request Changes
-                            </Button>
-                            <Button
-                                color="info"
-                                startIcon={<InfoIcon />}
-                                onClick={handleFlagReview}
-                                disabled={loading}
-                            >
-                                Flag for Review
-                            </Button>
-                        </>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <Button variant="secondary" onClick={handleReject} style={{ color: 'var(--accent-error)' }}>Reject</Button>
+                            <Button variant="secondary" onClick={handleFlagReview}>Flag</Button>
+                        </div>
                     )}
-                </Stack>
-                <Stack direction="row" spacing={2} alignItems="center">
-                    {(shipment.price || (user && isClient)) && (
-                        <Box sx={{ mr: 2, textAlign: 'right' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
-                                <AccountBalanceWalletIcon fontSize="small" color={((isClient ? user?.balance : shipment.user?.balance) + (isClient ? user?.creditLimit : shipment.user?.creditLimit)) < (formData.price || shipment.price) ? "error" : "success"} />
-                                <Typography variant="caption" fontWeight="bold" color={((isClient ? user?.balance : shipment.user?.balance) + (isClient ? user?.creditLimit : shipment.user?.creditLimit)) < (formData.price || shipment.price) ? "error.main" : "success.main"}>
-                                    {isClient ? "Your Balance: " : `${shipment.user?.name || 'User'}'s Balance: `}
-                                    {((isClient ? user?.balance : shipment.user?.balance) || 0).toFixed(3)} KD
-                                </Typography>
-                            </Box>
-                            <Typography variant="h6" fontWeight="bold">
-                                Total: {parseFloat(formData.price || shipment.price || 0).toFixed(3)} KD
-                            </Typography>
-                        </Box>
-                    )}
-                    <Button onClick={onClose} disabled={loading}>Cancel</Button>
-                    <Button
-                        variant="contained"
-                        color={isClient ? "primary" : "success"}
-                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : (isClient ? <EditIcon /> : <VerifiedIcon />)}
-                        onClick={handleConfirmBooking}
-                        disabled={loading || (!isClient && ((shipment.user?.balance || 0) + (shipment.user?.creditLimit || 0)) < (formData.price || shipment.price))}
-                    >
-                        {isClient ? "Save Changes" : (editMode ? "Save & Book DHL" : "Confirm & Book DHL")}
+
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginLeft: 'auto' }}>
+                        {totalPrice > 0 && (
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: '12px', color: hasFunds ? 'var(--text-secondary)' : 'var(--accent-error)' }}>
+                                    Bal: {availableFunds.toFixed(3)} KD
+                                </div>
+                                <div style={{ fontWeight: '700' }}>
+                                    Total: {totalPrice.toFixed(3)} KD
+                                </div>
+                            </div>
+                        )}
+
+                        {!isClient && (
+                            <div style={{ width: '150px' }}>
+                                <Select value={bookingCarrier} onChange={e => setBookingCarrier(e.target.value)}>
+                                    {availableCarriers.map(c => <option key={c.code} value={c.code} disabled={!c.active}>{c.name}</option>)}
+                                    {availableCarriers.length === 0 && <option value="DGR">Default Carrier</option>}
+                                </Select>
+                            </div>
+                        )}
+
+                        <Button variant="secondary" onClick={onClose}>Cancel</Button>
+                        <Button
+                            variant="primary"
+                            onClick={handleConfirmBooking}
+                            disabled={loading || (!isClient && !hasFunds)}
+                        >
+                            {loading ? <Loader size="16px" /> : (isClient ? "Save Changes" : "Confirm & Book")}
+                        </Button>
+                    </div>
+                </div>
+            }
+        >
+            <div style={{ padding: '0 4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                    <Button variant="secondary" onClick={() => setEditMode(!editMode)}>
+                        {editMode ? "Lock Editing" : "Unlock to Edit"}
                     </Button>
-                </Stack>
-            </DialogActions>
-        </Dialog>
+                </div>
+
+                {error && <Alert severity="error">{error}</Alert>}
+
+                <TwoCol>
+                    <AddressPanel
+                        title="Shipper"
+                        values={formData.origin}
+                        onChange={(val) => handleAddressChange('origin', val)}
+                        disabled={!editMode}
+                    />
+                    <AddressPanel
+                        title="Receiver"
+                        values={formData.destination}
+                        onChange={(val) => handleAddressChange('destination', val)}
+                        disabled={!editMode}
+                    />
+                </TwoCol>
+
+                <SectionHeader>Shipment Configuration</SectionHeader>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: '16px' }}>
+                    <Select
+                        label="Incoterm"
+                        value={formData.incoterm}
+                        onChange={e => handleGlobalChange('incoterm', e.target.value)}
+                        disabled={!editMode}
+                    >
+                        <option value="DAP">DAP (Delivered at Place)</option>
+                        <option value="DDP">DDP (Duty Paid)</option>
+                    </Select>
+                    <Select
+                        label="Currency"
+                        value={formData.currency}
+                        onChange={e => handleGlobalChange('currency', e.target.value)}
+                        disabled={!editMode}
+                    >
+                        <option value="KWD">KWD</option>
+                        <option value="USD">USD</option>
+                    </Select>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px' }}>
+                        <Button
+                            variant={formData.dangerousGoods?.contains ? "primary" : "secondary"}
+                            onClick={() => handleDGChange('contains', !formData.dangerousGoods?.contains)}
+                            disabled={!editMode}
+                            style={formData.dangerousGoods?.contains ? { background: 'var(--accent-error)', borderColor: 'var(--accent-error)' } : {}}
+                        >
+                            {formData.dangerousGoods?.contains ? "HAZARDOUS" : "Not Hazardous"}
+                        </Button>
+                        {formData.dangerousGoods?.contains && (
+                            <div style={{ flex: 1 }}>
+                                <Input
+                                    placeholder="UN Code"
+                                    value={formData.dangerousGoods?.code || ''}
+                                    onChange={e => handleDGChange('code', e.target.value)}
+                                    disabled={!editMode}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <SectionHeader>Parcels (Physical)</SectionHeader>
+                {formData.parcels.map((parcel, i) => (
+                    <Row key={i}>
+                        <IndexCircle>{i + 1}</IndexCircle>
+                        <div style={{ flex: 2 }}>
+                            <Input placeholder="Description" value={parcel.description || ''} onChange={e => handleParcelChange(i, 'description', e.target.value)} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '100px' }}>
+                            <Input type="number" placeholder="Kg" value={parcel.weight} onChange={e => handleParcelChange(i, 'weight', parseFloat(e.target.value))} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                            <Input type="number" placeholder="L" value={parcel.dimensions?.length || parcel.length} onChange={e => handleParcelChange(i, 'length', parseFloat(e.target.value))} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                            <Input type="number" placeholder="W" value={parcel.dimensions?.width || parcel.width} onChange={e => handleParcelChange(i, 'width', parseFloat(e.target.value))} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                            <Input type="number" placeholder="H" value={parcel.dimensions?.height || parcel.height} onChange={e => handleParcelChange(i, 'height', parseFloat(e.target.value))} disabled={!editMode} />
+                        </div>
+                    </Row>
+                ))}
+
+                <SectionHeader>Items (Customs)</SectionHeader>
+                {formData.items.map((item, i) => (
+                    <Row key={i}>
+                        <IndexCircle>{i + 1}</IndexCircle>
+                        <div style={{ flex: 2 }}>
+                            <Input placeholder="Item Description" value={item.description} onChange={e => handleItemChange(i, 'description', e.target.value)} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                            <Input type="number" placeholder="Qty" value={item.quantity} onChange={e => handleItemChange(i, 'quantity', parseInt(e.target.value))} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '100px' }}>
+                            <Input type="number" placeholder="Value" value={item.declaredValue} onChange={e => handleItemChange(i, 'declaredValue', parseFloat(e.target.value))} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '100px' }}>
+                            <Input placeholder="HS Code" value={item.hsCode || ''} onChange={e => handleItemChange(i, 'hsCode', e.target.value)} disabled={!editMode} />
+                        </div>
+                        <div style={{ width: '80px' }}>
+                            <Input placeholder="Origin" value={item.countryOfOrigin || 'CN'} onChange={e => handleItemChange(i, 'countryOfOrigin', e.target.value)} disabled={!editMode} />
+                        </div>
+                    </Row>
+                ))}
+            </div>
+        </Modal>
     );
 };
 

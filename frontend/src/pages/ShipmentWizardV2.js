@@ -8,8 +8,11 @@ import {
     Menu, MenuItem, LinearProgress,
     FormControl, InputLabel, Select,
     FormControlLabel, Switch,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow
+    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    ThemeProvider, createTheme
 } from '@mui/material';
+
+
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -39,6 +42,48 @@ import ShipmentBilling from '../components/shipment/ShipmentBilling';
 import { shipmentService } from '../services/api';
 import axios from 'axios';
 
+// --- Custom Dark Theme Local Override ---
+const darkFormTheme = createTheme({
+    palette: {
+        mode: 'dark',
+        primary: { main: '#00d9b8' },
+        background: { paper: '#141929', default: '#0a0e1a' },
+        text: { primary: '#e2e8f0', secondary: '#94a3b8' }
+    },
+    components: {
+        MuiTextField: {
+            styleOverrides: {
+                root: {
+                    '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#1a2035',
+                        '& fieldset': { borderColor: '#2a3347' },
+                        '&:hover fieldset': { borderColor: '#00d9b8' },
+                        '&.Mui-focused fieldset': { borderColor: '#00d9b8' }
+                    }
+                }
+            }
+        },
+        MuiCard: {
+            styleOverrides: {
+                root: {
+                    backgroundColor: '#141929',
+                    borderColor: '#2a3347',
+                    backgroundImage: 'none'
+                }
+            }
+        },
+        MuiSelect: {
+            styleOverrides: {
+                root: {
+                    backgroundColor: '#1a2035',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#2a3347' }
+                }
+            }
+        }
+    }
+});
+
+
 const VOLUME_FACTOR = 5000;
 const STEPS = ['Setup', 'Content', 'Billing', 'Review', 'Success'];
 const IS_DEV = process.env.NODE_ENV === 'development' || process.env.REACT_APP_VITE_DEV_TOOLS === 'true';
@@ -46,11 +91,12 @@ const IS_DEV = process.env.NODE_ENV === 'development' || process.env.REACT_APP_V
 // --- Integrated Autofill Scenarios ---
 // --- Integrated Autofill Scenarios ---
 const AUTOFILL_SCENARIOS = {
-    'DHL': {
+    'DGR': {
         'Standard': {
             'Full Business Shipment (DAP)': {
                 sender: {
                     company: 'Target Logistics Hub KW', contactPerson: 'Ahmed Al-Sabah', phone: '90001234', phoneCountryCode: '+965', email: 'shipments@target-kw.com',
+                    // ... rest of scenarios ...
                     area: 'Shuwaikh Industrial 1', city: 'Kuwait City', state: 'Asimah', countryCode: 'KW', postalCode: '70050',
                     buildingName: 'Logistics Center', unitNumber: 'Dock 4', landmark: 'Near Port Authority',
                     streetLines: ['Shuwaikh Industrial 1, Block A, St 45'],
@@ -246,58 +292,85 @@ const AUTOFILL_SCENARIOS = {
     }
 };
 
-const WizardHeader = ({ activeStep, totalSteps, estimatedTime }) => (
+const WizardHeader = ({ activeStep, totalSteps, estimatedTime, onDevMenuClick, isStaff, isAdmin }) => (
     <Box
         position="sticky"
         top={0}
         zIndex={1100}
-        bgcolor="background.default"
-        borderBottom={1}
-        borderColor="divider"
-        py={2}
+        bgcolor="#0a0e1a"
+        borderBottom="1px solid #2a3347"
+        py={3}
         px={3}
         mx={-3}
-        mb={3}
-        boxShadow={1}
+        mb={4}
+        boxShadow="0 4px 20px rgba(0,0,0,0.4)"
     >
         <Container maxWidth="lg">
-            <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Box>
-                    <Typography variant="h6" fontWeight="bold">New Shipment</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        Step {activeStep + 1} of {totalSteps}: {STEPS[activeStep]}
+                    <Typography variant="h5" fontWeight="800" sx={{ fontFamily: 'Outfit', color: '#fff', letterSpacing: '-0.5px' }}>
+                        Create New Shipment
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        {STEPS[activeStep]} <Box component="span" sx={{ opacity: 0.5, mx: 1 }}>|</Box> Step {activeStep + 1} of {totalSteps}
                     </Typography>
                 </Box>
+
+
+                {/* Right Side: Timer & Dev Tools */}
                 <Box display="flex" alignItems="center" gap={2}>
                     <Chip
-                        icon={<TimerIcon fontSize="small" />}
-                        label={`Est. Time: ${estimatedTime}`}
+                        icon={<TimerIcon fontSize="small" style={{ color: '#00d9b8' }} />}
+                        label={`Est: ${estimatedTime}`}
                         size="small"
-                        color="primary"
-                        variant="outlined"
+                        sx={{
+                            bgcolor: 'rgba(0, 217, 184, 0.1)',
+                            color: 'primary.main',
+                            fontWeight: 600,
+                            border: '1px solid rgba(0, 217, 184, 0.2)'
+                        }}
                     />
-                    <Box width={100}>
-                        <LinearProgress variant="determinate" value={((activeStep + 1) / totalSteps) * 100} sx={{ borderRadius: 1, height: 8 }} />
-                    </Box>
+
+                    {/* DEV TOOLS BUTTON */}
+                    {(IS_DEV || isStaff || isAdmin) && (
+                        <Tooltip title="Dev Tools: Autofill Scenarios">
+                            <IconButton onClick={onDevMenuClick} size="small" sx={{ border: '1px dashed #00d9b8', color: '#00d9b8' }}>
+                                <BugReportIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    )}
                 </Box>
             </Box>
-        </Container>
-    </Box>
+
+            {/* Progress Bar */}
+            <Box sx={{ position: 'relative', height: 6, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' }}>
+                <Box sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    height: '100%',
+                    width: `${((activeStep + 1) / totalSteps) * 100}%`,
+                    bgcolor: 'primary.main',
+                    borderRadius: 4,
+                    transition: 'width 0.5s ease',
+                    boxShadow: '0 0 10px #00d9b8'
+                }} />
+            </Box>
+        </Container >
+    </Box >
 );
 
-
-
-const DataRow = ({ label, value, required, requiredDHL }) => {
+const DataRow = ({ label, value, required, requiredDGR }) => {
     const isMissing = !value || (typeof value === 'string' && value.trim() === '');
-    const isError = isMissing && (required || requiredDHL);
+    const isError = isMissing && (required || requiredDGR);
 
     return (
-        <Box display="flex" justifyContent="space-between" py={0.5}>
-            <Box display="flex" alignItems="center" gap={0.5}>
+        <Box display="flex" justifyContent="space-between" py={1.5} borderBottom="1px solid rgba(255,255,255,0.05)">
+            <Box display="flex" alignItems="center" gap={1}>
                 <Typography variant="body2" color="text.secondary">{label}:</Typography>
-                {requiredDHL && (
-                    <Tooltip title="Required for DHL Compliance">
-                        <ErrorOutlineIcon sx={{ fontSize: 14, color: isMissing ? 'error.main' : 'warning.main' }} />
+                {requiredDGR && (
+                    <Tooltip title="Required for DGR Compliance">
+                        <ErrorOutlineIcon sx={{ fontSize: 14, color: isMissing ? '#ef4444' : '#f59e0b' }} />
                     </Tooltip>
                 )}
             </Box>
@@ -305,13 +378,15 @@ const DataRow = ({ label, value, required, requiredDHL }) => {
                 variant="body2"
                 fontWeight={value ? 600 : 400}
                 sx={{
-                    color: isError ? 'error.main' : (value ? 'text.primary' : 'text.disabled'),
-                    bgcolor: isError ? 'error.lighter' : 'transparent',
-                    px: isError ? 0.5 : 0,
-                    borderRadius: 1
+                    color: isError ? '#ef4444' : (value ? '#e2e8f0' : 'text.disabled'),
+                    bgcolor: isError ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
+                    px: isError ? 1 : 0,
+                    borderRadius: 1,
+                    maxWidth: '60%',
+                    textAlign: 'right'
                 }}
             >
-                {value || '— Not provided'}
+                {value || '—'}
             </Typography>
         </Box>
     );
@@ -357,7 +432,9 @@ const ShipmentWizardV2 = () => {
     const [packageMarks, setPackageMarks] = useState('');
 
     const [expandedParcel, setExpandedParcel] = useState(0);
-    const [selectedService] = useState({ serviceName: 'DHL Express Worldwide', serviceCode: 'P', totalPrice: '15.000', currency: 'KWD', deliveryDate: new Date() });
+
+    const [selectedService, setSelectedService] = useState({ serviceName: 'DGR Express Worldwide', serviceCode: 'P', totalPrice: '0.000', currency: 'KWD', deliveryDate: new Date() });
+
 
     // Global Settings
     const [currency, setCurrency] = useState('KWD');
@@ -369,57 +446,73 @@ const ShipmentWizardV2 = () => {
     // Dev Tools Menu
     const [devMenuAnchor, setDevMenuAnchor] = useState(null);
 
+    const handleDevMenuOpen = (event) => {
+        setDevMenuAnchor(event.currentTarget);
+    };
+
+    const handleDevMenuClose = () => {
+        setDevMenuAnchor(null);
+    };
+
     // Staff/Admin Features
     const { isStaff, isAdmin } = useAuth();
-    const [clients, setClients] = useState([]);
     const [selectedClient, setSelectedClient] = useState('');
+    const [clients, setClients] = useState([]);
+    const [availableCarriers, setAvailableCarriers] = useState([]);
+    const [selectedCarrier, setSelectedCarrier] = useState('DGR');
 
-    // Fetch clients for Staff/Admin
+    const handleCarrierChange = (carrierCode) => {
+        setSelectedCarrier(carrierCode);
+        // Reset service selection if carrier changes to prevent invalid service codes
+        setSelectedService(prev => ({ ...prev, serviceCode: 'P' }));
+    };
+
+    // Fetch Carriers & Clients
     React.useEffect(() => {
-        if (isStaff) {
-            const fetchClients = async () => {
-                try {
-                    const token = localStorage.getItem('token');
-                    // Fetch full list including org details
-                    const res = await axios.get('/api/auth/users', {
+        const fetchMetadata = async () => {
+            try {
+                const token = localStorage.getItem('token');
+
+                // 1. Fetch Available Carriers
+                const carrierRes = await shipmentService.getAvailableCarriers();
+                if (carrierRes.success) {
+                    setAvailableCarriers(carrierRes.data);
+                }
+
+                if (isStaff) {
+                    const clientRes = await axios.get('/api/auth/users', {
                         headers: { Authorization: `Bearer ${token}` }
                     });
-                    setClients(res.data.data);
-                } catch (err) {
-                    console.error('Failed to fetch clients', err);
-                    enqueueSnackbar('Failed to load client list', { variant: 'error' });
+                    setClients(clientRes.data.data);
+                } else if (user && !isStaff) {
+                    // 3. Client: Auto-fill My Default Profile ONLY if not staff
+                    const config = user.carrierConfig || {};
+                    const defaultAddress = user.addresses?.find(a => a.isDefault) || {};
+
+                    setSender(prev => ({
+                        ...prev,
+                        company: defaultAddress.company || user.company || user.organization?.name || prev.company,
+                        contactPerson: defaultAddress.contactPerson || user.name,
+                        email: defaultAddress.email || user.email,
+                        phone: defaultAddress.phone || user.phone,
+                        phoneCountryCode: defaultAddress.phoneCountryCode || prev.phoneCountryCode,
+                        streetLines: defaultAddress.streetLines || prev.streetLines,
+                        city: defaultAddress.city || prev.city,
+                        state: defaultAddress.state || prev.state,
+                        postalCode: defaultAddress.postalCode || prev.postalCode,
+                        countryCode: defaultAddress.countryCode || prev.countryCode,
+                        vatNumber: defaultAddress.vatNumber || config.vatNo || prev.vatNumber,
+                        eoriNumber: defaultAddress.eoriNumber || config.eori || prev.eoriNumber,
+                        taxId: defaultAddress.taxId || config.taxId || prev.taxId,
+                        traderType: defaultAddress.traderType || config.traderType || 'business',
+                        reference: defaultAddress.reference || config.defaultReference || prev.reference
+                    }));
                 }
-            };
-            fetchClients();
-        } else if (user && !isStaff) {
-            // Client: Auto-fill My Default Profile ONLY if not staff
-            const config = user.carrierConfig || {};
-            const defaultAddress = user.addresses?.find(a => a.isDefault) || {};
-
-            setSender(prev => ({
-                ...prev,
-                // Identity
-                company: defaultAddress.company || user.company || user.organization?.name || prev.company,
-                contactPerson: defaultAddress.contactPerson || user.name,
-                email: defaultAddress.email || user.email,
-                phone: defaultAddress.phone || user.phone,
-                phoneCountryCode: defaultAddress.phoneCountryCode || prev.phoneCountryCode,
-
-                // Address (only if default exists)
-                streetLines: defaultAddress.streetLines || prev.streetLines,
-                city: defaultAddress.city || prev.city,
-                state: defaultAddress.state || prev.state,
-                postalCode: defaultAddress.postalCode || prev.postalCode,
-                countryCode: defaultAddress.countryCode || prev.countryCode,
-
-                // Compliance
-                vatNumber: defaultAddress.vatNumber || config.vatNo || prev.vatNumber,
-                eoriNumber: defaultAddress.eoriNumber || config.eori || prev.eoriNumber,
-                taxId: defaultAddress.taxId || config.taxId || prev.taxId,
-                traderType: defaultAddress.traderType || config.traderType || 'business',
-                reference: defaultAddress.reference || config.defaultReference || prev.reference
-            }));
-        }
+            } catch (err) {
+                console.error('Failed to fetch metadata', err);
+            }
+        };
+        fetchMetadata();
     }, [isStaff, user, enqueueSnackbar]);
 
     // --- Auto-Save Draft Logic ---
@@ -515,6 +608,45 @@ const ShipmentWizardV2 = () => {
 
         enqueueSnackbar('Draft restored', { variant: 'success' });
     };
+
+    // --- Dynamic Quote Fetching ---
+    React.useEffect(() => {
+        if (activeStep === 3) {
+            // Fetch quote when entering Review step
+            const fetchQuote = async () => {
+                setLoading(true);
+                try {
+                    const payload = {
+                        sender, receiver, parcels, items,
+                        carrierCode: selectedCarrier,
+                        userId: selectedClient || user?._id // Use selected client ID for markup!
+                    };
+                    const response = await shipmentService.getQuotes(payload);
+                    if (response.success && response.data && response.data.length > 0) {
+                        // For now, auto-select the standard service (closest to logic) or P
+                        const quote = response.data.find(q => q.serviceCode === 'P') || response.data[0];
+                        setSelectedService({
+                            serviceName: quote.serviceName,
+                            serviceCode: quote.serviceCode,
+                            totalPrice: quote.totalPrice, // User's price (marked up)
+                            basePrice: quote.basePrice,   // Admin view
+                            markupLabel: quote.markupLabel,
+                            rawPrice: quote.rawPrice,
+                            currency: quote.currency,
+                            deliveryDate: quote.deliveryDate
+                        });
+                    }
+                } catch (err) {
+                    console.error('Quote fetch error', err);
+                    enqueueSnackbar('Failed to calculate latest rates', { variant: 'warning' });
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fetchQuote();
+        }
+    }, [activeStep, sender, receiver, parcels, items, selectedClient, user]);
+
 
     // Handle Client Selection (Autofill)
     const handleClientChange = (clientId) => {
@@ -619,10 +751,51 @@ const ShipmentWizardV2 = () => {
             if (scenario.shipmentType) setShipmentType(scenario.shipmentType);
             if (scenario.incoterm) setIncoterm(scenario.incoterm);
 
+            setDevMenuAnchor(null);
             enqueueSnackbar(`Loaded Scenario: ${name}`, { variant: 'success' });
         }
-        setDevMenuAnchor(null);
     };
+
+    const renderDevMenu = () => (
+        <Menu
+            anchorEl={devMenuAnchor}
+            open={Boolean(devMenuAnchor)}
+            onClose={handleDevMenuClose}
+            PaperProps={{
+                style: {
+                    backgroundColor: '#1a2035',
+                    color: '#fff',
+                    border: '1px solid #2a3347',
+                    maxHeight: 400
+                },
+            }}
+        >
+            {Object.keys(AUTOFILL_SCENARIOS).map((carrier) => (
+                <div key={carrier}>
+                    <MenuItem disabled sx={{ opacity: 1, fontWeight: 'bold', color: '#00d9b8', fontSize: '0.8rem', mt: 1 }}>
+                        {carrier}
+                    </MenuItem>
+                    {Object.keys(AUTOFILL_SCENARIOS[carrier]).map((category) => (
+                        <div key={category}>
+                            <MenuItem disabled sx={{ opacity: 0.8, fontSize: '0.75rem', pl: 3, color: '#94a3b8' }}>
+                                {category}
+                            </MenuItem>
+                            {Object.keys(AUTOFILL_SCENARIOS[carrier][category]).map((scenarioName) => (
+                                <MenuItem
+                                    key={scenarioName}
+                                    onClick={() => loadScenario(AUTOFILL_SCENARIOS[carrier][category][scenarioName], scenarioName)}
+                                    sx={{ pl: 4, fontSize: '0.9rem' }}
+                                >
+                                    {scenarioName}
+                                </MenuItem>
+                            ))}
+                        </div>
+                    ))}
+                    <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.1)' }} />
+                </div>
+            ))}
+        </Menu>
+    );
 
     const updateParcel = (index, field, val) => {
         const newParcels = [...parcels];
@@ -658,8 +831,8 @@ const ShipmentWizardV2 = () => {
             if (!sender.postalCode) newErrors.senderPostal = 'Postal Code required';
             // if (!sender.streetLines?.[0] && !sender.formattedAddress) newErrors.senderStreet = 'Street address required';
 
-            // DHL Sender Specific
-            if (!sender.reference) newErrors.senderReference = 'Shipper Reference required for DHL';
+            // DGR Sender Specific
+            if (!sender.reference) newErrors.senderReference = 'Shipper Reference required for DGR';
 
             // Receiver basic
             if (!receiver.contactPerson) newErrors.receiverContact = 'Contact Person required';
@@ -670,9 +843,9 @@ const ShipmentWizardV2 = () => {
             if (!receiver.postalCode) newErrors.receiverPostal = 'Postal Code required';
             // if (!receiver.streetLines?.[0] && !receiver.formattedAddress) newErrors.receiverStreet = 'Street address required';
 
-            // DHL Receiver Specific
-            // if (!receiver.vatNumber) newErrors.receiverVat = 'Receiver VAT number required (DHL)';
-            if (!receiver.reference) newErrors.receiverReference = 'Receiver Reference required (DHL)';
+            // DGR Receiver Specific
+            // if (!receiver.vatNumber) newErrors.receiverVat = 'Receiver VAT number required (DGR)';
+            if (!receiver.reference) newErrors.receiverReference = 'Receiver Reference required (DGR)';
         }
 
         if (step === 1) {
@@ -754,16 +927,15 @@ const ShipmentWizardV2 = () => {
                     ...i,
                     quantity: Number(i.quantity),
                     declaredValue: Number(i.declaredValue),
-                    quantity: Number(i.quantity),
-                    declaredValue: Number(i.declaredValue),
                     weight: Number(i.weight),
                     currency: i.currency || currency // Fallback to global currency if missing
                 })),
                 serviceCode: selectedService.serviceCode,
-                carrierCode: 'DHL',
+                carrierCode: 'DGR',
                 status: 'ready_for_pickup',
                 skipCarrierCreation: true,
                 price: selectedService.totalPrice,
+                costPrice: selectedService.rawPrice, // Pass raw cost if available (Admin/Staff)
                 currency: currency, // Dynamic currency
                 incoterm: incoterm, // Dynamic incoterm
                 dangerousGoods: dangerousGoods, // Dynamic DG
@@ -821,51 +993,7 @@ const ShipmentWizardV2 = () => {
 
 
 
-    const renderSetup = () => (
-        <React.Fragment>
-            {IS_DEV && (
-                <Grid item xs={12} sx={{ mb: 2 }}>
-                    <Box display="flex" justifyContent="flex-end" gap={2}>
-                        <Button
-                            variant="outlined" color="warning"
-                            startIcon={<BugReportIcon />}
-                            onClick={(e) => setDevMenuAnchor(e.currentTarget)}
-                        >
-                            Autofill (Dev)
-                        </Button>
-                        <Menu anchorEl={devMenuAnchor} open={Boolean(devMenuAnchor)} onClose={() => setDevMenuAnchor(null)}>
-                            {Object.entries(AUTOFILL_SCENARIOS['DHL']).map(([groupName, scenarios]) => (
-                                <Box key={groupName}>
-                                    <Typography variant="caption" sx={{ px: 2, pt: 1, fontWeight: 'bold', color: 'text.secondary' }}>
-                                        DHL - {groupName}
-                                    </Typography>
-                                    {Object.entries(scenarios).map(([name, data]) => (
-                                        <MenuItem key={name} onClick={() => loadScenario(data, name)} sx={{ pl: 4, fontSize: '0.9rem' }}>
-                                            {name}
-                                        </MenuItem>
-                                    ))}
-                                    <Divider />
-                                </Box>
-                            ))}
-                        </Menu>
-                    </Box>
-                </Grid>
-            )}
-            <ShipmentSetup
-                sender={sender} setSender={setSender}
-                receiver={receiver} setReceiver={setReceiver}
-                shipmentType={shipmentType} setShipmentType={setShipmentType}
-                plannedDate={plannedDate} setPlannedDate={setPlannedDate}
-                pickupRequired={pickupRequired} setPickupRequired={setPickupRequired}
-                errors={errors}
-                // Staff Props
-                isStaff={isStaff}
-                clients={clients}
-                selectedClient={selectedClient}
-                onClientChange={handleClientChange}
-            />
-        </React.Fragment>
-    );
+
 
     const renderParcels = () => {
         return (
@@ -881,8 +1009,8 @@ const ShipmentWizardV2 = () => {
                         <Select value={packagingType} label="Packaging Type" onChange={(e) => setPackagingType(e.target.value)}>
                             <MenuItem value="user">My Own Packaging</MenuItem>
                             <MenuItem value="CP">Custom Packaging</MenuItem>
-                            <MenuItem value="EE">DHL Express Envelope</MenuItem>
-                            <MenuItem value="OD">Other DHL Packaging</MenuItem>
+                            <MenuItem value="EE">DGR Express Envelope</MenuItem>
+                            <MenuItem value="OD">Other DGR Packaging</MenuItem>
                         </Select>
                     </FormControl>
                 </Box>
@@ -982,7 +1110,7 @@ const ShipmentWizardV2 = () => {
         if (!r.company && !r.contact) missingFields.push('Receiver Name');
         if (!r.phone) missingFields.push('Receiver Phone');
         if (!r.street || !r.city || !r.country) missingFields.push('Receiver Address');
-        if (!r.vatNumber) missingFields.push('Receiver VAT (Required for DHL)');
+        if (!r.vatNumber) missingFields.push('Receiver VAT (Required for DGR)');
         if (!s.reference) missingFields.push('Shipper Reference');
 
         // Styles
@@ -1250,30 +1378,101 @@ const ShipmentWizardV2 = () => {
     }
 
     return (
-        <Box minHeight="100vh" pb={10}>
-            <WizardHeader activeStep={activeStep} totalSteps={5} estimatedTime="5 mins" />
-            <Container maxWidth="lg">
-                <Fade in key={activeStep}>
-                    <Box>
-                        {activeStep === 0 && renderSetup()}
-                        {activeStep === 1 && renderContent()}
-                        {activeStep === 2 && renderBilling()}
-                        {activeStep === 3 && renderReview()}
+        <ThemeProvider theme={darkFormTheme}>
+            <Box sx={{ minHeight: '100vh', bgcolor: '#0a0e1a', pb: 8 }}>
+                <WizardHeader
+                    activeStep={activeStep}
+                    totalSteps={STEPS.length}
+                    estimatedTime="5-8 min"
+                    onDevMenuClick={handleDevMenuOpen}
+                    isStaff={isStaff}
+                    isAdmin={isAdmin}
+                />
+
+                {renderDevMenu()}
+
+                <Container maxWidth="lg">
+                    <Fade in key={activeStep}>
+                        <Box>
+                            {activeStep === 0 && (
+                                <Box>
+                                    <ShipmentSetup
+                                        sender={sender} setSender={setSender}
+                                        receiver={receiver} setReceiver={setReceiver}
+                                        pickupRequired={pickupRequired} setPickupRequired={setPickupRequired}
+                                        errors={errors}
+                                        isStaff={isStaff} clients={clients}
+                                        selectedClient={selectedClient} onClientChange={handleClientChange}
+                                        availableCarriers={availableCarriers}
+                                        selectedCarrier={selectedCarrier}
+                                        onCarrierChange={setSelectedCarrier}
+                                    />
+                                </Box>
+                            )}
+                            {activeStep === 1 && (
+                                <Box>
+                                    <ShipmentContent
+                                        parcels={parcels} setParcels={setParcels}
+                                        items={items} setItems={setItems}
+                                        shipmentType={shipmentType} setShipmentType={setShipmentType}
+                                        updateParcel={updateParcel} removeParcel={removeParcel}
+                                        expandedParcel={expandedParcel} setExpandedParcel={setExpandedParcel}
+                                        dangerousGoods={dangerousGoods} setDangerousGoods={setDangerousGoods}
+                                        addParcel={() => setParcels([...parcels, { description: '', weight: '', length: '', width: '', height: '', quantity: 1 }])}
+                                        addItem={() => setItems([...items, { description: '', quantity: 1, declaredValue: '', weight: '' }])}
+                                        removeItem={(i) => setItems(items.filter((_, idx) => idx !== i))}
+                                        updateItem={(i, f, v) => { const n = [...items]; n[i][f] = v; setItems(n); }}
+                                        errors={errors} packagingType={packagingType} setPackagingType={setPackagingType}
+                                    />
+                                </Box>
+                            )}
+                            {activeStep === 2 && (
+                                <Box>
+                                    <ShipmentBilling
+                                        sender={sender} receiver={receiver}
+                                        totals={totals}
+                                        incoterm={incoterm} setIncoterm={setIncoterm}
+                                        exportReason={exportReason} setExportReason={setExportReason}
+                                        invoiceRemarks={invoiceRemarks} setInvoiceRemarks={setInvoiceRemarks}
+                                        gstPaid={gstPaid} setGstPaid={setGstPaid}
+                                        payerOfVat={payerOfVat} setPayerOfVat={setPayerOfVat}
+                                        shipperAccount={shipperAccount} setShipperAccount={setShipperAccount}
+                                        packageMarks={packageMarks} setPackageMarks={setPackageMarks}
+                                        errors={errors}
+                                    />
+                                </Box>
+                            )}
+                            {activeStep === 3 && renderReview()}
+                        </Box>
+                    </Fade>
+
+                    <Box display="flex" justifyContent="space-between" mt={4} pt={4} borderTop="1px solid rgba(255,255,255,0.1)">
+                        <Button
+                            disabled={activeStep === 0}
+                            onClick={handleBack}
+                            startIcon={<ArrowBackIcon />}
+                            sx={{ color: 'text.secondary' }}
+                        >
+                            Back
+                        </Button>
+                        <Button
+                            variant="contained" size="large" onClick={activeStep === 3 ? handleSubmit : handleNext}
+                            endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <ArrowForwardIcon />}
+                            disabled={loading || (activeStep === 3 && user && !isAdmin && !isStaff && (user.balance + user.creditLimit) < Number(selectedService.totalPrice))}
+
+                            sx={{
+                                borderRadius: 50,
+                                px: 4,
+                                boxShadow: '0 4px 14px rgba(0, 217, 184, 0.4)',
+                                fontWeight: 700
+                            }}
+                        >
+                            {activeStep === 3 ? 'Finalize & Book' : 'Continue'}
+                        </Button>
                     </Box>
-                </Fade>
-                <Box display="flex" justifyContent="space-between" mt={4} pt={2} borderTop={1} borderColor="divider">
-                    <Button disabled={activeStep === 0} onClick={handleBack} startIcon={<ArrowBackIcon />}>Back</Button>
-                    <Button
-                        variant="contained" size="large" onClick={activeStep === 3 ? handleSubmit : handleNext}
-                        endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <ArrowForwardIcon />}
-                        disabled={loading || (activeStep === 3 && user && (user.balance + user.creditLimit) < Number(selectedService.totalPrice))}
-                        sx={{ borderRadius: 50, px: 4 }}
-                    >
-                        {activeStep === 3 ? 'Finalize & Book' : 'Continue'}
-                    </Button>
-                </Box>
-            </Container>
-        </Box>
+                </Container>
+            </Box>
+        </ThemeProvider>
     );
 };
 

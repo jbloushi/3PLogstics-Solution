@@ -112,10 +112,10 @@ const PickupRequestList = () => {
         try {
             // 2. If Staff Reviewing -> Approve / Finalize
             if (reviewDialog.mode === 'review') {
-                // If it's an existing shipment (awaiting DHL submission)
+                // If it's an existing shipment (awaiting DGR submission)
                 if (editData.trackingNumber && !editData.dhlConfirmed) {
-                    await shipmentService.submitToDhl(editData.trackingNumber);
-                    enqueueSnackbar('Shipment Processed & DHL Label Generated!', { variant: 'success' });
+                    await shipmentService.submitToDgr(editData.trackingNumber);
+                    enqueueSnackbar('Shipment Processed & DGR Label Generated!', { variant: 'success' });
                 }
                 // If it's still a raw Pickup Request
                 else {
@@ -183,7 +183,7 @@ const PickupRequestList = () => {
             label = 'Ready for Pickup';
         } else if (status === 'picked_up') {
             color = 'info';
-            label = 'Picked Up (Awaiting DHL)';
+            label = 'Picked Up (Awaiting DGR)';
         } else if (status === 'APPROVED' || status === 'approved') {
             color = 'success';
             label = 'Approved';

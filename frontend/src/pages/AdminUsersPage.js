@@ -1,25 +1,70 @@
 import React, { useState, useEffect } from 'react';
-import {
-    Container, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Button, IconButton, Chip, Box, FormControl, InputLabel, Select, MenuItem, Tooltip
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
-import BusinessIcon from '@mui/icons-material/Business';
+import styled from 'styled-components';
 import { useSnackbar } from 'notistack';
-import { userService } from '../services/api';
-import UserManagementDialog from '../components/admin/UserManagementDialog';
+import { userService, organizationService } from '../services/api';
+import {
+    PageHeader,
+    Card,
+    Button,
+    Input,
+    Select,
+    Modal,
+    Badge,
+    TableWrapper,
+    Table,
+    Thead,
+    Tbody,
+    Tr,
+    Th,
+    Td,
+    StatusPill,
+    Tabs,
+    Tab,
+    Alert
+} from '../ui';
+
+// --- Styled Components ---
+
+const FilterBar = styled.div`
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    background: var(--bg-secondary);
+    padding: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+`;
+
+const ActionButton = styled.button`
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: ${props => props.$color || 'var(--text-secondary)'};
+    padding: 4px;
+    transition: all 0.2s;
+    &:hover { color: var(--text-primary); transform: scale(1.1); }
+`;
 
 const AdminUsersPage = () => {
     const { enqueueSnackbar } = useSnackbar();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // Dialog State
     const [openDialog, setOpenDialog] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
+    const [activeTab, setActiveTab] = useState('profile');
 
     // Filter State
     const [roleFilter, setRoleFilter] = useState('');
+
+    // Form Data
+    const [formData, setFormData] = useState({});
+
+    // Aux Data
+    const [organizations, setOrganizations] = useState([]);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -34,32 +79,63 @@ const AdminUsersPage = () => {
         }
     };
 
+    const fetchOrgs = async () => {
+        try {
+            const res = await organizationService.getOrganizations();
+            setOrganizations(res.data);
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
     }, [roleFilter]);
 
-    const handleDelete = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this user?')) return;
-        try {
-            await userService.deleteUser(id);
-            enqueueSnackbar('User deleted', { variant: 'success' });
-            fetchUsers();
-        } catch (error) {
-            enqueueSnackbar('Failed to delete user', { variant: 'error' });
+    useEffect(() => {
+        if (openDialog) fetchOrgs();
+    }, [openDialog]);
+
+    // Handle Open Dialog
+    const handleOpenDialog = (user = null) => {
+        setEditingUser(user);
+
+        // Init Form Data
+        const initialData = user ? { ...user } : {
+            role: 'client',
+            carrierConfig: { preferredCarrier: 'DGR', traderType: 'business' },
+            markup: { type: 'PERCENTAGE', percentageValue: 15, flatValue: 0 }
+        };
+
+        // Ensure nested objects
+        if (!initialData.carrierConfig) initialData.carrierConfig = { preferredCarrier: 'DGR', traderType: 'business' };
+        if (!initialData.markup) initialData.markup = { type: 'PERCENTAGE', percentageValue: 15, flatValue: 0 };
+        if (typeof initialData.organization === 'object' && initialData.organization) {
+            initialData.organization = initialData.organization._id;
         }
+
+        setFormData(initialData);
+        setActiveTab('profile');
+        setOpenDialog(true);
     };
 
-    const handleSave = async (userData) => {
+    // Handle Save
+    const handleSave = async () => {
         try {
-            console.log('Saving user data:', userData);
-            if (userData._id) {
-                // Update
-                const res = await userService.updateUser(userData._id, userData);
-                console.log('Update response:', res);
+            const payload = { ...formData };
+            // Ensure numbers
+            if (payload.creditLimit) payload.creditLimit = Number(payload.creditLimit);
+            // Cleanup markup
+            if (payload.markup) {
+                payload.markup.percentageValue = Number(payload.markup.percentageValue || 0);
+                payload.markup.flatValue = Number(payload.markup.flatValue || 0);
+            }
+
+            if (editingUser?._id) {
+                await userService.updateUser(editingUser._id, payload);
                 enqueueSnackbar('User updated successfully', { variant: 'success' });
             } else {
-                // Create
-                await userService.createUser(userData);
+                await userService.createUser(payload);
                 enqueueSnackbar('User created successfully', { variant: 'success' });
             }
             setOpenDialog(false);
@@ -71,129 +147,259 @@ const AdminUsersPage = () => {
         }
     };
 
-    const handleEdit = (user) => {
-        setEditingUser(user);
-        setOpenDialog(true);
+    // Handle Delete
+    const handleDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this user?')) return;
+        try {
+            await userService.deleteUser(id);
+            enqueueSnackbar('User deleted', { variant: 'success' });
+            fetchUsers();
+        } catch (error) {
+            enqueueSnackbar('Failed to delete user', { variant: 'error' });
+        }
     };
 
-    const handleAdd = () => {
-        setEditingUser(null);
-        setOpenDialog(true);
-    };
+    // Helper to update form
+    const updateField = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+    const updateNested = (parent, field, value) => setFormData(prev => ({
+        ...prev,
+        [parent]: { ...prev[parent], [field]: value }
+    }));
 
+    // Render Markup Pill
     const renderMarkupInfo = (user) => {
-        const m = user.markup;
-        if (!m) return <Chip label="Def" size="small" variant="outlined" />;
-        if (m.type === 'PERCENTAGE') return <Chip label={`${m.percentageValue}%`} size="small" color="primary" variant="outlined" />;
-        if (m.type === 'FLAT') return <Chip label={`${m.flatValue} KWD`} size="small" color="info" variant="outlined" />;
-        return <Chip label={`${m.percentageValue}% + ${m.flatValue}K`} size="small" color="secondary" variant="outlined" />;
+        const m = user.markup || { type: 'PERCENTAGE', percentageValue: 15, flatValue: 0 };
+        if (m.type === 'PERCENTAGE') return <StatusPill status="info" text={`${m.percentageValue}%`} />;
+        if (m.type === 'FLAT') return <StatusPill status="info" text={`${m.flatValue} KD`} />;
+        return <StatusPill status="warning" text={`${m.percentageValue}% + ${m.flatValue}K`} />;
     };
 
     return (
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Typography variant="h4" fontWeight="bold">User Management</Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={handleAdd}>
-                    Add New User
-                </Button>
-            </Box>
-
-            <Paper sx={{ mb: 3, p: 2 }}>
-                <Box display="flex" gap={2}>
-                    <FormControl size="small" sx={{ minWidth: 150 }}>
-                        <InputLabel>Filter by Role</InputLabel>
-                        <Select value={roleFilter} label="Filter by Role" onChange={(e) => setRoleFilter(e.target.value)}>
-                            <MenuItem value="">All Roles</MenuItem>
-                            <MenuItem value="client">Client</MenuItem>
-                            <MenuItem value="staff">Staff</MenuItem>
-                            <MenuItem value="admin">Admin</MenuItem>
-                            <MenuItem value="driver">Driver</MenuItem>
-                        </Select>
-                    </FormControl>
-                    <Button variant="outlined" onClick={fetchUsers}>Refresh</Button>
-                </Box>
-            </Paper>
-
-            <TableContainer component={Paper}>
-                <Table>
-                    <TableHead>
-                        <TableRow>
-                            <TableCell>Name & Contact</TableCell>
-                            <TableCell>Role</TableCell>
-                            <TableCell>Organization</TableCell>
-                            <TableCell>Config</TableCell>
-                            <TableCell>Markup</TableCell>
-                            <TableCell>Balance</TableCell>
-                            <TableCell>Actions</TableCell>
-                        </TableRow>
-                    </TableHead>
-                    <TableBody>
-                        {users.map((user) => (
-                            <TableRow key={user._id}>
-                                <TableCell>
-                                    <Typography variant="subtitle2" fontWeight="bold">{user.name}</Typography>
-                                    <Typography variant="caption" display="block">{user.email}</Typography>
-                                    <Typography variant="caption" color="text.secondary">{user.phone}</Typography>
-                                </TableCell>
-                                <TableCell>
-                                    <Chip
-                                        label={user.role}
-                                        size="small"
-                                        color={user.role === 'admin' ? 'error' : user.role === 'staff' ? 'warning' : 'default'}
-                                        variant="filled"
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    {user.organization ? (
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            <BusinessIcon fontSize="small" color="action" />
-                                            <Typography variant="body2">{user.organization.name}</Typography>
-                                        </Box>
-                                    ) : (
-                                        <Typography variant="caption" color="text.disabled">Solo Account</Typography>
-                                    )}
-                                </TableCell>
-                                <TableCell>
-                                    {user.carrierConfig?.preferredCarrier && (
-                                        <Chip label={user.carrierConfig.preferredCarrier} size="small" sx={{ fontSize: '0.7rem' }} />
-                                    )}
-                                </TableCell>
-                                <TableCell>
-                                    {renderMarkupInfo(user)}
-                                </TableCell>
-                                <TableCell>
-                                    <Typography
-                                        variant="body2"
-                                        color={user.balance < 0 ? 'error.main' : 'success.main'}
-                                        fontWeight="bold"
-                                    >
-                                        {user.balance?.toFixed(3)} KWD
-                                    </Typography>
-                                    <Typography variant="caption">Limit: {user.creditLimit}</Typography>
-                                </TableCell>
-                                <TableCell>
-                                    <Tooltip title="Edit User & Config">
-                                        <IconButton size="small" onClick={() => handleEdit(user)}>
-                                            <EditIcon />
-                                        </IconButton>
-                                    </Tooltip>
-                                    <IconButton size="small" color="error" onClick={() => handleDelete(user._id)}>
-                                        <DeleteIcon />
-                                    </IconButton>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
-
-            <UserManagementDialog
-                open={openDialog}
-                onClose={() => setOpenDialog(false)}
-                user={editingUser}
-                onSave={handleSave}
+        <div>
+            <PageHeader
+                title="User Management"
+                description="Administer system users, roles, and permissions."
+                action={
+                    <Button variant="primary" onClick={() => handleOpenDialog()}>
+                        Add New User
+                    </Button>
+                }
+                secondaryAction={
+                    <Button variant="secondary" onClick={fetchUsers}>
+                        Refresh
+                    </Button>
+                }
             />
-        </Container>
+
+            <FilterBar>
+                <div style={{ width: '250px' }}>
+                    <Select
+                        label="Filter by Role"
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                    >
+                        <option value="">All Roles</option>
+                        <option value="client">Client</option>
+                        <option value="staff">Staff</option>
+                        <option value="admin">Admin</option>
+                        <option value="driver">Driver</option>
+                    </Select>
+                </div>
+            </FilterBar>
+
+            <Card>
+                <TableWrapper>
+                    <Table>
+                        <Thead>
+                            <Tr>
+                                <Th>Name & Contact</Th>
+                                <Th>Role</Th>
+                                <Th>Organization</Th>
+                                <Th>Carrier Config</Th>
+                                <Th>Markup</Th>
+                                <Th>Balance</Th>
+                                <Th style={{ textAlign: 'right' }}>Actions</Th>
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {loading ? (
+                                <Tr><Td colSpan={7} style={{ textAlign: 'center' }}>Loading...</Td></Tr>
+                            ) : users.map(user => (
+                                <Tr key={user._id}>
+                                    <Td>
+                                        <div style={{ fontWeight: 'bold' }}>{user.name}</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{user.email}</div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{user.phone}</div>
+                                    </Td>
+                                    <Td>
+                                        <StatusPill
+                                            status={user.role === 'admin' ? 'error' : user.role === 'staff' ? 'warning' : 'success'}
+                                            text={user.role.toUpperCase()}
+                                        />
+                                    </Td>
+                                    <Td>
+                                        {user.organization ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                </svg>
+                                                {user.organization.name}
+                                            </div>
+                                        ) : <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>Solo Account</span>}
+                                    </Td>
+                                    <Td>
+                                        {user.carrierConfig?.preferredCarrier || 'Default'}
+                                    </Td>
+                                    <Td>{renderMarkupInfo(user)}</Td>
+                                    <Td>
+                                        <div style={{
+                                            color: (user.balance || 0) < 0 ? 'var(--accent-error)' : 'var(--accent-success)',
+                                            fontWeight: 'bold',
+                                            fontFamily: 'monospace'
+                                        }}>
+                                            {Number(user.balance || 0).toFixed(3)} KWD
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                            Limit: {user.creditLimit || 0}
+                                        </div>
+                                    </Td>
+                                    <Td style={{ textAlign: 'right' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                            <ActionButton $color="var(--accent-primary)" onClick={() => handleOpenDialog(user)}>
+                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                            </ActionButton>
+                                            <ActionButton $color="var(--accent-error)" onClick={() => handleDelete(user._id)}>
+                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </ActionButton>
+                                        </div>
+                                    </Td>
+                                </Tr>
+                            ))}
+                        </Tbody>
+                    </Table>
+                </TableWrapper>
+            </Card>
+
+            <Modal
+                isOpen={openDialog}
+                onClose={() => setOpenDialog(false)}
+                title={editingUser ? 'Edit User' : 'Create New User'}
+                width="800px"
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setOpenDialog(false)}>Cancel</Button>
+                        <Button variant="primary" onClick={handleSave}>Save User</Button>
+                    </>
+                }
+            >
+                <Tabs>
+                    <Tab active={activeTab === 'profile'} onClick={() => setActiveTab('profile')}>Profile</Tab>
+                    <Tab active={activeTab === 'org'} onClick={() => setActiveTab('org')}>Organization</Tab>
+                    <Tab active={activeTab === 'config'} onClick={() => setActiveTab('config')}>Config & Financials</Tab>
+                </Tabs>
+
+                <div style={{ marginTop: '24px' }}>
+                    {activeTab === 'profile' && (
+                        <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <Input label="Full Name *" value={formData.name || ''} onChange={e => updateField('name', e.target.value)} />
+                            </div>
+                            <Input label="Email *" type="email" value={formData.email || ''} onChange={e => updateField('email', e.target.value)} />
+                            <Input label="Phone" value={formData.phone || ''} onChange={e => updateField('phone', e.target.value)} />
+
+                            <Select label="Role" value={formData.role || 'client'} onChange={e => updateField('role', e.target.value)}>
+                                <option value="client">Client</option>
+                                <option value="staff">Staff</option>
+                                <option value="admin">Admin</option>
+                                <option value="driver">Driver</option>
+                            </Select>
+
+                            {!editingUser && (
+                                <Input label="Password *" type="password" value={formData.password || ''} onChange={e => updateField('password', e.target.value)} />
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'org' && (
+                        <div>
+                            <Alert severity="info" title="Organization Membership" style={{ marginBottom: '16px' }}>
+                                Users belonging to an organization share its balance and credit limit.
+                            </Alert>
+                            <Select
+                                label="Select Organization"
+                                value={formData.organization || ''}
+                                onChange={e => updateField('organization', e.target.value)}
+                            >
+                                <option value="">-- No Organization (Solo) --</option>
+                                {organizations.map(org => (
+                                    <option key={org._id} value={org._id}>{org.name} ({org.type})</option>
+                                ))}
+                            </Select>
+                        </div>
+                    )}
+
+                    {activeTab === 'config' && (
+                        <div style={{ display: 'grid', gap: '24px' }}>
+                            <Card title="Financial Settings" variant="subtle">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <Input label="Current Balance (KWD)" type="number" value={formData.balance || 0} onChange={e => updateField('balance', e.target.value)} />
+                                    <Input label="Credit Limit (KWD)" type="number" value={formData.creditLimit || 0} onChange={e => updateField('creditLimit', e.target.value)} />
+                                </div>
+                            </Card>
+
+                            <Card title="Markup Configuration" variant="subtle">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                                    <Select
+                                        label="Markup Type"
+                                        value={formData.markup?.type || 'PERCENTAGE'}
+                                        onChange={e => updateNested('markup', 'type', e.target.value)}
+                                    >
+                                        <option value="PERCENTAGE">% Only</option>
+                                        <option value="FLAT">Flat Only</option>
+                                        <option value="COMBINED">Combined</option>
+                                    </Select>
+                                    <Input
+                                        label="Percentage %"
+                                        type="number"
+                                        value={formData.markup?.percentageValue || 0}
+                                        onChange={e => updateNested('markup', 'percentageValue', e.target.value)}
+                                    />
+                                    <Input
+                                        label="Flat Value"
+                                        type="number"
+                                        value={formData.markup?.flatValue || 0}
+                                        onChange={e => updateNested('markup', 'flatValue', e.target.value)}
+                                    />
+                                </div>
+                            </Card>
+
+                            <Card title="Carrier Config" variant="subtle">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <Select
+                                        label="Preferred Carrier"
+                                        value={formData.carrierConfig?.preferredCarrier || 'DGR'}
+                                        onChange={e => updateNested('carrierConfig', 'preferredCarrier', e.target.value)}
+                                    >
+                                        <option value="DGR">DGR Express</option>
+                                        <option value="DHL">DHL</option>
+                                        <option value="FEDEX">FedEx</option>
+                                    </Select>
+                                    <Input
+                                        label="Tax / VAT ID"
+                                        value={formData.carrierConfig?.vatNo || ''}
+                                        onChange={e => updateNested('carrierConfig', 'vatNo', e.target.value)}
+                                    />
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+                </div>
+            </Modal>
+        </div>
     );
 };
 

@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     Dialog, DialogTitle, DialogContent, DialogActions, Button,
     TextField, FormControl, InputLabel, Select, MenuItem,
-    Box, Tabs, Tab, Typography, Grid, IconButton, InputAdornment,
-    Switch, FormControlLabel, Divider, Alert
+    Box, Tabs, Tab, Typography, Grid, InputAdornment,
+    Divider, Alert
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { organizationService } from '../../services/api';
@@ -30,7 +30,7 @@ const UserManagementDialog = ({ open, onClose, user, onSave, refreshTrigger }) =
             if (!initialData.markup) initialData.markup = { type: 'PERCENTAGE', percentageValue: 15, flatValue: 0 };
 
             // Map legacy or missing fields if needed
-            if (!initialData.carrierConfig.preferredCarrier) initialData.carrierConfig.preferredCarrier = 'DHL';
+            if (!initialData.carrierConfig.preferredCarrier) initialData.carrierConfig.preferredCarrier = 'DGR';
 
             setFormData(initialData);
             setTabIndex(0);
@@ -288,11 +288,12 @@ const UserManagementDialog = ({ open, onClose, user, onSave, refreshTrigger }) =
                                 <FormControl fullWidth>
                                     <InputLabel>Preferred Carrier</InputLabel>
                                     <Select
-                                        value={formData.carrierConfig?.preferredCarrier || 'DHL'}
+                                        value={formData.carrierConfig?.preferredCarrier || 'DGR'}
                                         label="Preferred Carrier"
                                         onChange={(e) => handleCarrierConfigChange('preferredCarrier', e.target.value)}
                                     >
-                                        <MenuItem value="DHL">DHL Express</MenuItem>
+                                        <MenuItem value="DGR">DGR Express</MenuItem>
+                                        <MenuItem value="DHL">DHL (Legacy)</MenuItem>
                                         <MenuItem value="FEDEX">FedEx</MenuItem>
                                         <MenuItem value="UPS">UPS</MenuItem>
                                     </Select>

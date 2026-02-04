@@ -40,6 +40,9 @@ router.get('/', shipmentController.getAllShipments);
 // Get rate quotes
 router.post('/quote', shipmentController.getQuotes);
 
+// Get available carriers
+router.get('/carriers', shipmentController.getAvailableCarriers);
+
 // Get shipments near a location
 router.get(
   '/nearby',
@@ -193,14 +196,14 @@ router.post(
   shipmentController.processWarehouseScan
 );
 
-// Submit to DHL (Staff Only - logic in controller can enforce roles if needed, or add middleware here)
+// Submit to Carrier (Staff Only)
 router.post(
-  '/:trackingNumber/dhl',
+  '/:trackingNumber/book',
   [
     param('trackingNumber').isString().notEmpty().withMessage('Valid tracking number is required'),
     validate
   ],
-  shipmentController.submitToDhl
+  shipmentController.bookWithCarrier
 );
 
 // Update a checkpoint
