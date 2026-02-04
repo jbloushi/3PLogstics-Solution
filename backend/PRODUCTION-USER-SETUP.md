@@ -21,10 +21,41 @@ This creates:
 
 ---
 
+## 🐳 **For Production: Always Run Inside Docker**
+
+When using Docker deployment with MongoDB authentication, **you must run these scripts inside the Docker container**:
+
+```bash
+# Create default users
+docker exec -it target-logistics-api npm run create-default-users
+
+# Or create a single user interactively
+docker exec -it target-logistics-api npm run create-user
+
+# Or create from a custom JSON file
+docker exec -it target-logistics-api npm run create-users scripts/your-file.json
+```
+
+### Why Docker Execution is Required
+
+Your MongoDB runs in Docker with authentication enabled. The Docker container has the correct connection details in its environment (`MONGO_URI`, credentials), but the host system doesn't have these MongoDB credentials configured. Running the scripts from the host will fail to connect to the database.
+
+### 🔒 Security Recommendation
+
+**Change the default passwords after your first login!** These are demo credentials and should be updated immediately for production security.
+
+---
+
 ## 🔐 Production Best Practice
 
 ### Create Custom Admin User
 
+**For Docker deployments:**
+```bash
+docker exec -it target-logistics-api npm run create-user
+```
+
+**For non-Docker deployments:**
 ```bash
 npm run create-user
 ```
