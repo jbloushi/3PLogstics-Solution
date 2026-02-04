@@ -14,9 +14,11 @@ const mapContainerStyle = {
 const defaultCenter = { lat: 0, lng: 0 }; // Atlantic default
 
 const LocationPicker = ({ initialLocation, fallbackLocation, onLocationChange }) => {
+    const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+        googleMapsApiKey: apiKey,
         libraries
     });
 
@@ -177,6 +179,14 @@ const LocationPicker = ({ initialLocation, fallbackLocation, onLocationChange })
             }
         };
     }, []);
+
+    if (!apiKey) {
+        return (
+            <Alert severity="error" sx={{ m: 2 }}>
+                Google Maps API key not configured. Set REACT_APP_GOOGLE_MAPS_API_KEY in your .env file.
+            </Alert>
+        );
+    }
 
     if (!isLoaded) return <CircularProgress />;
 

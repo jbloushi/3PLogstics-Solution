@@ -104,26 +104,26 @@ services:
   # Frontend Service (Optional - Production Build)
   # ========================================
   # Uncomment to run frontend in Docker
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #     args:
-  #       REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000/api}
-  #       REACT_APP_GOOGLE_MAPS_API_KEY: ${REACT_APP_GOOGLE_MAPS_API_KEY}
-  #   
-  #   container_name: target-logistics-frontend
-  #   restart: unless-stopped
-  #   
-  #   ports:
-  #     - "${FRONTEND_PORT:-8833}:80"
-  #   
-  #   networks:
-  #     - target-logistics-network
-  #   
-  #   depends_on:
-  #     - backend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-/api}
+        REACT_APP_GOOGLE_MAPS_API_KEY: ${REACT_APP_GOOGLE_MAPS_API_KEY}
+        REACT_APP_MAPBOX_TOKEN: ${REACT_APP_MAPBOX_TOKEN}
 
+    container_name: target-logistics-frontend
+    restart: unless-stopped
+
+    ports:
+      - "${FRONTEND_PORT:-8833}:80"
+
+    networks:
+      - target-logistics-network
+
+    depends_on:
+      - backend
   # ========================================
   # Networks
   # ========================================

@@ -33,10 +33,50 @@ A modern React application for shipment tracking with Google Maps integration.
 
 ## 🔧 Environment Variables
 
+Create a `.env` file in the frontend directory:
+
 ```env
-REACT_APP_API_URL=http://localhost:5000/api
-REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_key
+# Backend API endpoint
+REACT_APP_API_URL=/api
+
+# Google Maps API Key (REQUIRED for address autofill)
+# Get your key from: https://console.cloud.google.com/google/maps-apis
+# Required APIs: Maps JavaScript API, Places API, Geocoding API
+REACT_APP_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
+
+# Mapbox Token (Optional)
+REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
 ```
+
+### Production Deployment
+
+For production builds, ensure the environment variables are set:
+
+**Option 1: Docker Build**
+```bash
+docker build \
+  --build-arg REACT_APP_API_URL=/api \
+  --build-arg REACT_APP_GOOGLE_MAPS_API_KEY=your_key \
+  --build-arg REACT_APP_MAPBOX_TOKEN=your_token \
+  -t target-logistics-frontend .
+```
+
+**Option 2: Docker Compose**
+```bash
+# Create a .env file in the root directory
+echo "REACT_APP_GOOGLE_MAPS_API_KEY=your_key" >> .env
+echo "REACT_APP_MAPBOX_TOKEN=your_token" >> .env
+
+# Build and run
+docker-compose up -d
+```
+
+**Option 3: GitHub Actions**
+Add the following secrets to your repository:
+- `REACT_APP_GOOGLE_MAPS_API_KEY`
+- `REACT_APP_MAPBOX_TOKEN`
+
+> ⚠️ **Important**: Without the Google Maps API key, address autofill will not work in production!
 
 ## 🚀 Quick Start
 

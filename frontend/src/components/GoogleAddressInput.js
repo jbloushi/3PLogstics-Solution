@@ -25,9 +25,23 @@ const GoogleAddressInput = ({
     error,
     helperText
 }) => {
+    // Validate API key is configured
+    const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+
+    React.useEffect(() => {
+        if (!apiKey) {
+            console.error(
+                '🔴 GOOGLE MAPS API KEY MISSING!\n' +
+                'Address autofill will not work.\n' +
+                'Set REACT_APP_GOOGLE_MAPS_API_KEY in your .env file.\n' +
+                'See: https://console.cloud.google.com/google/maps-apis'
+            );
+        }
+    }, [apiKey]);
+
     const { isLoaded } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+        googleMapsApiKey: apiKey,
         libraries
     });
 
@@ -123,10 +137,14 @@ const GoogleAddressInput = ({
                 <TextField
                     {...params}
                     label={label}
-                    disabled={!ready || disabled}
+                    disabled={!ready || disabled || !apiKey}
                     required={required}
-                    error={!!error}
-                    helperText={helperText}
+                    error={!!error || !apiKey}
+                    helperText={
+                        !apiKey
+                            ? "⚠️ Google Maps API key not configured"
+                            : helperText
+                    }
                     InputProps={{
                         ...params.InputProps,
                         startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,

@@ -25,10 +25,11 @@ const statusColors = {
 
 const GoogleMapAll = ({ shipments }) => {
     const [selectedShipment, setSelectedShipment] = useState(null);
+    const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
     const { isLoaded, loadError } = useJsApiLoader({
         id: 'google-map-script',
-        googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
+        googleMapsApiKey: apiKey,
         libraries
     });
 
@@ -70,6 +71,16 @@ const GoogleMapAll = ({ shipments }) => {
             map.fitBounds(bounds);
         }
     }, [markers]);
+
+    if (!apiKey) {
+        return (
+            <Box display="flex" justifyContent="center" alignItems="center" height="100%" p={2}>
+                <Alert severity="error">
+                    Google Maps API key not configured. Set REACT_APP_GOOGLE_MAPS_API_KEY in your .env file.
+                </Alert>
+            </Box>
+        );
+    }
 
     if (loadError) {
         return (
