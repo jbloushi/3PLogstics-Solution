@@ -1,0 +1,30 @@
+[
+    {
+        "name": "System Admin",
+        "email": "admin@demo.com",
+        "password": "password123",
+        "role": "admin",
+        "phone": "96511111111"
+    },
+    {
+        "name": "Operations Staff",
+        "email": "staff@demo.com",
+        "password": "password123",
+        "role": "staff",
+        "phone": "96522222222"
+    },
+    {
+        "name": "Default Client",
+        "email": "client@demo.com",
+        "password": "password123",
+        "role": "client",
+        "phone": "96533333333"
+    },
+    {
+        "name": "Delivery Driver",
+        "email": "driver@demo.com",
+        "password": "password123",
+        "role": "driver",
+        "phone": "96544444444"
+    }
+]
