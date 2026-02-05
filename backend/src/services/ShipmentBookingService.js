@@ -6,7 +6,7 @@ const CarrierFactory = require('./CarrierFactory');
 const PricingService = require('./pricing.service');
 const CarrierDocumentService = require('./CarrierDocumentService');
 const logger = require('../utils/logger');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 class ShipmentBookingService {
 
@@ -43,7 +43,7 @@ class ShipmentBookingService {
         }
 
         // --- STEP A: Atomic Placeholder (Pending) ---
-        const attemptId = uuidv4();
+        const attemptId = crypto.randomUUID();
         shipment.bookingAttempts.push({
             attemptId,
             status: 'pending'
