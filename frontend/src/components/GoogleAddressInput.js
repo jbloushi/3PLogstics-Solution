@@ -9,8 +9,10 @@ import {
     Autocomplete as MuiAutocomplete,
     Box,
     Typography,
-    CircularProgress
+    CircularProgress,
+    Alert
 } from '@mui/material';
+
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SearchIcon from '@mui/icons-material/Search';
 
@@ -134,28 +136,33 @@ const GoogleAddressInput = ({
                 }
             }}
             renderInput={(params) => (
-                <TextField
-                    {...params}
-                    label={label}
-                    disabled={!ready || disabled || !apiKey}
-                    required={required}
-                    error={!!error || !apiKey}
-                    helperText={
-                        !apiKey
-                            ? "⚠️ Google Maps API key not configured"
-                            : helperText
-                    }
-                    InputProps={{
-                        ...params.InputProps,
-                        startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
-                        endAdornment: (
-                            <>
-                                {!ready && <CircularProgress size={20} />}
-                                {params.InputProps.endAdornment}
-                            </>
-                        )
-                    }}
-                />
+                <>
+                    <TextField
+                        {...params}
+                        label={label}
+                        disabled={!ready || disabled || !apiKey}
+                        required={required}
+                        error={!!error || !apiKey}
+                        helperText={helperText}
+                        InputProps={{
+                            ...params.InputProps,
+                            startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+                            endAdornment: (
+                                <>
+                                    {!ready && <CircularProgress size={20} />}
+                                    {params.InputProps.endAdornment}
+                                </>
+                            )
+                        }}
+                    />
+                    {!apiKey && (
+                        <Box mt={1}>
+                            <Alert severity="error">
+                                Google Maps API Key is missing. Autofill disabled.
+                            </Alert>
+                        </Box>
+                    )}
+                </>
             )}
             renderOption={(props, optionId) => {
                 const suggestion = data.find(d => d.place_id === optionId);

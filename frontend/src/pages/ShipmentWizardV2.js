@@ -667,7 +667,10 @@ const ShipmentWizardV2 = () => {
                 phoneCountryCode: defaultAddress.phoneCountryCode || prev.phoneCountryCode,
 
                 // Address (only if default exists)
-                streetLines: defaultAddress.streetLines || prev.streetLines,
+                streetLines: defaultAddress.streetLines || (defaultAddress.street ? [defaultAddress.street] : []) || prev.streetLines,
+                buildingName: defaultAddress.buildingName || prev.buildingName,
+                unitNumber: defaultAddress.unitNumber || prev.unitNumber,
+                landmark: defaultAddress.landmark || prev.landmark,
                 city: defaultAddress.city || prev.city,
                 state: defaultAddress.state || prev.state,
                 postalCode: defaultAddress.postalCode || prev.postalCode,

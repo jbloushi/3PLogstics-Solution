@@ -151,7 +151,12 @@ const Sidebar = () => {
                                                     primaryTypographyProps={{
                                                         fontSize: '14px',
                                                         fontWeight: 500,
-                                                        color: 'inherit'
+                                                        color: 'inherit',
+                                                        noWrap: true,
+                                                        sx: {
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
+                                                        }
                                                     }}
                                                 />
                                             </ListItemButton>
@@ -201,7 +206,12 @@ const Sidebar = () => {
                                             primaryTypographyProps={{
                                                 fontSize: '14px',
                                                 fontWeight: 500,
-                                                color: 'inherit'
+                                                color: 'inherit',
+                                                noWrap: true,
+                                                sx: {
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis'
+                                                }
                                             }}
                                         />
                                     </ListItemButton>
@@ -249,3 +259,4 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+

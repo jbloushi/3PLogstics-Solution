@@ -114,8 +114,8 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
     };
 
     const validate = () => {
-        if (!formData.origin.streetLines?.[0] && !formData.origin.formattedAddress) return "Sender Address missing";
-        if (!formData.destination.streetLines?.[0] && !formData.destination.formattedAddress) return "Receiver Address missing";
+        if (!formData.origin.streetLines?.[0] && !formData.origin.formattedAddress) return "Sender Street Address missing";
+        if (!formData.destination.streetLines?.[0] && !formData.destination.formattedAddress) return "Receiver Street Address missing";
         if (!formData.items || formData.items.length === 0) return "No items defined";
         return null;
     };
@@ -150,7 +150,9 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
             onShipmentUpdated();
             // Modal closes via parent callback usually, but here we invoke onClose too just in case
         } catch (err) {
-            setError(err.response?.data?.error || err.message || "Operation Failed");
+            console.error("Booking Error:", err);
+            const msg = err.response?.data?.error || err.message || "Operation Failed";
+            setError(msg);
         } finally {
             setLoading(false);
         }

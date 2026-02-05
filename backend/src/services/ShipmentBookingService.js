@@ -58,8 +58,9 @@ class ShipmentBookingService {
             carrierResult = await adapter.createShipment(this.mapToCarrierPayload(shipment), shipment.serviceCode);
         } catch (error) {
             // Handle Failure
+            // Save detailed error to DB but rethrow specific message
             await this.handleBookingFailure(shipment._id, attemptId, error.message);
-            throw error; // Re-throw to controller
+            throw error; // Re-throw to controller so it can send 400 with specific message
         }
 
         // --- STEP C: Atomic Commit (Transaction) ---
