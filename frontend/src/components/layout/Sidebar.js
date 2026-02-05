@@ -32,7 +32,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BusinessIcon from '@mui/icons-material/Business';
 import { useAuth } from '../../context/AuthContext';
 
-const DRAWER_WIDTH = 280;
+const DRAWER_WIDTH = 240;
 
 const Sidebar = () => {
     const theme = useTheme();
