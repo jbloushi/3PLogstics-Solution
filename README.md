@@ -167,6 +167,7 @@ Before going live, ensure you've completed:
 
 For step-by-step VPS deployment, Nginx configuration, SSL setup, and production best practices, see:
 - [**OPERATIONS.md**](docs/OPERATIONS.md) - Complete deployment guide
+- [**AAPANEL_DEPLOYMENT.md**](docs/AAPANEL_DEPLOYMENT.md) - aaPanel VPS update guide
 - [**backend/PRODUCTION-USER-SETUP.md**](backend/PRODUCTION-USER-SETUP.md) - User management in production
 
 ---
