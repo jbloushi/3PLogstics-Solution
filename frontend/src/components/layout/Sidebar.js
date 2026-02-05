@@ -47,7 +47,7 @@ const Sidebar = () => {
         { text: 'Tracking', icon: <MapIcon />, path: '/tracking', disabled: true, tooltip: 'Coming Soon' },
         { text: 'Warehouse', icon: <WarehouseIcon />, path: '/warehouse', disabled: true, tooltip: 'Coming Soon' },
         { text: 'Fleets', icon: <DirectionsBusIcon />, path: '/fleets', disabled: true, tooltip: 'Coming Soon' },
-        { text: 'Users', icon: <PersonIcon />, path: '/admin/users', adminOnly: true },
+        { text: 'User Management', icon: <PersonIcon />, path: '/admin/users', adminOnly: true },
         { text: 'Organizations', icon: <BusinessIcon />, path: '/admin/organizations', staffOnly: true },
         { text: 'Address Book', icon: <MenuBookIcon />, path: '/address-book', restricted: true },
         { text: 'Drivers', icon: <PersonIcon />, path: '/drivers', disabled: true, restricted: true, tooltip: 'Coming Soon' },
