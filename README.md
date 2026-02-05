@@ -89,6 +89,88 @@ If you need to reset the system to its default state or recover the admin passwo
 
 ---
 
+## 🚀 Production Deployment (VPS)
+
+### Prerequisites
+- Ubuntu 20.04+ or similar Linux distribution
+- Node.js 18.x
+- MongoDB (standalone or Docker)
+- Domain name with DNS configured (optional but recommended)
+
+### Quick Production Setup
+
+#### 1. Generate Secure Credentials
+```bash
+node scripts/generate-secrets.js
+```
+This will generate secure JWT secrets and MongoDB passwords. **Save these values!**
+
+#### 2. Configure Backend Environment
+```bash
+cd backend
+cp .env.production.example .env
+nano .env
+```
+
+Update the following **REQUIRED** values:
+- `JWT_SECRET` - Use the generated value from step 1
+- `MONGO_URI` - Update password with generated value
+- `DHL_API_KEY` & `DHL_API_SECRET` - Your DHL credentials from [developer.dhl.com](https://developer.dhl.com/)
+- `GOOGLE_MAPS_API_KEY` - Your key from [Google Cloud Console](https://console.cloud.google.com/)
+- `CORS_ORIGIN` - Set to your domain(s): `https://yourdomain.com`
+
+#### 3. Configure Frontend Environment
+```bash
+cd frontend
+cp .env.production.example .env.production
+nano .env.production
+```
+
+Update:
+- `REACT_APP_GOOGLE_MAPS_API_KEY` - Same as backend
+
+#### 4. Deploy with Docker (Recommended)
+```bash
+# From project root
+cp .env.example .env
+nano .env  # Update MongoDB password from step 1
+
+docker-compose up -d
+```
+
+#### 5. Create Default Users
+```bash
+docker exec -it target-logistics-api npm run create-default-users
+```
+
+#### 6. Verify Deployment
+```bash
+curl http://localhost:8899/health
+# Expected: {"status":"ok","database":"connected"}
+```
+
+### 🔒 Security Checklist
+
+Before going live, ensure you've completed:
+
+- [ ] Changed all default passwords and secrets
+- [ ] Set `NODE_ENV=production` in backend/.env
+- [ ] Updated `CORS_ORIGIN` to your actual domain (not `*`)
+- [ ] Replaced demo DHL API credentials with your own
+- [ ] Replaced demo Google Maps API key with your own
+- [ ] Configured HTTPS/SSL (use Let's Encrypt with Nginx)
+- [ ] Set up firewall rules (UFW recommended)
+- [ ] Configured MongoDB authentication
+- [ ] Reviewed all `.env` files for sensitive data
+
+### 📖 Detailed Deployment Guide
+
+For step-by-step VPS deployment, Nginx configuration, SSL setup, and production best practices, see:
+- [**OPERATIONS.md**](docs/OPERATIONS.md) - Complete deployment guide
+- [**backend/PRODUCTION-USER-SETUP.md**](backend/PRODUCTION-USER-SETUP.md) - User management in production
+
+---
+
 ## 🛠️ Technology Stack
 
 | Layer | Technology |
