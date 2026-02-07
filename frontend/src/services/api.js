@@ -235,15 +235,6 @@ export const shipmentService = {
       throw error;
     }
   },
-  getCarriers: async () => {
-    try {
-      const response = await api.get('/shipments/carriers');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching carriers:', error);
-      throw error;
-    }
-  },
 
   // Submit to DGR (Generic Carrier Booking)
   submitToDgr: async (trackingNumber, carrierCode = 'DGR') => {
@@ -420,7 +411,10 @@ export const shipmentService = {
   },
 
   // Seed database with sample data (development only)
-  seedDatabase: async () => {
+  seedDatabase: async (req, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ success: false, error: 'Seeding disabled in production' });
+    }
     try {
       const response = await api.post('/shipments/seed');
       return response.data;
@@ -432,6 +426,9 @@ export const shipmentService = {
 
   // Seed database with Indian shipment data
   seedIndianData: async (count = 15) => {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Seeding disabled in production');
+    }
     try {
       const response = await api.post(`/shipments/seed/india?count=${count}`);
       return response.data;

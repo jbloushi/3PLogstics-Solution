@@ -3,7 +3,8 @@ import styled from 'styled-components';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/api';
-import { PageHeader, Button, Card, Modal, AddressPanel, Input } from '../ui';
+import { PageHeader, Button, Card, Modal, Input } from '../ui';
+import AddressPanel from '../components/AddressPanel';
 
 // Custom Table Styles (Sharing with Dashboard but inline for now as requested)
 const TableWrapper = styled.div`
@@ -327,10 +328,9 @@ const AddressBookPage = () => {
             >
                 <div style={{ padding: '0 8px' }}>
                     <AddressPanel
-                        title="" // No title inside modal
-                        values={editingAddress || {}}
+                        titleOverride="" // No title inside modal
+                        value={editingAddress || {}}
                         onChange={setEditingAddress}
-                        variant="default"
                     />
                 </div>
             </Modal>

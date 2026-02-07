@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { shipmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Modal, Button, AddressPanel, Input, Select, Alert, Loader, Card } from '../ui';
+import { Modal, Button, AddressPanel, Input, Select, Alert, Loader } from '../ui';
 
 const TwoCol = styled.div`
     display: grid;
@@ -79,7 +79,7 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
             setError(null);
 
             if (!isClient) {
-                shipmentService.getCarriers().then(res => {
+                shipmentService.getAvailableCarriers().then(res => {
                     if (res.success) setAvailableCarriers(res.data);
                 }).catch(err => console.error("Carrier Fetch Failed", err));
             }
@@ -244,14 +244,16 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
 
                 <TwoCol>
                     <AddressPanel
-                        title="Shipper"
-                        values={formData.origin}
+                        type="sender"
+                        titleOverride="SHIPPER (From)"
+                        value={formData.origin}
                         onChange={(val) => handleAddressChange('origin', val)}
                         disabled={!editMode}
                     />
                     <AddressPanel
-                        title="Receiver"
-                        values={formData.destination}
+                        type="receiver"
+                        titleOverride="RECEIVER (To)"
+                        value={formData.destination}
                         onChange={(val) => handleAddressChange('destination', val)}
                         disabled={!editMode}
                     />

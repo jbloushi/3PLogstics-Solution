@@ -11,6 +11,7 @@ const Ledger = require('../models/ledger.model');
 const PricingService = require('../services/pricing.service');
 const ShipmentDraftService = require('../services/ShipmentDraftService');
 const ShipmentBookingService = require('../services/ShipmentBookingService');
+const { generateTrackingNumber } = require('../utils/shipmentUtils');
 
 const buildHistoryKey = (event) => {
   const time = event?.timestamp ? new Date(event.timestamp).toISOString() : '';
@@ -74,17 +75,6 @@ const syncCarrierTrackingHistory = async (shipment) => {
   }
 };
 
-// Helper function to generate a tracking number
-const generateTrackingNumber = () => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 12; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-    if ((i + 1) % 4 === 0 && i < 11) result += '-';
-  }
-  return result;
-};
-
 // Calculate estimated delivery date (simple implementation - could be enhanced with distance calculation)
 const calculateEstimatedDelivery = () => {
   const deliveryDate = new Date();
@@ -95,10 +85,6 @@ const calculateEstimatedDelivery = () => {
 // Create a new shipment
 exports.createShipment = async (req, res) => {
   try {
-    // Check MongoDB connection first
-    if (mongoose.connection.readyState !== 1) {
-      await require('../config/database').connectDB();
-    }
 
     // Delegate to Service
     const shipment = await ShipmentDraftService.createDraft(req.body, req.user);

@@ -4,10 +4,9 @@ import { useSnackbar } from 'notistack';
 import {
     Container, Card, Typography, Button, Box, Grid,
     Divider, CardContent, CircularProgress, Alert, Chip, IconButton,
-    Tooltip, TextField, Stack, Paper, Collapse, Fade, Zoom,
-    Menu, MenuItem, LinearProgress,
+    Tooltip, Stack, Paper, Fade, Zoom,
+    Menu, MenuItem,
     FormControl, InputLabel, Select,
-    FormControlLabel, Switch,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     ThemeProvider, createTheme
 } from '@mui/material';
@@ -39,8 +38,8 @@ import { formatPartyAddress } from '../utils/addressFormatter';
 import ShipmentSetup from '../components/shipment/ShipmentSetup';
 import ShipmentContent from '../components/shipment/ShipmentContent';
 import ShipmentBilling from '../components/shipment/ShipmentBilling';
-import { shipmentService } from '../services/api';
-import axios from 'axios';
+import api, { shipmentService } from '../services/api';
+
 
 // --- Custom Dark Theme Local Override ---
 const darkFormTheme = createTheme({
@@ -96,26 +95,17 @@ const AUTOFILL_SCENARIOS = {
             'Full Business Shipment (DAP)': {
                 sender: {
                     company: 'Target Logistics Hub KW', contactPerson: 'Ahmed Al-Sabah', phone: '90001234', phoneCountryCode: '+965', email: 'shipments@target-kw.com',
-                    // ... rest of scenarios ...
-                    area: 'Shuwaikh Industrial 1', city: 'Kuwait City', state: 'Asimah', countryCode: 'KW', postalCode: '70050',
+                    streetLines: ['Street 20, Plot 5'],
                     buildingName: 'Logistics Center', unitNumber: 'Dock 4', landmark: 'Near Port Authority',
-                    streetLines: ['Shuwaikh Industrial 1, Block A, St 45'],
-                    taxId: '300012345600003',
-                    vatNumber: '300012345600003',
-                    eoriNumber: 'KW123456789012',
-                    traderType: 'business',
-                    reference: 'OUT-2024-001'
+                    area: 'Shuwaikh Industrial', city: 'Kuwait City', state: 'Asimah', countryCode: 'KW', postalCode: '70050',
+                    vatNumber: 'KW-VAT-12345', eoriNumber: 'KW-EORI-98765', taxId: 'KW-TAX-112233', traderType: 'business', reference: 'REF-KW-001'
                 },
                 receiver: {
-                    company: 'Grand Tech Solutions LLC', contactPerson: 'Johnathan Doe', phone: '501234567', phoneCountryCode: '+971', email: 'ops@techsolutions.ae',
-                    area: 'Business Bay', city: 'Dubai', state: 'Dubai', countryCode: 'AE', postalCode: '00000',
-                    buildingName: 'The Binary', unitNumber: 'Suite 2104', landmark: 'Near Metro',
-                    streetLines: ['Al Abraj Street, Business Bay'],
-                    vatNumber: '100223344550003',
-                    taxId: '100223344550003',
-                    eoriNumber: 'AE123456789012',
-                    traderType: 'business',
-                    reference: 'PO-998877'
+                    company: 'Global Retailers Inc', contactPerson: 'Sarah Jenkins', phone: '2025550123', phoneCountryCode: '+1', email: 'receiving@global-retail.com',
+                    streetLines: ['123 Commerce Blvd'],
+                    buildingName: 'Trade Tower', unitNumber: 'Suite 2104', landmark: 'Opposite Central Park',
+                    area: 'Manhattan', city: 'New York', state: 'NY', countryCode: 'US', postalCode: '10001',
+                    vatNumber: 'US-VAT-554433', eoriNumber: 'US-EORI-223344', taxId: 'EIN-99887766', traderType: 'business', reference: 'PO-998877'
                 },
                 parcels: [
                     { description: 'Precision Tools', weight: 14.2, length: 50, width: 40, height: 30, quantity: 1, declaredValue: 2450, hsCode: '8207.50.30', countryOfOrigin: 'US' }
@@ -127,15 +117,18 @@ const AUTOFILL_SCENARIOS = {
         'DG': {
             'Dry Ice (UN1845)': {
                 sender: {
-                    // ... (Copied from user sample)
                     company: 'ColdChain KW', contactPerson: 'Sara K', phone: '90005555', phoneCountryCode: '+965', email: 'cold@test.kw',
+                    streetLines: ['Block 5, Street 12'],
                     city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
-                    streetLines: ['Block 5, Street 12']
+                    buildingName: 'Frozen Logistics', unitNumber: 'Dock 1', area: 'Sulaibiya',
+                    vatNumber: 'KW-COLD-123', taxId: 'KW-TAX-456', reference: 'ICE-999', traderType: 'business'
                 },
                 receiver: {
                     company: 'Lab DE', contactPerson: 'Max M', phone: '4930000000', phoneCountryCode: '+49', email: 'lab@test.de',
+                    streetLines: ['Invalidenstr 1'],
                     city: 'Berlin', countryCode: 'DE', postalCode: '10115',
-                    streetLines: ['Invalidenstr 1']
+                    buildingName: 'Medical Center', unitNumber: 'Level 4', area: 'Mitte',
+                    vatNumber: 'DE-VAT-789', taxId: 'DE-TAX-012', reference: 'LAB-REQ-88', traderType: 'business'
                 },
                 parcels: [{ description: 'Insulated box', weight: 3, length: 30, width: 25, height: 20, quantity: 1, declaredValue: 120, hsCode: '3822.90.00', countryOfOrigin: 'KW' }],
                 incoterm: 'DAP',
@@ -153,13 +146,15 @@ const AUTOFILL_SCENARIOS = {
             'Lithium Batteries (PI Section II)': {
                 sender: {
                     company: 'KWT Tech', contactPerson: 'Ali A', phone: '90000001', phoneCountryCode: '+965', email: 'tech@test.kw',
+                    streetLines: ['Tech Park, Building 2'],
                     city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
-                    streetLines: ['Tech Park, Building 2']
+                    area: 'Ardiya', vatNumber: 'VAT-TECH-1', eoriNumber: 'EORI-TECH-1', taxId: 'TAX-TECH-1', reference: 'BAT-001', traderType: 'business'
                 },
                 receiver: {
                     company: 'Receiver Ltd', contactPerson: 'John J', phone: '44200000', phoneCountryCode: '+44', email: 'recv@test.gb',
+                    streetLines: ['10 Downing St'],
                     city: 'London', countryCode: 'GB', postalCode: 'SW1A 1AA',
-                    streetLines: ['10 Downing St']
+                    area: 'Westminster', vatNumber: 'UK-VAT-99', eoriNumber: 'GB-EORI-99', taxId: 'UK-TAX-99', reference: 'ORDER-LI', traderType: 'business'
                 },
                 parcels: [{ description: 'Electronics box', weight: 2, length: 25, width: 20, height: 10, quantity: 1, declaredValue: 300, hsCode: '8526.91.00', countryOfOrigin: 'CN' }],
                 incoterm: 'DAP',
@@ -176,16 +171,17 @@ const AUTOFILL_SCENARIOS = {
             'Consumer Commodity (ID8000)': {
                 sender: {
                     company: 'Retail KW', contactPerson: 'Mona M', phone: '90000002', phoneCountryCode: '+965', email: 'retail@test.kw',
-                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
                     streetLines: ['Retail Hub, Gate 3'],
-                    traderType: 'business'
+                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
+                    buildingName: 'Mall of Kuwait', area: 'Fahaheel',
+                    vatNumber: 'KW-VAT-888', eoriNumber: 'KW-EORI-888', taxId: 'KW-TAX-888', reference: 'RETAIL-001', traderType: 'business'
                 },
                 receiver: {
                     company: 'AU Shop', contactPerson: 'Sam S', phone: '61200000', phoneCountryCode: '+61', email: 'au@test.au',
-                    city: 'Sydney', countryCode: 'AU', postalCode: '2000',
                     streetLines: ['1 George St'],
-                    traderType: 'business',
-                    reference: 'REF-AU-123'
+                    city: 'Sydney', countryCode: 'AU', postalCode: '2000',
+                    buildingName: 'Sydney Trade Center', area: 'CBD',
+                    vatNumber: 'AU-VAT-111', eoriNumber: 'AU-EORI-111', taxId: 'AU-TAX-111', reference: 'REF-AU-123', traderType: 'business'
                 },
                 parcels: [{ description: 'Small box', weight: 1, length: 20, width: 15, height: 10, quantity: 1, declaredValue: 80, hsCode: '3307.90.00', countryOfOrigin: 'KW' }],
                 incoterm: 'DAP',
@@ -198,7 +194,6 @@ const AUTOFILL_SCENARIOS = {
                     customDescription: 'CONSUMER COMMODITY',
                     properShippingName: 'Consumer Commodity'
                 },
-                traderType: 'business',
                 payerOfVat: 'shipper',
                 palletCount: 1,
                 packageMarks: 'Handle with Care'
@@ -208,21 +203,15 @@ const AUTOFILL_SCENARIOS = {
                     company: 'Kuwait Fragrance', contactPerson: 'Ahmed F', phone: '90000005', phoneCountryCode: '+965', email: 'factory@test.kw',
                     city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
                     streetLines: ['Sanam Industrial Area'],
-                    traderType: 'business',
-                    vatNumber: '0258',
-                    eoriNumber: '753',
-                    taxId: 'TAX123',
-                    reference: 'SHIP-456'
+                    buildingName: 'Fragrance Factory', area: 'Industrial 1',
+                    vatNumber: '0258', eoriNumber: '753', taxId: 'TAX123', reference: 'SHIP-456', traderType: 'business'
                 },
                 receiver: {
                     company: 'Beauty Boutique', contactPerson: 'Claire', phone: '33100000', phoneCountryCode: '+33', email: 'claire@boutique.fr',
                     city: 'Paris', countryCode: 'FR', postalCode: '75001',
                     streetLines: ['12 Rue de la Paix'],
-                    traderType: 'business',
-                    vatNumber: '8520',
-                    eoriNumber: 'EORI753',
-                    taxId: 'RECV-TAX-999',
-                    reference: 'RECV-654'
+                    buildingName: 'Boutique House', area: '1st Arr',
+                    vatNumber: '8520', eoriNumber: 'EORI753', taxId: 'RECV-TAX-999', reference: 'RECV-654', traderType: 'business'
                 },
                 parcels: [{ description: 'Perfume boxes', weight: 5, length: 40, width: 30, height: 20, quantity: 1, declaredValue: 500, hsCode: '3303.00.00', countryOfOrigin: 'KW' }],
                 incoterm: 'DAP',
@@ -235,21 +224,22 @@ const AUTOFILL_SCENARIOS = {
                     properShippingName: 'PERFUMERY PRODUCTS',
                     hazardClass: '3',
                     packingGroup: 'II'
-                },
-                traderType: 'business'
+                }
             },
             'Perfumes (UN1266) - Cargo': {
                 sender: {
                     company: 'Kuwait Fragrance', contactPerson: 'Ahmed F', phone: '90000005', phoneCountryCode: '+965', email: 'factory@test.kw',
                     city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
                     streetLines: ['Sanam Industrial Area'],
-                    traderType: 'business'
+                    buildingName: 'Fragrance Factory', area: 'Industrial 1',
+                    vatNumber: '0258', eoriNumber: '753', taxId: 'TAX123', reference: 'SHIP-CARGO', traderType: 'business'
                 },
                 receiver: {
                     company: 'Luxury Scents', contactPerson: 'Marco', phone: '39060000', phoneCountryCode: '+39', email: 'marco@luxury.it',
                     city: 'Milan', countryCode: 'IT', postalCode: '20121',
                     streetLines: ['Via Montenapoleone 1'],
-                    traderType: 'business'
+                    buildingName: 'Luxury Plaza', area: 'Milan Center',
+                    vatNumber: 'IT-VAT-555', eoriNumber: 'IT-EORI-555', taxId: 'IT-TAX-555', reference: 'RECV-CARGO', traderType: 'business'
                 },
                 parcels: [{ description: 'Large perfume shipment', weight: 15, length: 60, width: 40, height: 40, quantity: 1, declaredValue: 1500, hsCode: '3303.00.00', countryOfOrigin: 'KW' }],
                 incoterm: 'DAP',
@@ -262,21 +252,22 @@ const AUTOFILL_SCENARIOS = {
                     properShippingName: 'PERFUMERY PRODUCTS',
                     hazardClass: '3',
                     packingGroup: 'II'
-                },
-                traderType: 'business'
+                }
             },
             'Excepted Quantities (E01)': {
                 sender: {
-                    company: 'Test KW', contactPerson: 'Test Person', phone: '90000003', phoneCountryCode: '+965', email: 't@test.kw',
+                    company: 'Test Labs KW', contactPerson: 'Testing Lab', phone: '90000003', phoneCountryCode: '+965', email: 'lab@test.kw',
                     city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
-                    streetLines: ['Block 1, Street 1']
+                    streetLines: ['Block 1, Street 1'], buildingName: 'Research Wing', area: 'Shuwaikh',
+                    vatNumber: 'KW-LAB-1', eoriNumber: 'KW-LAB-EORI', taxId: 'KW-TAX-LAB', reference: 'EXP-001', traderType: 'business'
                 },
                 receiver: {
-                    company: 'Test US', contactPerson: 'Receiver', phone: '121200000', phoneCountryCode: '+1', email: 'r@test.us',
+                    company: 'US University', contactPerson: 'Dean of Science', phone: '121200000', phoneCountryCode: '+1', email: 'dean@univ.us',
                     city: 'New York', countryCode: 'US', postalCode: '10001',
-                    streetLines: ['5th Ave']
+                    streetLines: ['5th Ave'], buildingName: 'Science Hall', area: 'Manhattan',
+                    vatNumber: 'US-EDU-99', eoriNumber: 'US-EORI-EDU', taxId: 'US-TAX-EDU', reference: 'GRANT-777', traderType: 'business'
                 },
-                parcels: [{ description: 'Box', weight: 1, length: 20, width: 15, height: 10, quantity: 1, declaredValue: 60, hsCode: '3822.00.00', countryOfOrigin: 'KW' }],
+                parcels: [{ description: 'Lab Samples', weight: 1, length: 20, width: 15, height: 10, quantity: 1, declaredValue: 60, hsCode: '3822.00.00', countryOfOrigin: 'KW' }],
                 incoterm: 'DAP',
                 invoiceRemarks: 'Excepted quantities E01 test',
                 dangerousGoods: {
@@ -480,9 +471,7 @@ const ShipmentWizardV2 = () => {
                 }
 
                 if (isStaff) {
-                    const clientRes = await axios.get('/api/auth/users', {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
+                    const clientRes = await api.get('/users');
                     setClients(clientRes.data.data);
                 } else if (user && !isStaff) {
                     // 3. Client: Auto-fill My Default Profile ONLY if not staff
@@ -715,12 +704,12 @@ const ShipmentWizardV2 = () => {
             setSender({
                 ...initialAddress,
                 ...scenario.sender,
-                street: scenario.sender.streetLines ? scenario.sender.streetLines[0] : `${scenario.sender.buildingName || ''} ${scenario.sender.area || ''}`.trim()
+                streetLines: scenario.sender.streetLines || [scenario.sender.street || '']
             });
             setReceiver({
                 ...initialAddress,
                 ...scenario.receiver,
-                street: scenario.receiver.streetLines ? scenario.receiver.streetLines[0] : `${scenario.receiver.buildingName || ''} ${scenario.receiver.area || ''}`.trim()
+                streetLines: scenario.receiver.streetLines || [scenario.receiver.street || '']
             });
             if (scenario.parcels) {
                 setParcels(scenario.parcels);
@@ -915,8 +904,6 @@ const ShipmentWizardV2 = () => {
         setLoading(true);
         try {
             const payload = {
-                sender,
-                receiver,
                 parcels: parcels.map(p => ({
                     ...p,
                     dimensions: {

@@ -88,11 +88,18 @@ manual_debug_*.json
 # ============================================
 # Uploads & Generated Files
 # ============================================
-# Uncomment patterns below based on your needs:
-# /backend/uploads/*.pdf
-# /backend/uploads/*.png
-# /backend/uploads/*.jpg
-# /backend/uploads/*.jpeg
+/backend/uploads/*.pdf
+/backend/uploads/*.png
+/backend/uploads/*.jpg
+/backend/uploads/*.jpeg
+/backend/uploads/*.csv
+/backend/uploads/*.xlsx
+/backend/uploads/*.xls
+/backend/uploads/*.zip
+/backend/uploads/*.gz
+/backend/uploads/*.tar
+/backend/temp/*
+/backend/logs/*
 
 # ============================================
 # Docker

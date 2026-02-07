@@ -253,6 +253,12 @@ const shipmentSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+// Optimization Indexes
+shipmentSchema.index({ user: 1 });
+shipmentSchema.index({ status: 1 });
+shipmentSchema.index({ createdAt: -1 });
+shipmentSchema.index({ 'customer.email': 1 });
+
 // Helper function to calculate distance between two points using Haversine formula
 function calculateDistance(point1, point2) {
   if (!point1 || !point2) return 0;

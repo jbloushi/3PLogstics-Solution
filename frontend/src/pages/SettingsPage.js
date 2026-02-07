@@ -286,8 +286,8 @@ const SettingsPage = () => {
                 <SectionGrid>
                     <div>
                         <AddressPanel
-                            title="Default Shipper Details (Autofill)"
-                            values={shipperProfile}
+                            titleOverride="Default Shipper Details (Autofill)"
+                            value={shipperProfile}
                             onChange={setShipperProfile}
                         />
                         <div style={{ marginTop: '24px' }}>

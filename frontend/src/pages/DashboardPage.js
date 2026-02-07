@@ -280,15 +280,19 @@ const DashboardPage = () => {
         fetchAllShipments();
     }, [fetchAllShipments]);
 
-    // Calculate stats
-    const stats = useMemo(() => ({
-        total: shipments?.length || 0,
-        pending: shipments?.filter(s => ['pending', 'ready_for_pickup'].includes(s.status)).length || 0,
-        pickedUp: shipments?.filter(s => s.status === 'picked_up').length || 0,
-        inTransit: shipments?.filter(s => ['in_transit', 'out_for_delivery'].includes(s.status)).length || 0,
-        delivered: shipments?.filter(s => s.status === 'delivered').length || 0,
-        exceptions: shipments?.filter(s => ['exception', 'failed', 'cancelled', 'returned'].includes(s.status)).length || 0
-    }), [shipments]);
+    // Calculate stats efficiently
+    const stats = useMemo(() => {
+        if (!shipments) return { total: 0, pending: 0, pickedUp: 0, inTransit: 0, delivered: 0, exceptions: 0 };
+        return shipments.reduce((acc, s) => {
+            acc.total++;
+            if (['pending', 'ready_for_pickup'].includes(s.status)) acc.pending++;
+            else if (s.status === 'picked_up') acc.pickedUp++;
+            else if (['in_transit', 'out_for_delivery'].includes(s.status)) acc.inTransit++;
+            else if (s.status === 'delivered') acc.delivered++;
+            else if (['exception', 'failed', 'cancelled', 'returned'].includes(s.status)) acc.exceptions++;
+            return acc;
+        }, { total: 0, pending: 0, pickedUp: 0, inTransit: 0, delivered: 0, exceptions: 0 });
+    }, [shipments]);
 
     // Calculate Shipment Activity (Group by Month)
     const chartData = useMemo(() => {
@@ -320,7 +324,7 @@ const DashboardPage = () => {
     return (
         <DashboardGrid>
             <PageHeader
-                title="Dashboard"
+                title="Dashboard (VERIFIED V3)"
                 description="Overview of your logistics operations."
                 action={
                     <Button

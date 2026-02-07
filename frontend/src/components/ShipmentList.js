@@ -1,11 +1,17 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { shipmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { TableWrapper, Table, Thead, Tbody, Tr, Th, Td, Button, Input, Modal, StatusPill } from '../ui'; // Added StatusPill
+import { TableWrapper, Table, Thead, Tbody, Tr, Th, Td, Button, Input, StatusPill } from '../ui';
 import { generateWaybillPDF } from '../utils/pdfGenerator';
 import ShipmentApprovalDialog from './ShipmentApprovalDialog';
+import { Menu, MenuItem, Divider, ListItemIcon, ListItemText } from '@mui/material';
+import DescriptionIcon from '@mui/icons-material/Description';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import DeleteIcon from '@mui/icons-material/Delete';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 
 // --- Styled Components ---
 
@@ -54,52 +60,6 @@ const CountBadge = styled.span`
   font-weight: 600;
 `;
 
-const ActionMenu = styled.div`
-  position: absolute;
-  right: 0;
-  top: 100%;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 8px 0;
-  z-index: 10;
-  min-width: 180px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-`;
-
-const MenuItem = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 10px 16px;
-  background: none;
-  border: none;
-  color: var(--text-primary);
-  text-align: left;
-  cursor: pointer;
-  font-size: 14px;
-
-  &:hover {
-    background: var(--bg-primary);
-  }
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  }
-`;
-
-const MenuSeparator = styled.div`
-  padding: 4px 16px;
-  font-size: 10px;
-  color: var(--text-secondary);
-  text-align: center;
-  margin: 4px 0;
-  opacity: 0.7;
-`;
-
 const PaginationContainer = styled.div`
   padding: 16px;
   display: flex;
@@ -144,9 +104,9 @@ const ShipmentList = () => {
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  // Dropdown State
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const menuRef = useRef(null);
+  // Menu State (Replaces Custom ActionMenu)
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+  const [activeShipment, setActiveShipment] = useState(null);
 
   // Approval State
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
@@ -168,18 +128,6 @@ const ShipmentList = () => {
   useEffect(() => {
     if (isAuthenticated) fetchShipments();
   }, [isAuthenticated]);
-
-  // Close menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setOpenMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
 
   // Filter Logic
   const filteredShipments = useMemo(() => {
@@ -207,17 +155,28 @@ const ShipmentList = () => {
   const currentShipments = filteredShipments.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   // Handlers
-  const handleDownloadLabel = async (shipment) => {
-    await generateWaybillPDF(shipment);
-    setOpenMenuId(null);
+  const handleMenuOpen = (event, shipment) => {
+    event.stopPropagation();
+    setMenuAnchorEl(event.currentTarget);
+    setActiveShipment(shipment);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchorEl(null);
+    setActiveShipment(null);
+  };
+
+  const handleDownloadLabel = async () => {
+    if (activeShipment) {
+      await generateWaybillPDF(activeShipment);
+    }
+    handleMenuClose();
   };
 
   const handleOpenPdf = (url) => {
     if (!url) return;
-
     if (url.startsWith('data:')) {
       try {
-        // Convert Base64 Data URI to Blob to avoid URL length limits and ensure proper rendering
         const arr = url.split(',');
         const mime = arr[0].match(/:(.*?);/)[1];
         const bstr = atob(arr[1]);
@@ -231,19 +190,27 @@ const ShipmentList = () => {
         window.open(blobUrl, '_blank');
       } catch (e) {
         console.error('Error opening PDF data URI:', e);
-        window.open(url, '_blank'); // Fallback
+        window.open(url, '_blank');
       }
     } else {
       window.open(url, '_blank');
     }
-    setOpenMenuId(null);
+    handleMenuClose();
   };
 
-  const handleDelete = async (tracking) => {
+  const handleDelete = async () => {
+    if (!activeShipment) return;
     if (window.confirm("Delete this shipment?")) {
-      await shipmentService.deleteShipment(tracking);
+      await shipmentService.deleteShipment(activeShipment.trackingNumber);
       fetchShipments();
     }
+    handleMenuClose();
+  };
+
+  const handleApproveEdit = () => {
+    setSelectedShipmentForApproval(activeShipment);
+    setApprovalDialogOpen(true);
+    handleMenuClose();
   };
 
   return (
@@ -299,6 +266,7 @@ const ShipmentList = () => {
                 <Tr
                   key={shipment._id}
                   onClick={() => navigate(`/shipment/${shipment.trackingNumber}`)}
+                  style={{ cursor: 'pointer' }}
                 >
                   <Td>
                     <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{shipment.trackingNumber}</div>
@@ -317,64 +285,14 @@ const ShipmentList = () => {
                   </Td>
                   <Td><StatusPill status={shipment.status} /></Td>
                   <Td>{shipment.estimatedDelivery ? new Date(shipment.estimatedDelivery).toLocaleDateString() : '—'}</Td>
-                  <Td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setOpenMenuId(openMenuId === shipment._id ? null : shipment._id)}
-                        style={{ padding: '6px 12px', fontSize: '13px' }}
-                      >
-                        Actions
-                      </Button>
-
-                      {/* Dropdown Menu */}
-                      {openMenuId === shipment._id && (
-                        <ActionMenu ref={menuRef}>
-                          <MenuItem onClick={() => handleDownloadLabel(shipment)}>
-                            Label
-                          </MenuItem>
-                          {(user?.role === 'admin' || user?.role === 'staff') && (
-                            <>
-                              <MenuSeparator>
-                                ---- {shipment.carrier?.toUpperCase() || 'CARRIER'} ----
-                              </MenuSeparator>
-
-                              <MenuItem
-                                disabled={!shipment.labelUrl}
-                                onClick={() => handleOpenPdf(shipment.labelUrl)}
-                              >
-                                AWB / Label
-                              </MenuItem>
-                              <MenuItem
-                                disabled={!shipment.invoiceUrl}
-                                onClick={() => handleOpenPdf(shipment.invoiceUrl)}
-                              >
-                                Invoice
-                              </MenuItem>
-                              {['pending', 'draft', 'updated', 'ready_for_pickup', 'picked_up'].includes(shipment.status) && (
-                                <MenuItem
-                                  onClick={() => {
-                                    setOpenMenuId(null);
-                                    setSelectedShipmentForApproval(shipment);
-                                    setApprovalDialogOpen(true);
-                                  }}
-                                >
-                                  Approve / Edit
-                                </MenuItem>
-                              )}
-                            </>
-                          )}
-                          {['pending', 'draft'].includes(shipment.status) && (
-                            <MenuItem
-                              onClick={() => handleDelete(shipment.trackingNumber)}
-                              style={{ color: 'var(--accent-error)' }}
-                            >
-                              Delete
-                            </MenuItem>
-                          )}
-                        </ActionMenu>
-                      )}
-                    </div>
+                  <Td style={{ textAlign: 'right' }}>
+                    <Button
+                      variant="secondary"
+                      onClick={(e) => handleMenuOpen(e, shipment)}
+                      style={{ padding: '6px 12px', fontSize: '13px' }}
+                    >
+                      Actions
+                    </Button>
                   </Td>
                 </Tr>
               ))}
@@ -384,6 +302,66 @@ const ShipmentList = () => {
             </Tbody>
           </Table>
         </TableWrapper>
+
+        {/* Mui Menu for Actions (Portaled to prevent clipping) */}
+        <Menu
+          anchorEl={menuAnchorEl}
+          open={Boolean(menuAnchorEl)}
+          onClose={handleMenuClose}
+          PaperProps={{
+            style: {
+              background: 'var(--bg-tertiary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              minWidth: '180px'
+            }
+          }}
+        >
+          <MenuItem onClick={handleDownloadLabel}>
+            <ListItemIcon><DescriptionIcon fontSize="small" sx={{ color: 'var(--text-secondary)' }} /></ListItemIcon>
+            <ListItemText>Label</ListItemText>
+          </MenuItem>
+
+          {activeShipment && (user?.role === 'admin' || user?.role === 'staff') && (
+            <div>
+              <Divider sx={{ my: 0.5, borderColor: 'var(--border-color)', opacity: 0.5 }} />
+              <div style={{ padding: '4px 16px', fontSize: '10px', color: 'var(--text-secondary)', textAlign: 'center', opacity: 0.7 }}>
+                {activeShipment.carrier?.toUpperCase() || 'CARRIER'}
+              </div>
+
+              <MenuItem
+                disabled={!activeShipment.labelUrl}
+                onClick={() => handleOpenPdf(activeShipment.labelUrl)}
+              >
+                <ListItemIcon><LocalShippingIcon fontSize="small" sx={{ color: 'var(--text-secondary)' }} /></ListItemIcon>
+                <ListItemText>AWB / Label</ListItemText>
+              </MenuItem>
+              <MenuItem
+                disabled={!activeShipment.invoiceUrl}
+                onClick={() => handleOpenPdf(activeShipment.invoiceUrl)}
+              >
+                <ListItemIcon><ReceiptIcon fontSize="small" sx={{ color: 'var(--text-secondary)' }} /></ListItemIcon>
+                <ListItemText>Invoice</ListItemText>
+              </MenuItem>
+              {['pending', 'draft', 'updated', 'ready_for_pickup', 'picked_up'].includes(activeShipment.status) && (
+                <MenuItem onClick={handleApproveEdit}>
+                  <ListItemIcon><CheckCircleIcon fontSize="small" sx={{ color: 'var(--text-secondary)' }} /></ListItemIcon>
+                  <ListItemText>Approve / Edit</ListItemText>
+                </MenuItem>
+              )}
+            </div>
+          )}
+
+          {activeShipment && ['pending', 'draft'].includes(activeShipment.status) && (
+            <div>
+              <Divider sx={{ my: 0.5, borderColor: 'var(--border-color)', opacity: 0.5 }} />
+              <MenuItem onClick={handleDelete} sx={{ color: 'var(--accent-error)' }}>
+                <ListItemIcon><DeleteIcon fontSize="small" sx={{ color: 'var(--accent-error)' }} /></ListItemIcon>
+                <ListItemText>Delete</ListItemText>
+              </MenuItem>
+            </div>
+          )}
+        </Menu>
 
         {/* Pagination */}
         {totalPages > 1 && (

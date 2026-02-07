@@ -100,6 +100,10 @@ const userSchema = new mongoose.Schema({
         company: String,
         contactPerson: String,
         streetLines: [String],
+        buildingName: String,
+        unitNumber: String,
+        area: String,
+        landmark: String,
         city: String,
         postalCode: String,
         countryCode: {

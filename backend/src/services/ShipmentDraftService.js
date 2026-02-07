@@ -3,6 +3,7 @@ const PricingService = require('./pricing.service');
 const CarrierFactory = require('./CarrierFactory');
 const logger = require('../utils/logger');
 const User = require('../models/user.model');
+const { generateDraftTrackingNumber } = require('../utils/shipmentUtils');
 
 class ShipmentDraftService {
 
@@ -50,7 +51,7 @@ class ShipmentDraftService {
         }
 
         // Helper to generate tracking number
-        const trackingNumber = data.trackingNumber || `DGR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        const trackingNumber = data.trackingNumber || generateDraftTrackingNumber();
         const estimatedDelivery = data.estimatedDelivery || new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
 
         // 4. Create Shipment

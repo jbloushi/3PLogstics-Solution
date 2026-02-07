@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const { port, mongoUri, corsOrigin } = require('./config/config');
 const { connectDB } = require('./config/database');
@@ -18,6 +19,27 @@ const app = express();
 
 // Security middleware
 app.use(helmet());
+
+// Rate Limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100, // Limit each IP to 100 requests per window
+  message: { success: false, error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply global rate limiter
+app.use('/api', globalLimiter);
+
+// Stricter limiter for auth and public routes
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 attempts per hour
+  message: { success: false, error: 'Security limit reached. Please try again later.' }
+});
+app.use('/api/auth', authLimiter);
+app.use('/api/shipments/public', authLimiter);
 
 // CORS configuration with origin whitelisting
 const corsOptions = {
@@ -70,7 +92,7 @@ const apiRoutes = require('./routes/api.routes');
 const financeRoutes = require('./routes/finance.routes');
 const organizationRoutes = require('./routes/organization.routes');
 
-// Mount routes with /api prefix (for direct access or non-stripping proxies)
+// Standard API Route Mounting
 app.use('/api/auth', authRoutes);
 app.use('/api/finance', checkDbAuth, financeRoutes);
 app.use('/api/users', checkDbAuth, userRoutes);
@@ -81,25 +103,6 @@ app.use('/api/v1', apiRoutes);
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/receivers', receiverRoutes);
 app.use('/api/shipments', checkDbAuth, shipmentRoutes);
-
-// Mount routes WITHOUT /api prefix (for proxies that strip /api)
-app.use('/auth', authRoutes);
-app.use('/finance', checkDbAuth, financeRoutes);
-app.use('/users', checkDbAuth, userRoutes);
-app.use('/organizations', checkDbAuth, organizationRoutes);
-app.use('/pickups', pickupRoutes);
-app.use('/client', externalRoutes);
-app.use('/v1', apiRoutes);
-app.use('/geocode', geocodeRoutes);
-app.use('/receivers', receiverRoutes);
-app.use('/shipments', checkDbAuth, shipmentRoutes);
-
-// Add redirect for /shipments to /api/shipments
-app.use('/shipments', (req, res) => {
-  // Redirect to the same path but with /api prefix
-  const redirectUrl = `/api${req.url}`;
-  res.redirect(307, redirectUrl);
-});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -132,7 +135,6 @@ app.all('*', (req, res, next) => {
 // Error handling middleware
 app.use(errorHandler);
 
-const seedUsers = require('./utils/seeder');
 
 // Start server
 const startServer = async () => {

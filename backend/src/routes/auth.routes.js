@@ -4,7 +4,6 @@ const authController = require('../controllers/auth.controller');
 
 router.post('/signup', authController.signup);
 router.post('/login', authController.login);
-router.post('/debug-hash', authController.debugHash);
 router.post('/request-otp', authController.requestOtp);
 router.post('/api-key', authController.protect, authController.generateApiKey);
 

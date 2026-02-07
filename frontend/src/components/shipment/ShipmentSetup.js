@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import axios from 'axios';
+// axios import removed
 import { useAuth } from '../../context/AuthContext';
-import { Card, Select, Input, AddressPanel, WizardHeader } from '../../ui';
+import { Select, Input, AddressPanel } from '../../ui';
 import Toggle from '../../ui/components/Toggle';
 
 const PageContainer = styled.div`
@@ -59,38 +59,6 @@ const ShipmentSetup = ({
     availableCarriers, selectedCarrier, onCarrierChange
 }) => {
     const { user } = useAuth();
-    const [savedAddresses, setSavedAddresses] = useState([]);
-
-    // Fetch saved addresses
-    useEffect(() => {
-        const fetchAddresses = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                if (isStaff) {
-                    // Fetch all client addresses for staff
-                    const res = await axios.get('/api/users', { // Should technically filter or use dedicated endpoint
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    // Flatten addresses
-                    const allAddrs = res.data.data.flatMap(u =>
-                        (u.addresses || []).map(a => ({
-                            ...a,
-                            label: `${a.label || 'Addr'} (${u.name})`
-                        }))
-                    );
-                    setSavedAddresses(allAddrs);
-                } else {
-                    // Client: Use own profile addresses
-                    if (user && user.addresses) {
-                        setSavedAddresses(user.addresses);
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to load address book', err);
-            }
-        };
-        if (user) fetchAddresses();
-    }, [isStaff, user]);
 
     // Inject saved addresses into sender/receiver state for the panel to use
     // Note: Ideally we pass 'savedAddresses' as a separate prop to AddressPanel
@@ -167,12 +135,11 @@ const ShipmentSetup = ({
                 </div>
             </TopControls>
 
-            {/* Address Panels */}
             <AddressGrid>
                 <AddressPanel
                     title="SHIPPER (From)"
                     variant="shipper"
-                    values={{ ...sender, savedAddresses }}
+                    value={sender}
                     onChange={setSender}
                     errors={errors}
                     onCopy={() => setReceiver({ ...sender })}
@@ -181,7 +148,7 @@ const ShipmentSetup = ({
                 <AddressPanel
                     title="RECEIVER (To)"
                     variant="receiver"
-                    values={{ ...receiver, savedAddresses }}
+                    value={receiver}
                     onChange={setReceiver}
                     errors={errors}
                     isStaff={isStaff}

@@ -3,8 +3,12 @@ const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 
 const signToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET || 'super-secret-key', {
-        expiresIn: process.env.JWT_EXPIRES_IN || '90d'
+    if (!process.env.JWT_SECRET) {
+        logger.error('JWT_SECRET is not defined in environment variables!');
+        throw new Error('Internal Server Error: Security Configuration Missing');
+    }
+    return jwt.sign({ id }, process.env.JWT_SECRET, {
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d'
     });
 };
 
@@ -97,7 +101,11 @@ exports.protect = async (req, res, next) => {
         }
 
         // Verify token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super-secret-key');
+        if (!process.env.JWT_SECRET) {
+            logger.error('JWT_SECRET is not defined in environment variables!');
+            return res.status(500).json({ success: false, error: 'Security Configuration Missing' });
+        }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         // Check if user still exists
         const currentUser = await User.findById(decoded.id);
@@ -168,18 +176,6 @@ exports.updateUserSurcharge = async (req, res) => {
     } catch (error) {
         logger.error('Update markup error:', error);
         res.status(500).json({ success: false, error: 'Failed to update markup' });
-    }
-};
-
-// TEMPORARY DEBUG ENDPOINT - REMOVE IN PRODUCTION
-exports.debugHash = async (req, res) => {
-    try {
-        const { password } = req.body;
-        const hash = await bcrypt.hash(password, 12);
-        const match = await bcrypt.compare(password, hash);
-        res.status(200).json({ success: true, passwordLength: password.length, match });
-    } catch (error) {
-        res.status(500).json({ success: false, error: error.message });
     }
 };
 
