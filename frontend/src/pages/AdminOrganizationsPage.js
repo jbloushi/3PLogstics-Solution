@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useSnackbar } from 'notistack';
-import { organizationService, userService } from '../services/api';
+import { financeService, organizationService, userService } from '../services/api';
 import {
     PageHeader,
     Card,
@@ -37,6 +37,7 @@ const AdminOrganizationsPage = () => {
     const [orgs, setOrgs] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [orgOverviews, setOrgOverviews] = useState({});
 
     // Dialog States
     const [openDialog, setOpenDialog] = useState(false);
@@ -47,7 +48,6 @@ const AdminOrganizationsPage = () => {
         name: '',
         taxId: '',
         type: 'BUSINESS',
-        balance: 0,
         creditLimit: 0,
         active: true
     });
@@ -61,8 +61,19 @@ const AdminOrganizationsPage = () => {
                 organizationService.getOrganizations(),
                 userService.getUsers()
             ]);
-            setOrgs(orgRes.data || []);
+            const organizations = orgRes.data || [];
+            setOrgs(organizations);
             setUsers(userRes.data || []);
+            const overviewEntries = await Promise.all(organizations.map(async (org) => {
+                try {
+                    const response = await financeService.getOrganizationOverview(org._id);
+                    return [org._id, response.data];
+                } catch (error) {
+                    console.error('Failed to load organization overview:', error);
+                    return [org._id, null];
+                }
+            }));
+            setOrgOverviews(Object.fromEntries(overviewEntries));
         } catch (error) {
             console.error(error);
             enqueueSnackbar('Failed to load organizations', { variant: 'error' });
@@ -82,7 +93,6 @@ const AdminOrganizationsPage = () => {
                 name: org.name || '',
                 taxId: org.taxId || '',
                 type: org.type || 'BUSINESS',
-                balance: org.balance || 0,
                 creditLimit: org.creditLimit || 0,
                 active: org.active ?? true
             });
@@ -92,7 +102,6 @@ const AdminOrganizationsPage = () => {
                 name: '',
                 taxId: '',
                 type: 'BUSINESS',
-                balance: 0,
                 creditLimit: 0,
                 active: true
             });
@@ -172,15 +181,21 @@ const AdminOrganizationsPage = () => {
                                 <Th>Company Name</Th>
                                 <Th>Type</Th>
                                 <Th>Members</Th>
-                                <Th style={{ textAlign: 'right' }}>Balance</Th>
+                                <Th style={{ textAlign: 'right' }}>Outstanding</Th>
+                                <Th style={{ textAlign: 'right' }}>Available Credit</Th>
                                 <Th style={{ textAlign: 'right' }}>Credit Limit</Th>
                                 <Th style={{ textAlign: 'center' }}>Actions</Th>
                             </Tr>
                         </Thead>
                         <Tbody>
                             {loading ? (
-                                <Tr><Td colSpan={6} style={{ textAlign: 'center' }}>Loading...</Td></Tr>
-                            ) : orgs.map(org => (
+                                <Tr><Td colSpan={7} style={{ textAlign: 'center' }}>Loading...</Td></Tr>
+                            ) : orgs.map(org => {
+                                const overview = orgOverviews[org._id];
+                                const outstanding = overview?.balance ?? 0;
+                                const availableCredit = overview?.availableCredit ?? 0;
+
+                                return (
                                 <Tr key={org._id}>
                                     <Td>
                                         <div style={{ fontWeight: 'bold' }}>{org.name}</div>
@@ -190,8 +205,11 @@ const AdminOrganizationsPage = () => {
                                         <StatusPill status="info" text={org.type} />
                                     </Td>
                                     <Td>{org.members?.length || 0}</Td>
-                                    <Td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold', color: (org.balance || 0) < 0 ? 'var(--accent-error)' : 'var(--accent-success)' }}>
-                                        {Number(org.balance || 0).toFixed(3)} KD
+                                    <Td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold', color: outstanding > 0 ? 'var(--accent-error)' : 'var(--accent-success)' }}>
+                                        {Number(outstanding).toFixed(3)} KD
+                                    </Td>
+                                    <Td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold' }}>
+                                        {Number(availableCredit).toFixed(3)} KD
                                     </Td>
                                     <Td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
                                         {Number(org.creditLimit || 0).toFixed(3)} KD
@@ -214,7 +232,8 @@ const AdminOrganizationsPage = () => {
                                         </div>
                                     </Td>
                                 </Tr>
-                            ))}
+                                );
+                            })}
                         </Tbody>
                     </Table>
                 </TableWrapper>
@@ -260,17 +279,14 @@ const AdminOrganizationsPage = () => {
                     <Card title="Finance Settings" variant="subtle">
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                             <Input
-                                label="Initial Balance (KD)"
-                                type="number"
-                                value={formData.balance}
-                                onChange={e => setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })}
-                            />
-                            <Input
                                 label="Credit Limit (KD)"
                                 type="number"
                                 value={formData.creditLimit}
                                 onChange={e => setFormData({ ...formData, creditLimit: parseFloat(e.target.value) || 0 })}
                             />
+                            <Alert severity="info" style={{ gridColumn: '1 / -1', margin: 0 }}>
+                                Balances are derived from the organization ledger. Use Finance to post adjustments or payments.
+                            </Alert>
                         </div>
                     </Card>
                 </div>

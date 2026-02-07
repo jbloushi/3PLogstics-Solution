@@ -170,13 +170,9 @@ const UserManagementDialog = ({ open, onClose, user, onSave, refreshTrigger }) =
                             />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                            <TextField
-                                label="Current Balance" fullWidth type="number"
-                                value={formData.balance || 0}
-                                onChange={(e) => handleChange('balance', Number(e.target.value))}
-                                InputProps={{ endAdornment: <InputAdornment position="end">KWD</InputAdornment> }}
-                                helperText="Negative means user owes money"
-                            />
+                            <Typography variant="body2" color="text.secondary">
+                                Balances are derived from the organization ledger. Post adjustments or payments in Finance.
+                            </Typography>
                         </Grid>
                     </Grid>
                 )}
