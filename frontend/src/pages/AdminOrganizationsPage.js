@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useSnackbar } from 'notistack';
 import { financeService, organizationService, userService } from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import {
     PageHeader,
     Card,
@@ -60,14 +59,13 @@ const AdminOrganizationsPage = () => {
     const fetchOrgs = useCallback(async () => {
         setLoading(true);
         try {
-            const requests = [organizationService.getOrganizations()];
-            if (isAdmin) {
-                requests.push(userService.getUsers());
-            }
-            const [orgRes, userRes] = await Promise.all(requests);
+            const [orgRes, userRes] = await Promise.all([
+                organizationService.getOrganizations(),
+                userService.getUsers()
+            ]);
             const organizations = orgRes.data || [];
             setOrgs(organizations);
-            setUsers(userRes?.data || []);
+            setUsers(userRes.data || []);
             const overviewEntries = await Promise.all(organizations.map(async (org) => {
                 try {
                     const response = await financeService.getOrganizationOverview(org._id);
