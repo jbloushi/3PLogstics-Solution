@@ -149,6 +149,41 @@ curl http://localhost:8899/health
 # Expected: {"status":"ok","database":"connected"}
 ```
 
+### 🔄 Updating Production After a Git Pull
+
+If you pull new changes on the VPS and do **not** rebuild/restart, you will still be running the old Docker images (or old frontend build). Use the steps below to ensure the latest code is running:
+
+#### Docker-based deployment
+```bash
+# From project root on the VPS
+git pull
+
+# Rebuild images so new code is baked in
+docker-compose build --no-cache
+
+# Restart containers with the rebuilt images
+docker-compose up -d --build
+```
+
+#### Non-Docker deployment (PM2/Node + Nginx)
+```bash
+# Backend
+git pull
+cd backend
+npm ci --omit=dev
+pm2 restart ecosystem.config.js --env production
+
+# Frontend (build is required for changes to appear)
+cd ../frontend
+npm ci --omit=dev
+npm run build
+# Ensure Nginx is serving the latest build output
+sudo systemctl reload nginx
+```
+
+> [!IMPORTANT]
+> React builds are static. If you pull frontend changes but do not rebuild, the UI will not update in production.
+
 ### 🔒 Security Checklist
 
 Before going live, ensure you've completed:
