@@ -26,7 +26,7 @@ const Layout = () => {
               <Outlet />
             </Container>
           </Box>
-          <Footer />
+          <Footer compact />
         </Box>
       </ThemeProvider>
     );

@@ -16,11 +16,11 @@ const Pill = styled.span`
 
 const getStatusColor = (status) => {
     const s = (status || '').toLowerCase();
-    if (['delivered', 'completed', 'paid', 'active', 'success'].includes(s))
+    if (['delivered', 'completed', 'paid', 'active', 'success', 'in_transit', 'out_for_delivery', 'created', 'picked_up', 'ready_for_pickup'].includes(s))
         return { bg: 'rgba(76, 175, 80, 0.15)', color: '#4caf50', border: 'rgba(76, 175, 80, 0.3)' }; // Green
     if (['pending', 'updated', 'draft', 'processing'].includes(s))
         return { bg: 'rgba(255, 167, 38, 0.15)', color: '#ffa726', border: 'rgba(255, 167, 38, 0.3)' }; // Orange
-    if (['in_transit', 'shipped', 'out_for_delivery', 'created', 'picked_up', 'ready_for_pickup', 'scheduled'].includes(s))
+    if (['shipped', 'scheduled'].includes(s))
         return { bg: 'rgba(66, 165, 245, 0.15)', color: '#42a5f5', border: 'rgba(66, 165, 245, 0.3)' }; // Blue
     if (['exception', 'cancelled', 'failed', 'overdue', 'inactive'].includes(s))
         return { bg: 'rgba(239, 83, 80, 0.15)', color: '#ef5350', border: 'rgba(239, 83, 80, 0.3)' }; // Red

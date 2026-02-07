@@ -27,37 +27,60 @@ const Toolbar = styled.div`
   border-bottom: 1px solid var(--border-color);
 `;
 
-const FilterTabs = styled.div`
-  display: flex;
-  gap: 24px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--border-color);
-  padding: 0 16px;
-`;
-
-const Tab = styled.div`
-  padding: 12px 4px;
-  cursor: pointer;
-  font-weight: ${props => props.$active ? '600' : '500'};
-  color: ${props => props.$active ? 'var(--accent-primary)' : 'var(--text-secondary)'};
-  border-bottom: 2px solid ${props => props.$active ? 'var(--accent-primary)' : 'transparent'};
-  transition: all 0.2s;
+const ResultsMeta = styled.div`
+  font-size: 13px;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+`;
+
+const EmptyState = styled.div`
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  display: grid;
+  gap: 16px;
+`;
+
+const CounterGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+`;
+
+const CounterCard = styled.button`
+  background: var(--bg-secondary);
+  border: 1px solid ${props => props.$active ? props.$color : 'var(--border-color)'};
+  padding: 18px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  display: grid;
+  gap: 6px;
 
   &:hover {
-    color: var(--text-primary);
+    transform: translateY(-2px);
+    border-color: ${props => props.$color};
+    box-shadow: 0 4px 20px -5px ${props => `${props.$color}33`};
   }
 `;
 
-const CountBadge = styled.span`
-  background: ${props => props.$active ? 'rgba(0, 217, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)'};
-  color: ${props => props.$active ? 'var(--accent-primary)' : 'var(--text-secondary)'};
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
+const CounterLabel = styled.span`
+  font-size: 12px;
   font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const CounterValue = styled.span`
+  font-family: 'Outfit', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
 `;
 
 const PaginationContainer = styled.div`
@@ -93,6 +116,9 @@ const PageBtn = styled.button`
   }
 `;
 
+const ACTIVE_STATUSES = ['created', 'in_transit', 'out_for_delivery'];
+const PENDING_STATUSES = ['draft', 'pending', 'updated', 'ready_for_pickup', 'picked_up'];
+
 const ShipmentList = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
@@ -100,7 +126,7 @@ const ShipmentList = () => {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('active');
+  const [viewMode, setViewMode] = useState('all');
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
@@ -133,8 +159,8 @@ const ShipmentList = () => {
   const filteredShipments = useMemo(() => {
     return shipments.filter(shipment => {
       // View Mode
-      if (viewMode === 'active' && !['created', 'in_transit', 'out_for_delivery'].includes(shipment.status)) return false;
-      if (viewMode === 'pending' && !['draft', 'pending', 'updated', 'ready_for_pickup', 'picked_up'].includes(shipment.status)) return false;
+      if (viewMode === 'active' && !ACTIVE_STATUSES.includes(shipment.status)) return false;
+      if (viewMode === 'pending' && !PENDING_STATUSES.includes(shipment.status)) return false;
       if (viewMode === 'delivered' && shipment.status !== 'delivered') return false;
 
       // Search
@@ -153,6 +179,13 @@ const ShipmentList = () => {
   // Pagination Logic
   const totalPages = Math.ceil(filteredShipments.length / ITEMS_PER_PAGE);
   const currentShipments = filteredShipments.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const hasFilters = Boolean(searchQuery) || viewMode !== 'all';
+  const counters = [
+    { id: 'all', label: 'All', count: shipments.length, color: '#00d9b8' },
+    { id: 'pending', label: 'Pending', count: shipments.filter(s => PENDING_STATUSES.includes(s.status)).length, color: '#fbbf24' },
+    { id: 'active', label: 'In Transit (Active)', count: shipments.filter(s => ACTIVE_STATUSES.includes(s.status)).length, color: '#34d399' },
+    { id: 'delivered', label: 'Delivered', count: shipments.filter(s => s.status === 'delivered').length, color: '#38bdf8' },
+  ];
 
   // Handlers
   const handleMenuOpen = (event, shipment) => {
@@ -215,24 +248,20 @@ const ShipmentList = () => {
 
   return (
     <div>
-      {/* Tabs */}
-      <FilterTabs>
-        {[
-          { id: 'active', label: 'Active', count: shipments.filter(s => ['created', 'in_transit', 'out_for_delivery'].includes(s.status)).length },
-          { id: 'pending', label: 'Pending', count: shipments.filter(s => ['draft', 'pending', 'updated', 'ready_for_pickup'].includes(s.status)).length },
-          { id: 'delivered', label: 'Delivered', count: shipments.filter(s => s.status === 'delivered').length },
-          { id: 'all', label: 'All', count: shipments.length }
-        ].map(tab => (
-          <Tab
-            key={tab.id}
-            $active={viewMode === tab.id}
-            onClick={() => { setViewMode(tab.id); setPage(1); }}
+      <CounterGrid>
+        {counters.map(counter => (
+          <CounterCard
+            key={counter.id}
+            type="button"
+            $active={viewMode === counter.id}
+            $color={counter.color}
+            onClick={() => { setViewMode(counter.id); setPage(1); }}
           >
-            {tab.label}
-            <CountBadge $active={viewMode === tab.id}>{tab.count}</CountBadge>
-          </Tab>
+            <CounterLabel>{counter.label}</CounterLabel>
+            <CounterValue>{counter.count}</CounterValue>
+          </CounterCard>
         ))}
-      </FilterTabs>
+      </CounterGrid>
 
       {/* List Container */}
       <div style={{ borderRadius: '16px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
@@ -245,6 +274,24 @@ const ShipmentList = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <ResultsMeta>
+            <span>
+              Showing {filteredShipments.length} of {shipments.length} shipments
+            </span>
+            {hasFilters && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSearchQuery('');
+                  setViewMode('all');
+                  setPage(1);
+                }}
+                style={{ padding: '6px 12px', fontSize: '12px' }}
+              >
+                Clear filters
+              </Button>
+            )}
+          </ResultsMeta>
         </Toolbar>
 
         <TableWrapper style={{ border: 'none', borderRadius: 0 }}>
@@ -297,7 +344,28 @@ const ShipmentList = () => {
                 </Tr>
               ))}
               {!loading && currentShipments.length === 0 && (
-                <Tr><Td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>No shipments found.</Td></Tr>
+                <Tr>
+                  <Td colSpan="6" style={{ padding: 0 }}>
+                    <EmptyState>
+                      <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>No shipments found</div>
+                      <div>Try adjusting your filters or search terms.</div>
+                      {hasFilters && (
+                        <div>
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              setSearchQuery('');
+                              setViewMode('all');
+                              setPage(1);
+                            }}
+                          >
+                            Clear filters
+                          </Button>
+                        </div>
+                      )}
+                    </EmptyState>
+                  </Td>
+                </Tr>
               )}
             </Tbody>
           </Table>
