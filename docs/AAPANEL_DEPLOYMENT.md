@@ -135,27 +135,62 @@ chmod -R 755 /www/wwwroot/3pl.mawthook.io/site
 # Test nginx configuration
 nginx -t
 
-# If test passes, reload nginx
-nginx -s reload
+# If test passes, use systemctl (more reliable on aaPanel)
+systemctl reload nginx
 
-# Or restart nginx if reload doesn't work
-systemctl restart nginx
+# If systemctl is not available, use:
+# nginx -s reload
 ```
 
 ### Step 6: Verify Deployment
 
 ```bash
-# Check backend health
+# Check backend health (Critical for 502 troubleshooting)
 curl http://localhost:8899/health
 
-# Check frontend is accessible
-curl -I https://3pl.mawthook.io
-
-# Check PM2 status
-pm2 status
-
-# View backend logs
+# If this fails, check PM2 logs IMMEDIATELY
 pm2 logs 3pl-backend --lines 100
+```
+
+---
+
+## 🛠️ Essential Configuration
+
+### 1. Environment Variables (.env)
+
+Your backend **will crash** if these are missing in `/www/wwwroot/3pl.mawthook.io/backend/.env`:
+
+```env
+NODE_ENV=production
+PORT=8899
+MONGO_URI=mongodb://your_user:your_pass@localhost:27017/3pl_db
+JWT_SECRET=your_long_secure_secret_at_least_32_chars
+DHL_API_KEY=your_key
+DHL_API_SECRET=your_secret
+```
+
+> [!IMPORTANT]
+> Use `pm2 restart 3pl-backend --update-env` after changing the `.env` file to ensure the process picks up new variables.
+
+### 2. Nginx Configuration (aaPanel)
+
+In aaPanel -> Website -> Settings -> Config, ensure you have the proxy block for `/api`:
+
+```nginx
+location / {
+    root /www/wwwroot/3pl.mawthook.io/site;
+    index index.html index.htm;
+    try_files $uri $uri/ /index.html;
+}
+
+location /api {
+    proxy_pass http://localhost:8899;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection 'upgrade';
+    proxy_set_header Host $host;
+    proxy_cache_bypass $http_upgrade;
+}
 ```
 
 ---
