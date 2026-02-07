@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { useShipment } from '../context/ShipmentContext';
+import { useAuth } from '../context/AuthContext';
 import {
     PageHeader,
     Button,
@@ -11,6 +13,8 @@ import {
     Tabs,
     Tab
 } from '../ui';
+import ShipmentApprovalDialog from '../components/ShipmentApprovalDialog';
+import TrackingTimeline from '../components/TrackingTimeline';
 
 // --- Styled Components ---
 
@@ -168,6 +172,21 @@ const MapPlaceholder = styled.div`
     font-size: 14px;
 `;
 
+const MapWrapper = styled.div`
+    height: 520px;
+    width: 100%;
+`;
+
+const TrackingLink = styled.a`
+    color: var(--accent-primary);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+        text-decoration: underline;
+    }
+`;
+
 const DetailsCard = styled.div`
     grid-column: 1 / 3;
     background: var(--bg-secondary);
@@ -238,6 +257,9 @@ const ShipmentDetailsPage = () => {
     const navigate = useNavigate();
     const fetchedRef = useRef(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [approvalOpen, setApprovalOpen] = useState(false);
+
+    const { user } = useAuth();
 
     const {
         shipment,
@@ -245,6 +267,12 @@ const ShipmentDetailsPage = () => {
         error,
         getShipment,
     } = useShipment();
+
+    const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+    const { isLoaded: isMapLoaded } = useJsApiLoader({
+        id: 'shipment-details-map',
+        googleMapsApiKey: googleMapsApiKey || ''
+    });
 
     // Fetch shipment data on component mount
     useEffect(() => {
@@ -287,11 +315,39 @@ const ShipmentDetailsPage = () => {
         );
     }
 
-    const sender = shipment.sender || {};
-    const receiver = shipment.receiver || {};
+    const sender = shipment.origin || shipment.sender || {};
+    const receiver = shipment.destination || shipment.receiver || {};
     const parcels = shipment.parcels || [];
     const totalWeight = parcels.reduce((sum, p) => sum + (Number(p.weight) || 0), 0);
     const totalPieces = parcels.reduce((sum, p) => sum + (Number(p.quantity) || 1), 0);
+    const isStaff = user?.role === 'admin' || user?.role === 'staff';
+    const isClient = user?.role === 'client';
+    const approvalStatuses = ['pending', 'draft', 'updated', 'ready_for_pickup', 'picked_up'];
+    const clientEditableStatuses = ['draft', 'pending', 'updated'];
+    const canApprove = isStaff && approvalStatuses.includes(shipment.status);
+    const canEdit = isClient && clientEditableStatuses.includes(shipment.status);
+    const carrierTrackingNumber = shipment.carrierShipmentId || shipment.dhlTrackingNumber;
+    const carrierCode = (shipment.carrier || shipment.carrierCode || 'DGR').toUpperCase();
+    const carrierTrackingUrl = carrierTrackingNumber && (carrierCode === 'DGR' || carrierCode === 'DHL')
+        ? `https://www.dhl.com/global-en/home/tracking.html?tracking-id=${carrierTrackingNumber}`
+        : null;
+    const currentLocation = shipment.currentLocation || shipment.location || sender;
+    const currentLocationLabel = currentLocation?.formattedAddress || currentLocation?.city || sender?.city || 'Unknown';
+
+    const resolveCoordinates = (location) => {
+        if (!location) return null;
+        if (Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+            return { lat: location.coordinates[1], lng: location.coordinates[0] };
+        }
+        if (typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+            return { lat: location.latitude, lng: location.longitude };
+        }
+        return null;
+    };
+
+    const mapCenter = resolveCoordinates(currentLocation)
+        || resolveCoordinates(receiver)
+        || resolveCoordinates(sender);
 
     return (
         <div>
@@ -299,12 +355,24 @@ const ShipmentDetailsPage = () => {
                 title="Shipment Details"
                 description={`Tracking Number: ${shipment.trackingNumber}`}
                 action={
-                    <Button
-                        variant="primary"
-                        onClick={() => window.open(`${process.env.REACT_APP_API_URL}/shipments/${shipment.trackingNumber}/label`, '_blank')}
-                    >
-                        Print Label
-                    </Button>
+                    <>
+                        {canEdit && (
+                            <Button variant="secondary" onClick={() => setApprovalOpen(true)}>
+                                Edit Shipment
+                            </Button>
+                        )}
+                        {canApprove && (
+                            <Button variant="secondary" onClick={() => setApprovalOpen(true)}>
+                                Approve Shipment
+                            </Button>
+                        )}
+                        <Button
+                            variant="primary"
+                            onClick={() => window.open(`${process.env.REACT_APP_API_URL}/shipments/${shipment.trackingNumber}/label`, '_blank')}
+                        >
+                            Print Label
+                        </Button>
+                    </>
                 }
                 secondaryAction={
                     <Button variant="secondary" onClick={() => navigate('/shipments')}>
@@ -372,12 +440,12 @@ const ShipmentDetailsPage = () => {
                             </svg>
                             ORIGIN (SENDER)
                         </CardHeader>
-                        <PartyName>{sender.contactPerson || sender.companyName || 'N/A'}</PartyName>
-                        <PartyType>{sender.companyName || 'Individual'}</PartyType>
+                        <PartyName>{sender.contactPerson || sender.company || 'N/A'}</PartyName>
+                        <PartyType>{sender.company || 'Individual'}</PartyType>
                         <DetailRow>
                             <strong>{sender.streetLines?.[0] || sender.formattedAddress || 'N/A'}</strong><br />
                             <span style={{ color: 'var(--text-secondary)' }}>
-                                {sender.city}, {sender.stateOrProvinceCode} {sender.postalCode}, {sender.countryCode}
+                                {sender.city || 'N/A'}{sender.state || sender.stateOrProvinceCode ? `, ${sender.state || sender.stateOrProvinceCode}` : ''} {sender.postalCode || ''}, {sender.countryCode || ''}
                             </span>
                         </DetailRow>
                         <ContactInfo>
@@ -402,12 +470,12 @@ const ShipmentDetailsPage = () => {
                             </svg>
                             DESTINATION (RECIPIENT)
                         </CardHeader>
-                        <PartyName>{receiver.contactPerson || receiver.companyName || 'N/A'}</PartyName>
-                        <PartyType>{receiver.companyName || 'Individual'}</PartyType>
+                        <PartyName>{receiver.contactPerson || receiver.company || 'N/A'}</PartyName>
+                        <PartyType>{receiver.company || 'Individual'}</PartyType>
                         <DetailRow>
                             <strong>{receiver.streetLines?.[0] || receiver.formattedAddress || 'N/A'}</strong><br />
                             <span style={{ color: 'var(--text-secondary)' }}>
-                                {receiver.city}, {receiver.stateOrProvinceCode} {receiver.postalCode}, {receiver.countryCode}
+                                {receiver.city || 'N/A'}{receiver.state || receiver.stateOrProvinceCode ? `, ${receiver.state || receiver.stateOrProvinceCode}` : ''} {receiver.postalCode || ''}, {receiver.countryCode || ''}
                             </span>
                         </DetailRow>
                         <ContactInfo>
@@ -429,15 +497,43 @@ const ShipmentDetailsPage = () => {
                         <MapHeader>
                             <div>
                                 <LocationBadge>CURRENT LOCATION</LocationBadge>
-                                <LocationName>{sender.city || 'Unknown'}</LocationName>
+                                <LocationName>{currentLocationLabel}</LocationName>
                             </div>
                             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-secondary)' }}>
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                             </svg>
                         </MapHeader>
-                        <MapPlaceholder>
-                            [Map View - {sender.city} to {receiver.city}]
-                        </MapPlaceholder>
+                        {!googleMapsApiKey && (
+                            <MapPlaceholder>
+                                Google Maps API key not configured.
+                            </MapPlaceholder>
+                        )}
+                        {googleMapsApiKey && !mapCenter && (
+                            <MapPlaceholder>
+                                No coordinates available for this shipment.
+                            </MapPlaceholder>
+                        )}
+                        {googleMapsApiKey && mapCenter && (
+                            <MapWrapper>
+                                {isMapLoaded ? (
+                                    <GoogleMap
+                                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                                        center={mapCenter}
+                                        zoom={12}
+                                        options={{
+                                            streetViewControl: false,
+                                            mapTypeControl: false,
+                                            fullscreenControl: true,
+                                            gestureHandling: 'greedy'
+                                        }}
+                                    >
+                                        <Marker position={mapCenter} />
+                                    </GoogleMap>
+                                ) : (
+                                    <MapPlaceholder>Loading map...</MapPlaceholder>
+                                )}
+                            </MapWrapper>
+                        )}
                     </MapContainer>
 
                     {/* Shipment Details Card */}
@@ -495,6 +591,41 @@ const ShipmentDetailsPage = () => {
                                     </DetailContentValue>
                                 </DetailContent>
                             </DetailItem>
+
+                            {isStaff && (
+                                <>
+                                    <DetailItem>
+                                        <DetailIcon>
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7h18M3 12h18M3 17h18" />
+                                            </svg>
+                                        </DetailIcon>
+                                        <DetailContent>
+                                            <DetailContentLabel>Carrier Tracking #</DetailContentLabel>
+                                            <DetailContentValue>{carrierTrackingNumber || 'Not assigned'}</DetailContentValue>
+                                        </DetailContent>
+                                    </DetailItem>
+                                    <DetailItem>
+                                        <DetailIcon>
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 010 5.656m1.414-7.07a6 6 0 010 8.484m-9.9-1.414a4 4 0 010-5.656m-1.414 7.07a6 6 0 010-8.484M12 12h.01" />
+                                            </svg>
+                                        </DetailIcon>
+                                        <DetailContent>
+                                            <DetailContentLabel>Carrier Tracking Link</DetailContentLabel>
+                                            <DetailContentValue>
+                                                {carrierTrackingUrl ? (
+                                                    <TrackingLink href={carrierTrackingUrl} target="_blank" rel="noreferrer">
+                                                        Open Tracking
+                                                    </TrackingLink>
+                                                ) : (
+                                                    'Not available'
+                                                )}
+                                            </DetailContentValue>
+                                        </DetailContent>
+                                    </DetailItem>
+                                </>
+                            )}
                         </DetailsGrid>
                     </DetailsCard>
                 </ContentGrid>
@@ -507,8 +638,8 @@ const ShipmentDetailsPage = () => {
             )}
 
             {activeTab === 'activity' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Activity timeline - Coming soon
+                <div style={{ padding: '24px' }}>
+                    <TrackingTimeline history={shipment.history || []} currentStatus={shipment.status} />
                 </div>
             )}
 
@@ -523,6 +654,16 @@ const ShipmentDetailsPage = () => {
                     Management - Coming soon
                 </div>
             )}
+
+            <ShipmentApprovalDialog
+                open={approvalOpen}
+                onClose={() => setApprovalOpen(false)}
+                shipment={shipment}
+                onShipmentUpdated={() => {
+                    setApprovalOpen(false);
+                    getShipment(shipment.trackingNumber);
+                }}
+            />
         </div>
     );
 };

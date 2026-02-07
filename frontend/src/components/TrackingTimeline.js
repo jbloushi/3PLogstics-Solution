@@ -196,10 +196,10 @@ const TrackingTimeline = ({ history = [], currentStatus }) => {
                                                             {event.description}
                                                         </Typography>
                                                     )}
-                                                    {event.location?.address && (
+                                                    {(event.location?.address || event.location?.formattedAddress) && (
                                                         <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                                                             <HomeIcon sx={{ fontSize: 14 }} />
-                                                            {event.location.address}
+                                                            {event.location.address || event.location.formattedAddress}
                                                         </Typography>
                                                     )}
                                                 </Box>
