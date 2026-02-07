@@ -250,6 +250,48 @@ const DetailContentValue = styled.div`
     color: var(--text-primary);
 `;
 
+const SectionCard = styled.div`
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+`;
+
+const SectionTitle = styled.h3`
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+`;
+
+const Table = styled.table`
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th, td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+        color: var(--text-secondary);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+`;
+
+const EmptyState = styled.div`
+    padding: 24px;
+    border: 1px dashed var(--border-color);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    text-align: center;
+`;
+
 // --- Main Component ---
 
 const ShipmentDetailsPage = () => {
@@ -318,6 +360,8 @@ const ShipmentDetailsPage = () => {
     const sender = shipment.origin || shipment.sender || {};
     const receiver = shipment.destination || shipment.receiver || {};
     const parcels = shipment.parcels || [];
+    const items = shipment.items || [];
+    const documents = shipment.documents || [];
     const totalWeight = parcels.reduce((sum, p) => sum + (Number(p.weight) || 0), 0);
     const totalPieces = parcels.reduce((sum, p) => sum + (Number(p.quantity) || 1), 0);
     const isStaff = user?.role === 'admin' || user?.role === 'staff';
@@ -632,8 +676,74 @@ const ShipmentDetailsPage = () => {
             )}
 
             {activeTab === 'parcels' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Parcels view - Coming soon
+                <div>
+                    <SectionCard>
+                        <SectionTitle>Parcels</SectionTitle>
+                        {parcels.length === 0 ? (
+                            <EmptyState>No parcels recorded for this shipment yet.</EmptyState>
+                        ) : (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Description</th>
+                                        <th>Weight (kg)</th>
+                                        <th>Dimensions (cm)</th>
+                                        <th>Reference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {parcels.map((parcel, index) => (
+                                        <tr key={`${parcel.trackingReference || parcel.description || 'parcel'}-${index}`}>
+                                            <td>{index + 1}</td>
+                                            <td>{parcel.description || 'Parcel'}</td>
+                                            <td>{Number(parcel.weight || 0).toFixed(2)}</td>
+                                            <td>
+                                                {parcel.dimensions
+                                                    ? `${parcel.dimensions.length || 0}×${parcel.dimensions.width || 0}×${parcel.dimensions.height || 0}`
+                                                    : 'N/A'}
+                                            </td>
+                                            <td>{parcel.trackingReference || shipment.reference || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        )}
+                    </SectionCard>
+
+                    <SectionCard>
+                        <SectionTitle>Items / Contents</SectionTitle>
+                        {items.length === 0 ? (
+                            <EmptyState>No line items recorded for this shipment yet.</EmptyState>
+                        ) : (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Description</th>
+                                        <th>Qty</th>
+                                        <th>Value</th>
+                                        <th>HS Code</th>
+                                        <th>Origin</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {items.map((item, index) => (
+                                        <tr key={`${item.sku || item.description || 'item'}-${index}`}>
+                                            <td>{index + 1}</td>
+                                            <td>{item.description || 'Item'}</td>
+                                            <td>{item.quantity || 1}</td>
+                                            <td>
+                                                {item.declaredValue != null ? `${item.declaredValue} ${shipment.currency || ''}` : '—'}
+                                            </td>
+                                            <td>{item.hsCode || '—'}</td>
+                                            <td>{item.countryOfOrigin || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        )}
+                    </SectionCard>
                 </div>
             )}
 
@@ -644,14 +754,100 @@ const ShipmentDetailsPage = () => {
             )}
 
             {activeTab === 'documents' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Documents - Coming soon
+                <div>
+                    <SectionCard>
+                        <SectionTitle>Generated Documents</SectionTitle>
+                        {documents.length === 0 && !shipment.labelUrl && !shipment.invoiceUrl ? (
+                            <EmptyState>No documents are available yet.</EmptyState>
+                        ) : (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Format</th>
+                                        <th>Link</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {documents.map((doc) => (
+                                        <tr key={`${doc.type}-${doc.createdAt || doc.url}`}>
+                                            <td>{doc.type}</td>
+                                            <td>{doc.format || 'pdf'}</td>
+                                            <td>
+                                                {doc.url ? (
+                                                    <TrackingLink href={doc.url} target="_blank" rel="noreferrer">
+                                                        View
+                                                    </TrackingLink>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {shipment.labelUrl && (
+                                        <tr>
+                                            <td>Label</td>
+                                            <td>pdf</td>
+                                            <td>
+                                                <TrackingLink href={shipment.labelUrl} target="_blank" rel="noreferrer">
+                                                    View
+                                                </TrackingLink>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {shipment.invoiceUrl && (
+                                        <tr>
+                                            <td>Invoice</td>
+                                            <td>pdf</td>
+                                            <td>
+                                                <TrackingLink href={shipment.invoiceUrl} target="_blank" rel="noreferrer">
+                                                    View
+                                                </TrackingLink>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </Table>
+                        )}
+                    </SectionCard>
                 </div>
             )}
 
             {activeTab === 'management' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Management - Coming soon
+                <div>
+                    <SectionCard>
+                        <SectionTitle>Shipment Settings</SectionTitle>
+                        <Table>
+                            <thead>
+                                <tr>
+                                    <th>Setting</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Public Location Updates</td>
+                                    <td>{shipment.allowPublicLocationUpdate ? 'Enabled' : 'Disabled'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Public Info Updates</td>
+                                    <td>{shipment.allowPublicInfoUpdate ? 'Enabled' : 'Disabled'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Incoterm</td>
+                                    <td>{shipment.incoterm || '—'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Export Reason</td>
+                                    <td>{shipment.exportReason || '—'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Reference</td>
+                                    <td>{shipment.reference || '—'}</td>
+                                </tr>
+                            </tbody>
+                        </Table>
+                    </SectionCard>
                 </div>
             )}
 
