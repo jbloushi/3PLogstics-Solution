@@ -15,8 +15,13 @@ const organizationSchema = new mongoose.Schema({
     // Type of Organization
     type: {
         type: String,
-        enum: ['client', 'partner', 'internal'],
-        default: 'client'
+        enum: ['BUSINESS', 'INDIVIDUAL', 'GOVERNMENT', 'client', 'partner', 'internal'],
+        default: 'BUSINESS'
+    },
+
+    taxId: {
+        type: String,
+        trim: true
     },
 
     // Financials (Centralized)

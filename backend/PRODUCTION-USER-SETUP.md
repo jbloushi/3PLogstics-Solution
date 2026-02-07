@@ -6,6 +6,9 @@ After deploying to production, you need to create users manually since seeding i
 
 ### **Fastest Method: Create Default Users**
 
+> [!CAUTION]
+> **If you are using Docker, do NOT run this command directly on your VPS host.** It will likely fail with a "MongoDB connection error: Authentication failed". See the [Docker section below](#-for-production-always-run-inside-docker).
+
 ```bash
 cd /path/to/backend
 npm run create-default-users
@@ -26,7 +29,7 @@ This creates:
 When using Docker deployment with MongoDB authentication, **you must run these scripts inside the Docker container**:
 
 ```bash
-# Create default users
+# Create default users (Most common fix for local auth errors)
 docker exec -it target-logistics-api npm run create-default-users
 
 # Or create a single user interactively
@@ -35,6 +38,9 @@ docker exec -it target-logistics-api npm run create-user
 # Or create from a custom JSON file
 docker exec -it target-logistics-api npm run create-users scripts/your-file.json
 ```
+
+> [!NOTE]
+> Based on your production environment, the container name is `target-logistics-api`.
 
 ### Why Docker Execution is Required
 
@@ -112,9 +118,11 @@ If you get "401 Unauthorized" or "Incorrect email or password":
    # Enter same email, select 'yes' when asked to update
    ```
 
-3. **Check database connection**
-   - Verify `MONGO_URI` in `.env` is correct
-   - Ensure MongoDB is accessible from production server
+3. **Check database connection & Authentication**
+   - **Are you running inside Docker?** If yes, you MUST use `docker exec` (see [Docker section](#-for-production-always-run-inside-docker)).
+   - **Authentication failed?** Host systems often lack the credentials configured inside Docker.
+   - Verify `MONGO_URI` in `.env` is correct.
+   - Ensure MongoDB is accessible from production server.
 
 4. **Check application logs**
    ```bash

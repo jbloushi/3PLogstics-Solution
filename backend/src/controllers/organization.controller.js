@@ -9,12 +9,14 @@ const logger = require('../utils/logger');
  */
 exports.createOrganization = async (req, res) => {
     try {
-        const { name, type, creditLimit, markup, address } = req.body;
+        const { name, type, creditLimit, balance, markup, address, taxId } = req.body;
 
         const organization = await Organization.create({
             name,
             type,
             creditLimit,
+            balance,
+            taxId,
             markup,
             addresses: address ? [address] : []
         });
@@ -25,6 +27,15 @@ exports.createOrganization = async (req, res) => {
         });
     } catch (error) {
         logger.error('Error creating organization:', error);
+
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({
+                success: false,
+                error: messages.join(', ')
+            });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message || 'Server Error'
@@ -116,6 +127,15 @@ exports.updateOrganization = async (req, res) => {
         });
     } catch (error) {
         logger.error('Error updating organization:', error);
+
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(val => val.message);
+            return res.status(400).json({
+                success: false,
+                error: messages.join(', ')
+            });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message || 'Server Error'

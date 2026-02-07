@@ -312,8 +312,9 @@ const ShipmentDetailsPage = () => {
 
     const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
     const { isLoaded: isMapLoaded } = useJsApiLoader({
-        id: 'shipment-details-map',
-        googleMapsApiKey: googleMapsApiKey || ''
+        id: 'google-map-script',
+        googleMapsApiKey: googleMapsApiKey || '',
+        libraries: ['places']
     });
 
     // Fetch shipment data on component mount
