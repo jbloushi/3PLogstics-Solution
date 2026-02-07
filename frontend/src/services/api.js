@@ -460,6 +460,76 @@ export const financeService = {
     }
   },
 
+  getOrganizationOverview: async (orgId) => {
+    try {
+      const response = await api.get(`/finance/organizations/${orgId}/overview`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching organization overview:', error);
+      throw error;
+    }
+  },
+
+  listPayments: async (orgId) => {
+    try {
+      const response = await api.get(`/finance/organizations/${orgId}/payments`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      throw error;
+    }
+  },
+
+  postPayment: async (orgId, payload) => {
+    try {
+      const response = await api.post(`/finance/organizations/${orgId}/payments`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error posting payment:', error);
+      throw error;
+    }
+  },
+
+  allocatePaymentManual: async (orgId, payload) => {
+    try {
+      const response = await api.post(`/finance/organizations/${orgId}/allocations`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error allocating payment:', error);
+      throw error;
+    }
+  },
+
+  allocatePaymentsFifo: async (orgId) => {
+    try {
+      const response = await api.post(`/finance/organizations/${orgId}/allocations/fifo`);
+      return response.data;
+    } catch (error) {
+      console.error('Error allocating FIFO payments:', error);
+      throw error;
+    }
+  },
+
+  getShipmentAccounting: async (shipmentId) => {
+    try {
+      const response = await api.get(`/finance/shipments/${shipmentId}/accounting`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching shipment accounting:', error);
+      throw error;
+    }
+  },
+
+  reverseAllocation: async (allocationId, payload) => {
+    try {
+      const response = await api.post(`/finance/allocations/${allocationId}/reverse`, payload);
+      return response.data;
+    } catch (error) {
+      console.error('Error reversing allocation:', error);
+      throw error;
+    }
+  },
+
   adjustBalance: async (adjustmentData) => {
     try {
       const response = await api.post('/finance/adjust', adjustmentData);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   AppBar,
@@ -29,6 +29,7 @@ import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import PersonIcon from '@mui/icons-material/Person';
 import { styled } from '@mui/material/styles';
 import { useAuth } from '../../context/AuthContext';
+import { financeService } from '../../services/api';
 
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
@@ -98,7 +99,8 @@ const UserIconWrapper = styled(Box)(({ theme }) => ({
 const Header = () => {
   const theme = useTheme();
   const { user, isAuthenticated, logout } = useAuth();
-  const [anchorElUser, setAnchorElUser] = React.useState(null);
+  const [anchorElUser, setAnchorElUser] = useState(null);
+  const [financeSummary, setFinanceSummary] = useState(null);
 
   const handleOpenUserMenu = (event) => {
     setAnchorElUser(event.currentTarget);
@@ -107,6 +109,20 @@ const Header = () => {
   const handleCloseUserMenu = () => {
     setAnchorElUser(null);
   };
+
+  useEffect(() => {
+    const loadFinance = async () => {
+      if (!user?.organization) return;
+      try {
+        const response = await financeService.getBalance();
+        setFinanceSummary(response.data);
+      } catch (error) {
+        console.error('Failed to fetch finance summary:', error);
+      }
+    };
+
+    loadFinance();
+  }, [user?.organization]);
 
   if (!isAuthenticated) {
     return (
@@ -171,7 +187,7 @@ const Header = () => {
               }}
             >
               <AccountBalanceWalletIcon sx={{ fontSize: 20 }} />
-              {parseFloat(user.balance || 0).toFixed(3)} KD
+              {parseFloat(financeSummary?.balance || 0).toFixed(3)} KD
             </Box>
           )}
 

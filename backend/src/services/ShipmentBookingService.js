@@ -1,12 +1,13 @@
 const mongoose = require('mongoose');
 const Shipment = require('../models/shipment.model');
 const User = require('../models/user.model');
-const Ledger = require('../models/ledger.model');
+const Organization = require('../models/organization.model');
 const CarrierFactory = require('./CarrierFactory');
 const PricingService = require('./pricing.service');
 const CarrierDocumentService = require('./CarrierDocumentService');
 const logger = require('../utils/logger');
 const crypto = require('crypto');
+const financeLedgerService = require('./financeLedger.service');
 
 class ShipmentBookingService {
 
@@ -26,6 +27,29 @@ class ShipmentBookingService {
         // 2. Validate Pricing Snapshot
         if (!PricingService.validateSnapshot(shipment.pricingSnapshot)) {
             throw new Error('Pricing data invalid or expired. Please re-edit/save the shipment to refresh rates.');
+        }
+
+        const price = shipment.pricingSnapshot?.totalPrice ?? shipment.price ?? 0;
+        const payingUser = await User.findById(shipment.user).populate('organization');
+        const organizationId = shipment.organization || payingUser?.organization?._id;
+        if (!organizationId) {
+            throw new Error('Shipment is missing an organization for ledger posting.');
+        }
+
+        const organization = await Organization.findById(organizationId);
+        const orgBalance = await financeLedgerService.getOrganizationBalance(organizationId);
+        const availableCredit = (organization?.creditLimit || 0) - orgBalance;
+
+        if (price > 0 && availableCredit < price) {
+            shipment.financeHold = {
+                status: true,
+                reason: 'Insufficient available credit',
+                checkedAt: new Date(),
+                availableCredit,
+                requiredAmount: price
+            };
+            await shipment.save();
+            throw new Error('Insufficient available credit to book shipment.');
         }
 
         // 3. Idempotency Check (Duplicate Prevention)
@@ -96,28 +120,18 @@ class ShipmentBookingService {
             }
 
             // Financial Deduction
-            const price = freshShipment.pricingSnapshot.totalPrice;
-            if (price > 0 && !freshShipment.paid) {
-                const payingUser = await User.findById(freshShipment.user); // Removed session
-
-                // Deduct
-                payingUser.balance = (payingUser.balance || 0) - price;
-                await payingUser.save(); // Removed session
-
-                freshShipment.paid = true;
-
-                // Ledger
-                await Ledger.create([{
-                    user: payingUser._id,
+            const finalPrice = freshShipment.pricingSnapshot?.totalPrice ?? freshShipment.price ?? 0;
+            if (finalPrice > 0) {
+                await financeLedgerService.createLedgerEntry(organizationId, {
                     shipment: freshShipment._id,
-                    amount: price,
-                    type: 'DEBIT',
-                    category: 'SHIPMENT_FEE',
-                    description: `Shipment Fee: ${freshShipment.trackingNumber}`,
-                    balanceAfter: payingUser.balance,
+                    amount: finalPrice,
+                    entryType: 'DEBIT',
+                    category: 'SHIPMENT_CHARGE',
+                    description: `Shipment charge: ${freshShipment.trackingNumber}`,
                     reference: freshShipment.trackingNumber,
+                    createdBy: payingUser?._id,
                     metadata: { attemptId }
-                }]); // Removed session
+                });
             }
 
             await freshShipment.save(); // Removed session

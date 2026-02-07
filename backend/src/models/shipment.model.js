@@ -246,6 +246,16 @@ const shipmentSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
     index: true
+  },
+  financeHold: {
+    status: {
+      type: Boolean,
+      default: false
+    },
+    reason: String,
+    checkedAt: Date,
+    availableCredit: Number,
+    requiredAmount: Number
   }
 }, {
   timestamps: true,

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import styled from 'styled-components';
 import { useSnackbar } from 'notistack';
-import { organizationService, userService } from '../services/api';
+import { financeService, organizationService, userService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
     PageHeader,
     Card,
@@ -34,9 +35,12 @@ const ActionButton = styled.button`
 
 const AdminOrganizationsPage = () => {
     const { enqueueSnackbar } = useSnackbar();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin';
     const [orgs, setOrgs] = useState([]);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [orgOverviews, setOrgOverviews] = useState({});
 
     // Dialog States
     const [openDialog, setOpenDialog] = useState(false);
@@ -47,7 +51,6 @@ const AdminOrganizationsPage = () => {
         name: '',
         taxId: '',
         type: 'BUSINESS',
-        balance: 0,
         creditLimit: 0,
         active: true
     });
@@ -61,8 +64,19 @@ const AdminOrganizationsPage = () => {
                 organizationService.getOrganizations(),
                 userService.getUsers()
             ]);
-            setOrgs(orgRes.data || []);
+            const organizations = orgRes.data || [];
+            setOrgs(organizations);
             setUsers(userRes.data || []);
+            const overviewEntries = await Promise.all(organizations.map(async (org) => {
+                try {
+                    const response = await financeService.getOrganizationOverview(org._id);
+                    return [org._id, response.data];
+                } catch (error) {
+                    console.error('Failed to load organization overview:', error);
+                    return [org._id, null];
+                }
+            }));
+            setOrgOverviews(Object.fromEntries(overviewEntries));
         } catch (error) {
             console.error(error);
             enqueueSnackbar('Failed to load organizations', { variant: 'error' });
@@ -76,13 +90,16 @@ const AdminOrganizationsPage = () => {
     }, [fetchOrgs]);
 
     const handleOpenDialog = (org = null) => {
+        if (!isAdmin) {
+            enqueueSnackbar('Only admins can create or edit organizations.', { variant: 'warning' });
+            return;
+        }
         if (org) {
             setEditingOrg(org);
             setFormData({
                 name: org.name || '',
                 taxId: org.taxId || '',
                 type: org.type || 'BUSINESS',
-                balance: org.balance || 0,
                 creditLimit: org.creditLimit || 0,
                 active: org.active ?? true
             });
@@ -92,7 +109,6 @@ const AdminOrganizationsPage = () => {
                 name: '',
                 taxId: '',
                 type: 'BUSINESS',
-                balance: 0,
                 creditLimit: 0,
                 active: true
             });
@@ -118,6 +134,10 @@ const AdminOrganizationsPage = () => {
     };
 
     const handleAddMember = async () => {
+        if (!isAdmin) {
+            enqueueSnackbar('Only admins can manage members.', { variant: 'warning' });
+            return;
+        }
         if (!selectedMemberToAdd) return;
         try {
             await organizationService.addMember(editingOrg._id, selectedMemberToAdd);
@@ -134,6 +154,10 @@ const AdminOrganizationsPage = () => {
     };
 
     const handleRemoveMember = async (memberId) => {
+        if (!isAdmin) {
+            enqueueSnackbar('Only admins can manage members.', { variant: 'warning' });
+            return;
+        }
         try {
             await organizationService.removeMember(editingOrg._id, memberId);
             enqueueSnackbar('Member removed', { variant: 'success' });
@@ -153,9 +177,15 @@ const AdminOrganizationsPage = () => {
                 title="Organization Management"
                 description="Manage business entities, shared balances, and global markup configurations."
                 action={
-                    <Button variant="primary" onClick={() => handleOpenDialog()}>
-                        New Organization
-                    </Button>
+                    isAdmin ? (
+                        <Button variant="primary" onClick={() => handleOpenDialog()}>
+                            New Organization
+                        </Button>
+                    ) : (
+                        <Alert severity="warning" style={{ margin: 0 }}>
+                            Organization creation is limited to admins.
+                        </Alert>
+                    )
                 }
                 secondaryAction={
                     <Button variant="secondary" onClick={fetchOrgs}>
@@ -172,15 +202,21 @@ const AdminOrganizationsPage = () => {
                                 <Th>Company Name</Th>
                                 <Th>Type</Th>
                                 <Th>Members</Th>
-                                <Th style={{ textAlign: 'right' }}>Balance</Th>
+                                <Th style={{ textAlign: 'right' }}>Outstanding</Th>
+                                <Th style={{ textAlign: 'right' }}>Available Credit</Th>
                                 <Th style={{ textAlign: 'right' }}>Credit Limit</Th>
                                 <Th style={{ textAlign: 'center' }}>Actions</Th>
                             </Tr>
                         </Thead>
                         <Tbody>
                             {loading ? (
-                                <Tr><Td colSpan={6} style={{ textAlign: 'center' }}>Loading...</Td></Tr>
-                            ) : orgs.map(org => (
+                                <Tr><Td colSpan={7} style={{ textAlign: 'center' }}>Loading...</Td></Tr>
+                            ) : orgs.map(org => {
+                                const overview = orgOverviews[org._id];
+                                const outstanding = overview?.balance ?? 0;
+                                const availableCredit = overview?.availableCredit ?? 0;
+
+                                return (
                                 <Tr key={org._id}>
                                     <Td>
                                         <div style={{ fontWeight: 'bold' }}>{org.name}</div>
@@ -190,31 +226,39 @@ const AdminOrganizationsPage = () => {
                                         <StatusPill status="info" text={org.type} />
                                     </Td>
                                     <Td>{org.members?.length || 0}</Td>
-                                    <Td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold', color: (org.balance || 0) < 0 ? 'var(--accent-error)' : 'var(--accent-success)' }}>
-                                        {Number(org.balance || 0).toFixed(3)} KD
+                                    <Td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold', color: outstanding > 0 ? 'var(--accent-error)' : 'var(--accent-success)' }}>
+                                        {Number(outstanding).toFixed(3)} KD
+                                    </Td>
+                                    <Td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 'bold' }}>
+                                        {Number(availableCredit).toFixed(3)} KD
                                     </Td>
                                     <Td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
                                         {Number(org.creditLimit || 0).toFixed(3)} KD
                                     </Td>
                                     <Td style={{ textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
-                                            <ActionButton $color="var(--accent-primary)" onClick={() => {
-                                                setEditingOrg(org);
-                                                setOpenMembersDialog(true);
-                                            }}>
-                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                                </svg>
-                                            </ActionButton>
-                                            <ActionButton $color="var(--accent-warning)" onClick={() => handleOpenDialog(org)}>
-                                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                </svg>
-                                            </ActionButton>
-                                        </div>
+                                        {isAdmin ? (
+                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                                                <ActionButton $color="var(--accent-primary)" onClick={() => {
+                                                    setEditingOrg(org);
+                                                    setOpenMembersDialog(true);
+                                                }}>
+                                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                                    </svg>
+                                                </ActionButton>
+                                                <ActionButton $color="var(--accent-warning)" onClick={() => handleOpenDialog(org)}>
+                                                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </ActionButton>
+                                            </div>
+                                        ) : (
+                                            <span style={{ color: 'var(--text-secondary)' }}>Admin only</span>
+                                        )}
                                     </Td>
                                 </Tr>
-                            ))}
+                                );
+                            })}
                         </Tbody>
                     </Table>
                 </TableWrapper>
@@ -260,17 +304,14 @@ const AdminOrganizationsPage = () => {
                     <Card title="Finance Settings" variant="subtle">
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                             <Input
-                                label="Initial Balance (KD)"
-                                type="number"
-                                value={formData.balance}
-                                onChange={e => setFormData({ ...formData, balance: parseFloat(e.target.value) || 0 })}
-                            />
-                            <Input
                                 label="Credit Limit (KD)"
                                 type="number"
                                 value={formData.creditLimit}
                                 onChange={e => setFormData({ ...formData, creditLimit: parseFloat(e.target.value) || 0 })}
                             />
+                            <Alert severity="info" style={{ gridColumn: '1 / -1', margin: 0 }}>
+                                Balances are derived from the organization ledger. Use Finance to post adjustments or payments.
+                            </Alert>
                         </div>
                     </Card>
                 </div>

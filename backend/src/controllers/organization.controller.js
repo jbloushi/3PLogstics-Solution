@@ -9,13 +9,12 @@ const logger = require('../utils/logger');
  */
 exports.createOrganization = async (req, res) => {
     try {
-        const { name, type, creditLimit, balance, markup, address, taxId } = req.body;
+        const { name, type, creditLimit, markup, address, taxId } = req.body;
 
         const organization = await Organization.create({
             name,
             type,
             creditLimit,
-            balance,
             taxId,
             markup,
             addresses: address ? [address] : []
@@ -109,7 +108,10 @@ exports.getOrganization = async (req, res) => {
  */
 exports.updateOrganization = async (req, res) => {
     try {
-        const organization = await Organization.findByIdAndUpdate(req.params.id, req.body, {
+        const updatePayload = { ...req.body };
+        delete updatePayload.balance;
+
+        const organization = await Organization.findByIdAndUpdate(req.params.id, updatePayload, {
             new: true,
             runValidators: true
         });
