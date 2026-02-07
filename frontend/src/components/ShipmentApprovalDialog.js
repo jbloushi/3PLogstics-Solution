@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { shipmentService } from '../services/api';
+import { financeService, shipmentService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Modal, Button, AddressPanel, Input, Select, Alert, Loader } from '../ui';
 
@@ -179,10 +179,31 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
 
     if (!shipment || !formData) return null;
 
+    const [financeSummary, setFinanceSummary] = useState(null);
+
+    useEffect(() => {
+        const loadFinance = async () => {
+            if (!shipment) return;
+            try {
+                if (isClient) {
+                    const response = await financeService.getBalance();
+                    setFinanceSummary(response.data);
+                } else {
+                    const orgId = shipment.organization || shipment.user?.organization;
+                    if (!orgId) return;
+                    const response = await financeService.getOrganizationOverview(orgId);
+                    setFinanceSummary(response.data);
+                }
+            } catch (error) {
+                console.error('Failed to fetch finance summary:', error);
+            }
+        };
+
+        loadFinance();
+    }, [shipment, isClient]);
+
     const totalPrice = parseFloat(formData.price || shipment.price || 0);
-    const balance = (isClient ? user?.balance : shipment.user?.balance) || 0;
-    const credit = (isClient ? user?.creditLimit : shipment.user?.creditLimit) || 0;
-    const availableFunds = balance + credit;
+    const availableFunds = financeSummary?.availableCredit ?? 0;
     const hasFunds = availableFunds >= totalPrice;
 
     return (

@@ -1,7 +1,10 @@
 const User = require('../models/user.model');
-const Ledger = require('../models/ledger.model');
+const Organization = require('../models/organization.model');
+const OrganizationLedger = require('../models/organizationLedger.model');
+const Payment = require('../models/payment.model');
+const PaymentAllocation = require('../models/paymentAllocation.model');
 const logger = require('../utils/logger');
-const mongoose = require('mongoose');
+const financeLedgerService = require('../services/financeLedger.service');
 
 /**
  * Get current user balance
@@ -16,13 +19,17 @@ exports.getBalance = async (req, res) => {
             return res.status(404).json({ success: false, error: 'User is not linked to an organization' });
         }
 
+        const balance = await financeLedgerService.getOrganizationBalance(org._id);
+        const availableCredit = (org.creditLimit || 0) - balance;
+        const unappliedCash = await financeLedgerService.getUnappliedCash(org._id);
+
         res.status(200).json({
             success: true,
             data: {
-                balance: org.balance || 0,
+                balance,
                 creditLimit: org.creditLimit || 0,
-                // Total spending power
-                totalAvailable: (org.balance || 0) + (org.creditLimit || 0),
+                availableCredit,
+                unappliedCash,
                 currency: org.currency || 'KWD'
             }
         });
@@ -37,41 +44,31 @@ exports.getBalance = async (req, res) => {
  */
 exports.getLedger = async (req, res) => {
     try {
-        const { page = 1, limit = 20, userId } = req.query;
+        const { page = 1, limit = 20, orgId } = req.query;
 
-        // Clients can only see their own organization's ledger
-        // Staff/Admin can see specific user/org or all
         const query = {};
 
-        // Populate org for current user
         const currentUser = await User.findById(req.user._id);
 
         if (req.user.role === 'client') {
-            if (currentUser.organization) {
-                // Future-proof: Ledger should have 'organization' field.
-                // For immediate Phase 2 with existing Ledger schema:
-                // We query Ledgers belonging to ANY user in the organization OR look for org-based logic
-                // Since we haven't updated Ledger schema to have 'organization' ref yet, we rely on user IDs.
-
-                const orgMembers = await User.find({ organization: currentUser.organization }).select('_id');
-                const memberIds = orgMembers.map(u => u._id);
-                query.user = { $in: memberIds };
-            } else {
-                query.user = req.user._id; // Fallback
+            if (!currentUser.organization) {
+                return res.status(404).json({ success: false, error: 'User is not linked to an organization' });
             }
-        } else if (userId) {
-            query.user = userId;
+            query.organization = currentUser.organization;
+        } else if (orgId) {
+            query.organization = orgId;
         }
 
         const skip = (page - 1) * limit;
 
-        const transactions = await Ledger.find(query)
+        const transactions = await OrganizationLedger.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
-            .populate('shipment', 'trackingNumber status');
+            .populate('shipment', 'trackingNumber status')
+            .populate('payment', 'reference amount');
 
-        const total = await Ledger.countDocuments(query);
+        const total = await OrganizationLedger.countDocuments(query);
 
         res.status(200).json({
             success: true,
@@ -94,68 +91,176 @@ exports.getLedger = async (req, res) => {
  */
 exports.adjustBalance = async (req, res) => {
     try {
-        const { userId, amount, type, category, description } = req.body;
+        const { organizationId, amount, type, category, description } = req.body;
 
-        if (!userId || !amount || !type) {
+        if (!organizationId || !amount || !type) {
             return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
 
-        const user = await User.findById(userId).populate('organization');
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'User not found' });
-        }
-
-        let targetEntity = user;
-
-        // If Organization exists, we credit/debit the Org.
-        if (user.organization) {
-            const Organisation = require('../models/organization.model');
-            targetEntity = await Organisation.findById(user.organization._id);
-        } else {
-            logger.warn(`Adjusting balance for independent User ${user._id} (No Org found)`);
+        const organization = await Organization.findById(organizationId);
+        if (!organization) {
+            return res.status(404).json({ success: false, error: 'Organization not found' });
         }
 
         const adjustment = parseFloat(amount);
-        const oldBalance = targetEntity.balance || 0;
-        let newBalance = oldBalance;
-
-        if (type === 'CREDIT') {
-            newBalance += adjustment;
-        } else {
-            newBalance -= adjustment;
-        }
-
-        targetEntity.balance = newBalance;
-        await targetEntity.save();
-
-        // Prepare metadata safely
-        const metadata = {
-            adminId: req.user._id.toString()
-        };
-        if (user.organization) {
-            metadata.organizationId = user.organization._id.toString();
-        }
-
-        // Record in Ledger
-        await Ledger.create({
-            user: userId,
+        const entry = await financeLedgerService.createLedgerEntry(organization._id, {
             amount: adjustment,
-            type: type,
+            entryType: type,
             category: category || 'ADJUSTMENT',
-            description: description || `Manual ${type.toLowerCase()} by admin (Org Adjustment)`,
-            balanceAfter: newBalance,
-            metadata: metadata
+            description: description || `Manual ${type.toLowerCase()} by admin`,
+            createdBy: req.user._id,
+            metadata: { adminId: req.user._id.toString() }
         });
 
-        logger.info(`Balance adjusted for Org ${targetEntity._id} (via User ${userId}) by admin ${req.user._id}: ${type} ${amount}`);
+        logger.info(`Balance adjusted for Org ${organization._id} by admin ${req.user._id}: ${type} ${amount}`);
 
         res.status(200).json({
             success: true,
             message: 'Balance adjusted successfully',
-            data: { newBalance }
+            data: { newBalance: entry.balanceAfter }
         });
     } catch (error) {
         logger.error('Error adjusting balance:', error);
         res.status(500).json({ success: false, error: 'Failed to adjust balance' });
+    }
+};
+
+exports.getOrganizationOverview = async (req, res) => {
+    try {
+        const organization = await Organization.findById(req.params.orgId);
+        if (!organization) {
+            return res.status(404).json({ success: false, error: 'Organization not found' });
+        }
+
+        const overview = await financeLedgerService.getOrganizationOverview(organization._id, organization.creditLimit);
+
+        res.status(200).json({ success: true, data: overview });
+    } catch (error) {
+        logger.error('Error getting organization overview:', error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve organization overview' });
+    }
+};
+
+exports.getShipmentAccounting = async (req, res) => {
+    try {
+        const accounting = await financeLedgerService.getShipmentAccounting(req.params.shipmentId);
+        if (!accounting) {
+            return res.status(404).json({ success: false, error: 'Shipment not found' });
+        }
+
+        const allocations = await PaymentAllocation.find({ shipment: req.params.shipmentId })
+            .populate('payment', 'reference amount postedAt')
+            .sort({ allocatedAt: -1 });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                ...accounting,
+                allocations
+            }
+        });
+    } catch (error) {
+        logger.error('Error getting shipment accounting:', error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve shipment accounting' });
+    }
+};
+
+exports.listPayments = async (req, res) => {
+    try {
+        const payments = await Payment.find({ organization: req.params.orgId })
+            .sort({ postedAt: -1 })
+            .populate('ledgerEntry', 'entryType amount');
+        res.status(200).json({ success: true, data: payments });
+    } catch (error) {
+        logger.error('Error listing payments:', error);
+        res.status(500).json({ success: false, error: 'Failed to retrieve payments' });
+    }
+};
+
+exports.postPayment = async (req, res) => {
+    try {
+        const { amount, method, reference, notes } = req.body;
+        const organization = await Organization.findById(req.params.orgId);
+        if (!organization) {
+            return res.status(404).json({ success: false, error: 'Organization not found' });
+        }
+
+        const ledgerEntry = await financeLedgerService.createLedgerEntry(organization._id, {
+            amount,
+            entryType: 'CREDIT',
+            category: 'PAYMENT',
+            description: `Payment posted${reference ? ` (${reference})` : ''}`,
+            reference,
+            createdBy: req.user._id
+        });
+
+        const payment = await Payment.create({
+            organization: organization._id,
+            amount,
+            method,
+            reference,
+            notes,
+            createdBy: req.user._id,
+            ledgerEntry: ledgerEntry._id
+        });
+
+        res.status(201).json({ success: true, data: payment });
+    } catch (error) {
+        logger.error('Error posting payment:', error);
+        res.status(500).json({ success: false, error: 'Failed to post payment' });
+    }
+};
+
+exports.allocatePaymentManual = async (req, res) => {
+    try {
+        const { paymentId, shipmentId, amount } = req.body;
+        if (!paymentId || !shipmentId || !amount) {
+            return res.status(400).json({ success: false, error: 'Missing required fields' });
+        }
+
+        const allocation = await financeLedgerService.allocatePayment({
+            organizationId: req.params.orgId,
+            paymentId,
+            shipmentId,
+            amount,
+            createdBy: req.user._id
+        });
+
+        res.status(201).json({ success: true, data: allocation });
+    } catch (error) {
+        logger.error('Error allocating payment:', error);
+        res.status(500).json({ success: false, error: 'Failed to allocate payment' });
+    }
+};
+
+exports.allocatePaymentsFifo = async (req, res) => {
+    try {
+        const allocations = await financeLedgerService.allocatePaymentsFifo({
+            organizationId: req.params.orgId,
+            createdBy: req.user._id
+        });
+
+        res.status(201).json({ success: true, data: allocations });
+    } catch (error) {
+        logger.error('Error allocating payments FIFO:', error);
+        res.status(500).json({ success: false, error: 'Failed to allocate payments' });
+    }
+};
+
+exports.reverseAllocation = async (req, res) => {
+    try {
+        const allocation = await financeLedgerService.reverseAllocation({
+            allocationId: req.params.allocationId,
+            reversedBy: req.user._id,
+            reason: req.body?.reason
+        });
+        if (!allocation) {
+            return res.status(404).json({ success: false, error: 'Allocation not found' });
+        }
+
+        res.status(200).json({ success: true, data: allocation });
+    } catch (error) {
+        logger.error('Error reversing allocation:', error);
+        res.status(500).json({ success: false, error: 'Failed to reverse allocation' });
     }
 };

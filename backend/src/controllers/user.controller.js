@@ -18,10 +18,10 @@ exports.getUsers = async (req, res) => {
 
         // Select fields and populate Organization
         const users = await User.find(query)
-            .select('name email phone addresses role company organization carrierConfig markup balance creditLimit')
+            .select('name email phone addresses role company organization carrierConfig markup creditLimit')
             .populate({
                 path: 'organization',
-                select: 'name addresses markup balance'
+                select: 'name addresses markup creditLimit'
             })
             .sort({ name: 1 });
 
@@ -106,7 +106,7 @@ exports.updateUser = async (req, res) => {
         const userId = req.params.id;
         logger.info(`Attempting to update user ${userId}. Body: ${JSON.stringify(req.body)}`);
 
-        const { name, email, phone, role, organization, carrierConfig, markup, balance, creditLimit } = req.body;
+        const { name, email, phone, role, organization, carrierConfig, markup, creditLimit } = req.body;
 
         const user = await User.findById(userId);
         if (!user) {
@@ -125,7 +125,6 @@ exports.updateUser = async (req, res) => {
             user.organization = (organization === '' || organization === null) ? undefined : organization;
         }
 
-        if (balance !== undefined) user.balance = balance;
         if (creditLimit !== undefined) user.creditLimit = creditLimit;
 
         // Update Nested Carrier Config

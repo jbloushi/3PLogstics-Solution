@@ -217,7 +217,7 @@ const AdminUsersPage = () => {
                                 <Th>Organization</Th>
                                 <Th>Carrier Config</Th>
                                 <Th>Markup</Th>
-                                <Th>Balance</Th>
+                                <Th>Credit Limit</Th>
                                 <Th style={{ textAlign: 'right' }}>Actions</Th>
                             </Tr>
                         </Thead>
@@ -252,16 +252,15 @@ const AdminUsersPage = () => {
                                     </Td>
                                     <Td>{renderMarkupInfo(user)}</Td>
                                     <Td>
-                                        <div style={{
-                                            color: (user.balance || 0) < 0 ? 'var(--accent-error)' : 'var(--accent-success)',
-                                            fontWeight: 'bold',
-                                            fontFamily: 'monospace'
-                                        }}>
-                                            {Number(user.balance || 0).toFixed(3)} KWD
-                                        </div>
-                                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                            Limit: {user.creditLimit || 0}
-                                        </div>
+                                        {user.organization ? (
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                                Organization-controlled
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>
+                                                {Number(user.creditLimit || 0).toFixed(3)} KWD
+                                            </div>
+                                        )}
                                     </Td>
                                     <Td style={{ textAlign: 'right' }}>
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -327,7 +326,7 @@ const AdminUsersPage = () => {
                     {activeTab === 'org' && (
                         <div>
                             <Alert severity="info" title="Organization Membership" style={{ marginBottom: '16px' }}>
-                                Users belonging to an organization share its balance and credit limit.
+                                Users belonging to an organization share its ledger-based balance and credit limit.
                             </Alert>
                             <Select
                                 label="Select Organization"
@@ -346,7 +345,6 @@ const AdminUsersPage = () => {
                         <div style={{ display: 'grid', gap: '24px' }}>
                             <Card title="Financial Settings" variant="subtle">
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                    <Input label="Current Balance (KWD)" type="number" value={formData.balance || 0} onChange={e => updateField('balance', e.target.value)} />
                                     <Input label="Credit Limit (KWD)" type="number" value={formData.creditLimit || 0} onChange={e => updateField('creditLimit', e.target.value)} />
                                 </div>
                             </Card>

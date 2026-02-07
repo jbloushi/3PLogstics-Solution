@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import Button from './Button';
 import { useAuth } from '../../context/AuthContext';
+import { financeService } from '../../services/api';
 
 const HeaderContainer = styled.header`
   height: 70px;
@@ -146,6 +147,7 @@ const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef();
   const navigate = useNavigate();
+  const [financeSummary, setFinanceSummary] = useState(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -156,6 +158,20 @@ const Header = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const loadFinance = async () => {
+      if (!user?.organization) return;
+      try {
+        const response = await financeService.getBalance();
+        setFinanceSummary(response.data);
+      } catch (error) {
+        console.error('Failed to fetch finance summary:', error);
+      }
+    };
+
+    loadFinance();
+  }, [user?.organization]);
 
   return (
     <HeaderContainer>
@@ -176,7 +192,7 @@ const Header = () => {
             <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
-            {parseFloat(user.balance || 0).toFixed(3)} KD
+            {parseFloat(financeSummary?.balance || 0).toFixed(3)} KD
           </BalancePill>
         )}
 

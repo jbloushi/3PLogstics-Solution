@@ -3,6 +3,7 @@ const { connectDB } = require('../config/database');
 const User = require('../models/user.model');
 const Organization = require('../models/organization.model');
 const logger = require('../utils/logger');
+const financeLedgerService = require('./financeLedger.service');
 
 // Load env vars
 const path = require('path');
@@ -24,7 +25,6 @@ const seedDemoData = async () => {
             org = await Organization.create({
                 name: orgName,
                 type: 'internal',
-                balance: 1000,
                 creditLimit: 5000,
                 currency: 'KWD',
                 markup: { type: 'PERCENTAGE', percentageValue: 15 },
@@ -45,12 +45,21 @@ const seedDemoData = async () => {
             console.log(`Created Default Organization: ${orgName}`);
         } else {
             console.log(`Organization exists: ${orgName}`);
-            // Ensure financial defaults
-            org.balance = 1000;
             org.creditLimit = 5000;
             org.type = 'internal';
             await org.save();
             console.log(`Organization financial defaults updated.`);
+        }
+
+        const seedBalance = 1000;
+        const existingBalance = await financeLedgerService.getOrganizationBalance(org._id);
+        if (existingBalance === 0 && seedBalance > 0) {
+            await financeLedgerService.createLedgerEntry(org._id, {
+                amount: seedBalance,
+                entryType: 'CREDIT',
+                category: 'ADJUSTMENT',
+                description: 'Seed funding credit'
+            });
         }
 
         // 2. Define Default Users

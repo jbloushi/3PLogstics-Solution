@@ -15,6 +15,7 @@ import {
 } from '../ui';
 import ShipmentApprovalDialog from '../components/ShipmentApprovalDialog';
 import TrackingTimeline from '../components/TrackingTimeline';
+import { financeService } from '../services/api';
 
 // --- Styled Components ---
 
@@ -300,6 +301,9 @@ const ShipmentDetailsPage = () => {
     const fetchedRef = useRef(false);
     const [activeTab, setActiveTab] = useState('overview');
     const [approvalOpen, setApprovalOpen] = useState(false);
+    const [accounting, setAccounting] = useState(null);
+    const [payments, setPayments] = useState([]);
+    const [allocationForm, setAllocationForm] = useState({ paymentId: '', amount: '' });
 
     const { user } = useAuth();
 
@@ -334,6 +338,54 @@ const ShipmentDetailsPage = () => {
 
         fetchShipmentData();
     }, [trackingNumber, getShipment]);
+
+    useEffect(() => {
+        const loadAccounting = async () => {
+            if (!shipment?._id) return;
+            try {
+                const accountingResponse = await financeService.getShipmentAccounting(shipment._id);
+                setAccounting(accountingResponse.data);
+                if (shipment.organization) {
+                    const paymentResponse = await financeService.listPayments(shipment.organization);
+                    setPayments(paymentResponse.data || []);
+                }
+            } catch (error) {
+                console.error('Failed to load shipment accounting:', error);
+            }
+        };
+
+        loadAccounting();
+    }, [shipment?._id, shipment?.organization]);
+
+    const refreshAccounting = async () => {
+        if (!shipment?._id) return;
+        const accountingResponse = await financeService.getShipmentAccounting(shipment._id);
+        setAccounting(accountingResponse.data);
+    };
+
+    const handleAllocatePayment = async () => {
+        if (!allocationForm.paymentId || !allocationForm.amount) return;
+        try {
+            await financeService.allocatePaymentManual(shipment.organization, {
+                paymentId: allocationForm.paymentId,
+                shipmentId: shipment._id,
+                amount: parseFloat(allocationForm.amount)
+            });
+            setAllocationForm({ paymentId: '', amount: '' });
+            await refreshAccounting();
+        } catch (error) {
+            console.error('Failed to allocate payment:', error);
+        }
+    };
+
+    const handleReverseAllocation = async (allocationId) => {
+        try {
+            await financeService.reverseAllocation(allocationId, { reason: 'Manual reversal' });
+            await refreshAccounting();
+        } catch (error) {
+            console.error('Failed to reverse allocation:', error);
+        }
+    };
 
     if (loading && !shipment) {
         return (
@@ -378,6 +430,13 @@ const ShipmentDetailsPage = () => {
         : null;
     const currentLocation = shipment.currentLocation || shipment.location || sender;
     const currentLocationLabel = currentLocation?.formattedAddress || currentLocation?.city || sender?.city || 'Unknown';
+    const accountingSummary = accounting || {
+        totalCharge: 0,
+        totalPaid: 0,
+        remainingBalance: 0,
+        status: 'unpaid',
+        allocations: []
+    };
 
     const resolveCoordinates = (location) => {
         if (!location) return null;
@@ -466,6 +525,15 @@ const ShipmentDetailsPage = () => {
                 >
                     Documents
                 </Tab>
+                {(user?.role === 'admin' || user?.role === 'staff') && (
+                    <Tab
+                        active={activeTab === 'accounting'}
+                        onClick={() => setActiveTab('accounting')}
+                        icon={<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M3 12h18M3 18h18" /></svg>}
+                    >
+                        Accounting
+                    </Tab>
+                )}
                 <Tab
                     active={activeTab === 'management'}
                     onClick={() => setActiveTab('management')}
@@ -809,6 +877,106 @@ const ShipmentDetailsPage = () => {
                                     )}
                                 </tbody>
                             </Table>
+                        )}
+                    </SectionCard>
+                </div>
+            )}
+
+            {activeTab === 'accounting' && (
+                <div style={{ padding: '24px' }}>
+                    <SectionCard>
+                        <SectionTitle>Shipment Accounting Summary</SectionTitle>
+                        <Table>
+                            <thead>
+                                <tr>
+                                    <th>Metric</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Total Charge</td>
+                                    <td>{Number(accountingSummary.totalCharge || 0).toFixed(3)} {shipment.currency || 'KWD'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Total Paid</td>
+                                    <td>{Number(accountingSummary.totalPaid || 0).toFixed(3)} {shipment.currency || 'KWD'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Remaining Balance</td>
+                                    <td>{Number(accountingSummary.remainingBalance || 0).toFixed(3)} {shipment.currency || 'KWD'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Status</td>
+                                    <td><StatusPill status={accountingSummary.status} text={accountingSummary.status} /></td>
+                                </tr>
+                            </tbody>
+                        </Table>
+                    </SectionCard>
+
+                    <SectionCard>
+                        <SectionTitle>Allocate Payments</SectionTitle>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                            <select
+                                value={allocationForm.paymentId}
+                                onChange={(e) => setAllocationForm({ ...allocationForm, paymentId: e.target.value })}
+                                style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+                            >
+                                <option value="">Select Payment</option>
+                                {payments.map((payment) => (
+                                    <option key={payment._id} value={payment._id}>
+                                        {payment.reference || payment._id.slice(-6)} • {payment.amount.toFixed(3)} {payment.currency || 'KWD'} • {payment.status}
+                                    </option>
+                                ))}
+                            </select>
+                            <input
+                                type="number"
+                                value={allocationForm.amount}
+                                onChange={(e) => setAllocationForm({ ...allocationForm, amount: e.target.value })}
+                                placeholder="Allocation Amount"
+                                style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+                            />
+                            <Button variant="primary" onClick={handleAllocatePayment} disabled={!allocationForm.paymentId || !allocationForm.amount}>
+                                Allocate
+                            </Button>
+                        </div>
+                    </SectionCard>
+
+                    <SectionCard>
+                        <SectionTitle>Allocation History</SectionTitle>
+                        {accountingSummary.allocations?.length ? (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>Payment</th>
+                                        <th>Amount</th>
+                                        <th>Allocated At</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {accountingSummary.allocations.map((allocation) => (
+                                        <tr key={allocation._id}>
+                                            <td>{allocation.payment?.reference || allocation.payment?._id?.slice(-6) || '—'}</td>
+                                            <td>{Number(allocation.amount || 0).toFixed(3)} {shipment.currency || 'KWD'}</td>
+                                            <td>{new Date(allocation.allocatedAt || allocation.createdAt).toLocaleString()}</td>
+                                            <td>{allocation.status}</td>
+                                            <td>
+                                                {allocation.status === 'ACTIVE' ? (
+                                                    <Button variant="outline" onClick={() => handleReverseAllocation(allocation._id)}>
+                                                        Reverse
+                                                    </Button>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        ) : (
+                            <EmptyState>No payment allocations yet.</EmptyState>
                         )}
                     </SectionCard>
                 </div>

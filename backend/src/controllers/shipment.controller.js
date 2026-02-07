@@ -208,7 +208,7 @@ exports.getShipmentByTrackingNumber = async (req, res) => {
   try {
     const { trackingNumber } = req.params;
 
-    const shipment = await Shipment.findOne({ trackingNumber }).populate('user', 'name email role balance creditLimit');
+    const shipment = await Shipment.findOne({ trackingNumber }).populate('user', 'name email role organization');
 
     if (!shipment) {
       return res.status(404).json({
@@ -441,7 +441,7 @@ exports.getAllShipments = async (req, res) => {
         .sort(sortOptions)
         .skip(skip)
         .limit(limitValue)
-        .populate('user', 'name email role balance creditLimit')
+        .populate('user', 'name email role organization')
         .select('-__v');
     } catch (fetchError) {
       // If first fetch fails, try one more time

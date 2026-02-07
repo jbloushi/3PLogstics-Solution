@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import {
@@ -38,7 +38,7 @@ import { formatPartyAddress } from '../utils/addressFormatter';
 import ShipmentSetup from '../components/shipment/ShipmentSetup';
 import ShipmentContent from '../components/shipment/ShipmentContent';
 import ShipmentBilling from '../components/shipment/ShipmentBilling';
-import api, { shipmentService } from '../services/api';
+import api, { financeService, shipmentService } from '../services/api';
 
 
 // --- Custom Dark Theme Local Override ---
@@ -400,6 +400,7 @@ const ShipmentWizardV2 = () => {
 
     const [activeStep, setActiveStep] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [financeSummary, setFinanceSummary] = useState(null);
     const [sender, setSender] = useState({ ...initialAddress });
     const [receiver, setReceiver] = useState({ ...initialAddress });
     const [parcels, setParcels] = useState([{ description: 'Box 1', weight: '', length: '', width: '', height: '', quantity: 1, trackingReference: '' }]);
@@ -421,6 +422,20 @@ const ShipmentWizardV2 = () => {
     const [signatureTitle, setSignatureTitle] = useState('');
     const [palletCount, setPalletCount] = useState('');
     const [packageMarks, setPackageMarks] = useState('');
+
+    useEffect(() => {
+        const loadFinance = async () => {
+            if (!user?.organization) return;
+            try {
+                const response = await financeService.getBalance();
+                setFinanceSummary(response.data);
+            } catch (error) {
+                console.error('Failed to fetch finance summary:', error);
+            }
+        };
+
+        loadFinance();
+    }, [user?.organization]);
 
     const [expandedParcel, setExpandedParcel] = useState(0);
 
@@ -447,6 +462,14 @@ const ShipmentWizardV2 = () => {
 
     // Staff/Admin Features
     const { isStaff, isAdmin } = useAuth();
+    const availableCredit = useMemo(() => {
+        if (financeSummary?.availableCredit !== undefined && financeSummary?.availableCredit !== null) {
+            return Number(financeSummary.availableCredit);
+        }
+        const balance = Number(user?.balance || 0);
+        const creditLimit = Number(user?.creditLimit || user?.organization?.creditLimit || 0);
+        return balance + creditLimit;
+    }, [financeSummary, user]);
     const [selectedClient, setSelectedClient] = useState('');
     const [clients, setClients] = useState([]);
     const [availableCarriers, setAvailableCarriers] = useState([]);
@@ -1306,17 +1329,17 @@ const ShipmentWizardV2 = () => {
                         {user && (
                             <Card variant="outlined" sx={{
                                 borderRadius: 2,
-                                bgcolor: (user.balance + user.creditLimit) < Number(selectedService.totalPrice) ? 'error.lighter' : 'success.lighter',
-                                borderColor: (user.balance + user.creditLimit) < Number(selectedService.totalPrice) ? 'error.main' : 'success.main',
+                                bgcolor: availableCredit < Number(selectedService.totalPrice) ? 'error.lighter' : 'success.lighter',
+                                borderColor: availableCredit < Number(selectedService.totalPrice) ? 'error.main' : 'success.main',
                                 p: 1
                             }}>
                                 <Box display="flex" alignItems="center" gap={1}>
-                                    <AccountBalanceWalletIcon color={(user.balance + user.creditLimit) < Number(selectedService.totalPrice) ? 'error' : 'success'} />
+                                    <AccountBalanceWalletIcon color={availableCredit < Number(selectedService.totalPrice) ? 'error' : 'success'} />
                                     <Box>
                                         <Typography variant="caption" display="block" fontWeight="bold">
-                                            Available Credit: {(user.balance + user.creditLimit).toFixed(3)} KD
+                                            Available Credit: {availableCredit.toFixed(3)} KD
                                         </Typography>
-                                        {(user.balance + user.creditLimit) < Number(selectedService.totalPrice) && (
+                                        {availableCredit < Number(selectedService.totalPrice) && (
                                             <Typography variant="caption" color="error.main" fontWeight="bold">
                                                 Insufficient balance. Please top up.
                                             </Typography>
@@ -1448,7 +1471,7 @@ const ShipmentWizardV2 = () => {
                         <Button
                             variant="contained" size="large" onClick={activeStep === 3 ? handleSubmit : handleNext}
                             endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <ArrowForwardIcon />}
-                            disabled={loading || (activeStep === 3 && user && !isAdmin && !isStaff && (user.balance + user.creditLimit) < Number(selectedService.totalPrice))}
+                            disabled={loading || (activeStep === 3 && user && !isAdmin && !isStaff && availableCredit < Number(selectedService.totalPrice))}
 
                             sx={{
                                 borderRadius: 50,
