@@ -60,13 +60,14 @@ const AdminOrganizationsPage = () => {
     const fetchOrgs = useCallback(async () => {
         setLoading(true);
         try {
-            const [orgRes, userRes] = await Promise.all([
-                organizationService.getOrganizations(),
-                userService.getUsers()
-            ]);
+            const requests = [organizationService.getOrganizations()];
+            if (isAdmin) {
+                requests.push(userService.getUsers());
+            }
+            const [orgRes, userRes] = await Promise.all(requests);
             const organizations = orgRes.data || [];
             setOrgs(organizations);
-            setUsers(userRes.data || []);
+            setUsers(userRes?.data || []);
             const overviewEntries = await Promise.all(organizations.map(async (org) => {
                 try {
                     const response = await financeService.getOrganizationOverview(org._id);
@@ -83,7 +84,7 @@ const AdminOrganizationsPage = () => {
         } finally {
             setLoading(false);
         }
-    }, [enqueueSnackbar]);
+    }, [enqueueSnackbar, isAdmin]);
 
     useEffect(() => {
         fetchOrgs();
