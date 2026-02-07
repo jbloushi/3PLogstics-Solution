@@ -12,6 +12,68 @@ const PricingService = require('../services/pricing.service');
 const ShipmentDraftService = require('../services/ShipmentDraftService');
 const ShipmentBookingService = require('../services/ShipmentBookingService');
 
+const buildHistoryKey = (event) => {
+  const time = event?.timestamp ? new Date(event.timestamp).toISOString() : '';
+  const status = event?.status || '';
+  const location = event?.location?.formattedAddress || event?.location?.address || event?.location || '';
+  return `${status}|${time}|${location}`;
+};
+
+const syncCarrierTrackingHistory = async (shipment) => {
+  const trackingNumber = shipment?.carrierShipmentId || shipment?.dhlTrackingNumber;
+  if (!trackingNumber) return;
+
+  const carrierCode = (shipment?.carrier || shipment?.carrierCode || 'DGR').toUpperCase();
+  let carrier;
+  try {
+    carrier = CarrierFactory.getAdapter(carrierCode);
+  } catch (error) {
+    logger.warn(`Carrier adapter not available for ${carrierCode}: ${error.message}`);
+    return;
+  }
+
+  try {
+    const tracking = await carrier.getTracking(trackingNumber);
+    const events = tracking?.events || [];
+    if (events.length === 0) return;
+
+    const existingKeys = new Set(
+      shipment.history.map((entry) => buildHistoryKey(entry))
+    );
+
+    const fallbackContact = shipment.origin?.contactPerson || 'Carrier';
+    const fallbackPhone = shipment.origin?.phone || '0000000';
+
+    let hasUpdates = false;
+    events.forEach((event) => {
+      const historyEntry = {
+        status: event.statusCode || tracking.status || 'in_transit',
+        description: event.description || 'Carrier update',
+        timestamp: event.timestamp ? new Date(event.timestamp) : new Date(),
+        location: {
+          formattedAddress: event.location || 'Unknown',
+          city: event.location || undefined,
+          contactPerson: fallbackContact,
+          phone: fallbackPhone
+        }
+      };
+      const key = buildHistoryKey(historyEntry);
+      if (!existingKeys.has(key)) {
+        shipment.history.push(historyEntry);
+        existingKeys.add(key);
+        hasUpdates = true;
+      }
+    });
+
+    if (hasUpdates) {
+      shipment.history.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      await shipment.save();
+    }
+  } catch (error) {
+    logger.warn(`Failed to sync carrier tracking for ${shipment.trackingNumber}: ${error.message}`);
+  }
+};
+
 // Helper function to generate a tracking number
 const generateTrackingNumber = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -174,6 +236,8 @@ exports.getShipmentByTrackingNumber = async (req, res) => {
       shipment.costPrice = undefined;
       shipment.markup = undefined;
     }
+
+    await syncCarrierTrackingHistory(shipment);
 
     res.status(200).json({
       success: true,
@@ -1573,4 +1637,3 @@ exports.submitToDhl = async (req, res) => {
     });
   }
 };
-
