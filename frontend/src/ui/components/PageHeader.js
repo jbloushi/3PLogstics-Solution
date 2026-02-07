@@ -4,16 +4,18 @@ import styled from 'styled-components';
 const HeaderContainer = styled.div`
   margin-bottom: 32px;
   display: flex;
-  justify-content: space-between;
+  justify-content: ${props => props.$align === 'center' ? 'center' : 'space-between'};
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
+  text-align: ${props => props.$align === 'center' ? 'center' : 'left'};
 `;
 
 const TitleGroup = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
+  align-items: ${props => props.$align === 'center' ? 'center' : 'flex-start'};
 `;
 
 const Title = styled.h1`
@@ -39,10 +41,10 @@ const ActionGroup = styled.div`
   align-items: center;
 `;
 
-const PageHeader = ({ title, description, action, secondaryAction }) => {
+const PageHeader = ({ title, description, action, secondaryAction, align = 'left' }) => {
     return (
-        <HeaderContainer>
-            <TitleGroup>
+        <HeaderContainer $align={align}>
+            <TitleGroup $align={align}>
                 <Title>{title}</Title>
                 {description && <Description>{description}</Description>}
             </TitleGroup>

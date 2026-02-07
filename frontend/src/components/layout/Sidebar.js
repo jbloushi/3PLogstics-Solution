@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
     Box,
@@ -10,10 +10,10 @@ import {
     ListItemText,
     Typography,
     Avatar,
-    Badge,
     useTheme,
     Divider,
-    Tooltip
+    Tooltip,
+    IconButton
 } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import AssessmentIcon from '@mui/icons-material/Assessment';
@@ -23,28 +23,40 @@ import MapIcon from '@mui/icons-material/Map';
 import WarehouseIcon from '@mui/icons-material/Warehouse';
 import DirectionsBusIcon from '@mui/icons-material/DirectionsBus';
 import PersonIcon from '@mui/icons-material/Person';
-import ReceiptIcon from '@mui/icons-material/Receipt';
 import MessageIcon from '@mui/icons-material/Message';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import SettingsIcon from '@mui/icons-material/Settings';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import BusinessIcon from '@mui/icons-material/Business';
+import MenuIcon from '@mui/icons-material/Menu';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { useAuth } from '../../context/AuthContext';
 
 const DRAWER_WIDTH = 240;
+const COLLAPSED_WIDTH = 80;
 
 const Sidebar = () => {
     const theme = useTheme();
     const location = useLocation();
     const { user } = useAuth();
+    const [collapsed, setCollapsed] = useState(false);
+
+    const drawerWidth = collapsed ? COLLAPSED_WIDTH : DRAWER_WIDTH;
+    const textStyles = {
+        opacity: collapsed ? 0 : 1,
+        width: collapsed ? 0 : 'auto',
+        marginLeft: collapsed ? 0 : undefined,
+        transition: 'opacity 0.2s ease',
+        whiteSpace: 'nowrap'
+    };
 
     const menuItems = [
         { text: 'Dashboard', icon: <HomeIcon />, path: '/dashboard' },
         { text: 'Analytics', icon: <AssessmentIcon />, path: '/analytics', disabled: true, tooltip: 'Coming Soon' },
         { text: 'Calendar', icon: <CalendarMonthIcon />, path: '/calendar', disabled: true, tooltip: 'Coming Soon' },
         { text: 'Shipments', icon: <LocalShippingIcon />, path: '/shipments' },
-        { text: 'Tracking', icon: <MapIcon />, path: '/tracking', disabled: true, tooltip: 'Coming Soon' },
+        { text: 'Tracking', icon: <MapIcon />, path: '/tracking' },
         { text: 'Warehouse', icon: <WarehouseIcon />, path: '/warehouse', disabled: true, tooltip: 'Coming Soon' },
         { text: 'Fleets', icon: <DirectionsBusIcon />, path: '/fleets', disabled: true, tooltip: 'Coming Soon' },
         { text: 'User Management', icon: <PersonIcon />, path: '/admin/users', adminOnly: true },
@@ -64,13 +76,15 @@ const Sidebar = () => {
         <Drawer
             variant="permanent"
             sx={{
-                width: DRAWER_WIDTH,
+                width: drawerWidth,
                 flexShrink: 0,
                 '& .MuiDrawer-paper': {
-                    width: DRAWER_WIDTH,
+                    width: drawerWidth,
                     boxSizing: 'border-box',
                     borderRight: '1px solid #2a3347',
                     backgroundColor: '#141929',
+                    transition: 'width 0.2s ease',
+                    height: '100vh',
                 },
             }}
         >
@@ -89,14 +103,23 @@ const Sidebar = () => {
                 >
                     {user?.name?.charAt(0) || 'D'}
                 </Avatar>
-                <Box>
-                    <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: '15px', color: '#e8eaf0' }}>
-                        {user?.name || 'Demo Admin'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ fontSize: '13px', color: '#9ca3af', textTransform: 'capitalize' }}>
-                        {user?.role || 'Admin'}
-                    </Typography>
-                </Box>
+                {!collapsed && (
+                    <Box>
+                        <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: '15px', color: '#e8eaf0' }}>
+                            {user?.name || 'Demo Admin'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ fontSize: '13px', color: '#9ca3af', textTransform: 'capitalize' }}>
+                            {user?.role || 'Admin'}
+                        </Typography>
+                    </Box>
+                )}
+                <IconButton
+                    onClick={() => setCollapsed((prev) => !prev)}
+                    sx={{ marginLeft: 'auto', color: '#9ca3af' }}
+                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                    {collapsed ? <MenuIcon /> : <ChevronLeftIcon />}
+                </IconButton>
             </Box>
 
             <Box sx={{ overflow: 'auto', mt: 2, px: 2 }}>
@@ -123,6 +146,7 @@ const Sidebar = () => {
                                                     opacity: item.disabled ? 0.4 : 1,
                                                     pointerEvents: item.disabled ? 'none' : 'auto',
                                                     position: 'relative',
+                                                    justifyContent: collapsed ? 'center' : 'flex-start',
                                                     '&:hover': {
                                                         backgroundColor: item.disabled ? 'transparent' : 'rgba(0, 217, 184, 0.05)',
                                                         color: item.disabled ? 'inherit' : '#e8eaf0',
@@ -143,11 +167,12 @@ const Sidebar = () => {
                                                     },
                                                 }}
                                             >
-                                                <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                                                <ListItemIcon sx={{ minWidth: collapsed ? 'auto' : 40, color: 'inherit' }}>
                                                     {item.icon}
                                                 </ListItemIcon>
                                                 <ListItemText
                                                     primary={item.text}
+                                                    sx={textStyles}
                                                     primaryTypographyProps={{
                                                         fontSize: '14px',
                                                         fontWeight: 500,
@@ -172,6 +197,7 @@ const Sidebar = () => {
                                             py: 1.5,
                                             position: 'relative',
                                             color: '#9ca3af',
+                                            justifyContent: collapsed ? 'center' : 'flex-start',
                                             '&:hover': {
                                                 backgroundColor: 'rgba(0, 217, 184, 0.05)',
                                                 color: '#e8eaf0',
@@ -198,11 +224,12 @@ const Sidebar = () => {
                                             },
                                         }}
                                     >
-                                        <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                                        <ListItemIcon sx={{ minWidth: collapsed ? 'auto' : 40, color: 'inherit' }}>
                                             {item.icon}
                                         </ListItemIcon>
                                         <ListItemText
                                             primary={item.text}
+                                            sx={textStyles}
                                             primaryTypographyProps={{
                                                 fontSize: '14px',
                                                 fontWeight: 500,
@@ -235,17 +262,19 @@ const Sidebar = () => {
                                     sx={{
                                         borderRadius: 3,
                                         color: 'text.secondary',
+                                        justifyContent: collapsed ? 'center' : 'flex-start',
                                         '&.active': {
                                             backgroundColor: theme.palette.primary.main, // Or a secondary color
                                             color: theme.palette.primary.contrastText,
                                         },
                                     }}
                                 >
-                                    <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                                    <ListItemIcon sx={{ minWidth: collapsed ? 'auto' : 40, color: 'inherit' }}>
                                         {item.icon}
                                     </ListItemIcon>
                                     <ListItemText
                                         primary={item.text}
+                                        sx={textStyles}
                                         primaryTypographyProps={{ fontSize: '0.9rem', fontWeight: 500 }}
                                     />
                                 </ListItemButton>
@@ -259,4 +288,3 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
-

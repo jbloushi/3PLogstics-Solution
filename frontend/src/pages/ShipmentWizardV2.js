@@ -1359,7 +1359,7 @@ const ShipmentWizardV2 = () => {
                         onClick={() => generateWaybillPDF(createdShipment || { sender, receiver, parcels, totals, _id: 'PENDING' })}
                         startIcon={<DescriptionIcon />}
                     >
-                        Download System Label (v2)
+                        Download System Label
                     </Button>
                     <Button variant="outlined" size="large" onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
                 </Stack>

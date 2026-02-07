@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import TrackingPage from '../pages/TrackingPage';
 import CreateShipmentPage from '../pages/CreateShipmentPage';
 import DgrShipmentWizard from '../pages/DgrShipmentWizard';
 import ShipmentWizardV2 from '../pages/ShipmentWizardV2';
@@ -16,6 +15,7 @@ import AddressBookPage from '../pages/AddressBookPage';
 import AdminUsersPage from '../pages/AdminUsersPage';
 import AdminOrganizationsPage from '../pages/AdminOrganizationsPage';
 import PublicLocationPage from '../pages/PublicLocationPage';
+import PublicTrackingLandingPage from '../pages/PublicTrackingLandingPage';
 import { useAuth } from '../context/AuthContext';
 
 import DashboardPage from '../pages/DashboardPage';
@@ -25,6 +25,7 @@ import WarehouseScanPage from '../pages/WarehouseScanPage';
 import InConstructionPage from '../pages/InConstructionPage';
 import FinancePage from '../pages/FinancePage';
 import ShipmentDetailsPage from '../pages/ShipmentDetailsPage';
+import TrackingLandingPage from '../pages/TrackingLandingPage';
 
 
 
@@ -56,8 +57,6 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/signup" element={<SignupPage />} />
-      <Route path="/" element={<LoginPage />} />
-
       <Route path="/" element={<LoginPage />} />
 
       {/* Standalone Driver Route (No Sidebar) */}
@@ -123,6 +122,11 @@ const AppRoutes = () => {
         } />
 
         <Route path="tracking/:trackingNumber" element={<RedirectToShipment />} />
+        <Route path="tracking" element={
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+            <TrackingLandingPage />
+          </ProtectedRoute>
+        } />
         <Route path="shipment/:trackingNumber" element={
           <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
             <ShipmentDetailsPage />
@@ -137,6 +141,7 @@ const AppRoutes = () => {
         } />
 
         {/* Public Routes */}
+        <Route path="track" element={<PublicTrackingLandingPage />} />
         <Route path="track/:trackingNumber" element={<PublicLocationPage />} />
         <Route path="track/:trackingNumber/location" element={<PublicLocationPage />} />
         <Route path="shipments/:trackingNumber" element={<RedirectToShipment />} />
@@ -169,6 +174,8 @@ const AppRoutes = () => {
           </ProtectedRoute>
         } />
 
+        <Route path="forgot-password" element={<InConstructionPage title="Password Reset" description="Password recovery is coming soon." />} />
+
         <Route path="privacy" element={<div>Privacy Policy - Coming Soon</div>} />
         <Route path="terms" element={<div>Terms of Service - Coming Soon</div>} />
         <Route path="*" element={<NotFoundPage />} />
@@ -178,5 +185,3 @@ const AppRoutes = () => {
 };
 
 export default AppRoutes;
-
-

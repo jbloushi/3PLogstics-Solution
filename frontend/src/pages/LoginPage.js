@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
-import { Button, Input, Alert, Toggle } from '../ui';
+import { Button, Input, Alert } from '../ui';
 
 // --- Styled Components ---
 
@@ -124,7 +124,7 @@ const LoginPage = () => {
     const [showDevOptions, setShowDevOptions] = useState(false);
 
     // Note: 'rememberMe' state existed but wasn't doing anything logic-wise in the original code beyond UI toggle.
-    // Keeping it simple for this V2 refactor unless explicitly needed.
+    // Keeping it simple unless explicitly needed.
 
     const { login, loading, error, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
