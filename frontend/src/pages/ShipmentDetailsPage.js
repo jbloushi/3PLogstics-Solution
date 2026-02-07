@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
 import { useShipment } from '../context/ShipmentContext';
+import { useAuth } from '../context/AuthContext';
 import {
     PageHeader,
     Button,
@@ -11,6 +13,8 @@ import {
     Tabs,
     Tab
 } from '../ui';
+import ShipmentApprovalDialog from '../components/ShipmentApprovalDialog';
+import TrackingTimeline from '../components/TrackingTimeline';
 
 // --- Styled Components ---
 
@@ -168,6 +172,21 @@ const MapPlaceholder = styled.div`
     font-size: 14px;
 `;
 
+const MapWrapper = styled.div`
+    height: 520px;
+    width: 100%;
+`;
+
+const TrackingLink = styled.a`
+    color: var(--accent-primary);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover {
+        text-decoration: underline;
+    }
+`;
+
 const DetailsCard = styled.div`
     grid-column: 1 / 3;
     background: var(--bg-secondary);
@@ -231,6 +250,48 @@ const DetailContentValue = styled.div`
     color: var(--text-primary);
 `;
 
+const SectionCard = styled.div`
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+`;
+
+const SectionTitle = styled.h3`
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+`;
+
+const Table = styled.table`
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+
+    th, td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+        color: var(--text-secondary);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+`;
+
+const EmptyState = styled.div`
+    padding: 24px;
+    border: 1px dashed var(--border-color);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    text-align: center;
+`;
+
 // --- Main Component ---
 
 const ShipmentDetailsPage = () => {
@@ -238,6 +299,9 @@ const ShipmentDetailsPage = () => {
     const navigate = useNavigate();
     const fetchedRef = useRef(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [approvalOpen, setApprovalOpen] = useState(false);
+
+    const { user } = useAuth();
 
     const {
         shipment,
@@ -245,6 +309,12 @@ const ShipmentDetailsPage = () => {
         error,
         getShipment,
     } = useShipment();
+
+    const googleMapsApiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+    const { isLoaded: isMapLoaded } = useJsApiLoader({
+        id: 'shipment-details-map',
+        googleMapsApiKey: googleMapsApiKey || ''
+    });
 
     // Fetch shipment data on component mount
     useEffect(() => {
@@ -287,11 +357,41 @@ const ShipmentDetailsPage = () => {
         );
     }
 
-    const sender = shipment.sender || {};
-    const receiver = shipment.receiver || {};
+    const sender = shipment.origin || shipment.sender || {};
+    const receiver = shipment.destination || shipment.receiver || {};
     const parcels = shipment.parcels || [];
+    const items = shipment.items || [];
+    const documents = shipment.documents || [];
     const totalWeight = parcels.reduce((sum, p) => sum + (Number(p.weight) || 0), 0);
     const totalPieces = parcels.reduce((sum, p) => sum + (Number(p.quantity) || 1), 0);
+    const isStaff = user?.role === 'admin' || user?.role === 'staff';
+    const isClient = user?.role === 'client';
+    const approvalStatuses = ['pending', 'draft', 'updated', 'ready_for_pickup', 'picked_up'];
+    const clientEditableStatuses = ['draft', 'pending', 'updated'];
+    const canApprove = isStaff && approvalStatuses.includes(shipment.status);
+    const canEdit = isClient && clientEditableStatuses.includes(shipment.status);
+    const carrierTrackingNumber = shipment.carrierShipmentId || shipment.dhlTrackingNumber;
+    const carrierCode = (shipment.carrier || shipment.carrierCode || 'DGR').toUpperCase();
+    const carrierTrackingUrl = carrierTrackingNumber && (carrierCode === 'DGR' || carrierCode === 'DHL')
+        ? `https://www.dhl.com/global-en/home/tracking.html?tracking-id=${carrierTrackingNumber}`
+        : null;
+    const currentLocation = shipment.currentLocation || shipment.location || sender;
+    const currentLocationLabel = currentLocation?.formattedAddress || currentLocation?.city || sender?.city || 'Unknown';
+
+    const resolveCoordinates = (location) => {
+        if (!location) return null;
+        if (Array.isArray(location.coordinates) && location.coordinates.length === 2) {
+            return { lat: location.coordinates[1], lng: location.coordinates[0] };
+        }
+        if (typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+            return { lat: location.latitude, lng: location.longitude };
+        }
+        return null;
+    };
+
+    const mapCenter = resolveCoordinates(currentLocation)
+        || resolveCoordinates(receiver)
+        || resolveCoordinates(sender);
 
     return (
         <div>
@@ -299,12 +399,24 @@ const ShipmentDetailsPage = () => {
                 title="Shipment Details"
                 description={`Tracking Number: ${shipment.trackingNumber}`}
                 action={
-                    <Button
-                        variant="primary"
-                        onClick={() => window.open(`${process.env.REACT_APP_API_URL}/shipments/${shipment.trackingNumber}/label`, '_blank')}
-                    >
-                        Print Label
-                    </Button>
+                    <>
+                        {canEdit && (
+                            <Button variant="secondary" onClick={() => setApprovalOpen(true)}>
+                                Edit Shipment
+                            </Button>
+                        )}
+                        {canApprove && (
+                            <Button variant="secondary" onClick={() => setApprovalOpen(true)}>
+                                Approve Shipment
+                            </Button>
+                        )}
+                        <Button
+                            variant="primary"
+                            onClick={() => window.open(`${process.env.REACT_APP_API_URL}/shipments/${shipment.trackingNumber}/label`, '_blank')}
+                        >
+                            Print Label
+                        </Button>
+                    </>
                 }
                 secondaryAction={
                     <Button variant="secondary" onClick={() => navigate('/shipments')}>
@@ -372,12 +484,12 @@ const ShipmentDetailsPage = () => {
                             </svg>
                             ORIGIN (SENDER)
                         </CardHeader>
-                        <PartyName>{sender.contactPerson || sender.companyName || 'N/A'}</PartyName>
-                        <PartyType>{sender.companyName || 'Individual'}</PartyType>
+                        <PartyName>{sender.contactPerson || sender.company || 'N/A'}</PartyName>
+                        <PartyType>{sender.company || 'Individual'}</PartyType>
                         <DetailRow>
                             <strong>{sender.streetLines?.[0] || sender.formattedAddress || 'N/A'}</strong><br />
                             <span style={{ color: 'var(--text-secondary)' }}>
-                                {sender.city}, {sender.stateOrProvinceCode} {sender.postalCode}, {sender.countryCode}
+                                {sender.city || 'N/A'}{sender.state || sender.stateOrProvinceCode ? `, ${sender.state || sender.stateOrProvinceCode}` : ''} {sender.postalCode || ''}, {sender.countryCode || ''}
                             </span>
                         </DetailRow>
                         <ContactInfo>
@@ -402,12 +514,12 @@ const ShipmentDetailsPage = () => {
                             </svg>
                             DESTINATION (RECIPIENT)
                         </CardHeader>
-                        <PartyName>{receiver.contactPerson || receiver.companyName || 'N/A'}</PartyName>
-                        <PartyType>{receiver.companyName || 'Individual'}</PartyType>
+                        <PartyName>{receiver.contactPerson || receiver.company || 'N/A'}</PartyName>
+                        <PartyType>{receiver.company || 'Individual'}</PartyType>
                         <DetailRow>
                             <strong>{receiver.streetLines?.[0] || receiver.formattedAddress || 'N/A'}</strong><br />
                             <span style={{ color: 'var(--text-secondary)' }}>
-                                {receiver.city}, {receiver.stateOrProvinceCode} {receiver.postalCode}, {receiver.countryCode}
+                                {receiver.city || 'N/A'}{receiver.state || receiver.stateOrProvinceCode ? `, ${receiver.state || receiver.stateOrProvinceCode}` : ''} {receiver.postalCode || ''}, {receiver.countryCode || ''}
                             </span>
                         </DetailRow>
                         <ContactInfo>
@@ -429,15 +541,43 @@ const ShipmentDetailsPage = () => {
                         <MapHeader>
                             <div>
                                 <LocationBadge>CURRENT LOCATION</LocationBadge>
-                                <LocationName>{sender.city || 'Unknown'}</LocationName>
+                                <LocationName>{currentLocationLabel}</LocationName>
                             </div>
                             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--text-secondary)' }}>
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                             </svg>
                         </MapHeader>
-                        <MapPlaceholder>
-                            [Map View - {sender.city} to {receiver.city}]
-                        </MapPlaceholder>
+                        {!googleMapsApiKey && (
+                            <MapPlaceholder>
+                                Google Maps API key not configured.
+                            </MapPlaceholder>
+                        )}
+                        {googleMapsApiKey && !mapCenter && (
+                            <MapPlaceholder>
+                                No coordinates available for this shipment.
+                            </MapPlaceholder>
+                        )}
+                        {googleMapsApiKey && mapCenter && (
+                            <MapWrapper>
+                                {isMapLoaded ? (
+                                    <GoogleMap
+                                        mapContainerStyle={{ width: '100%', height: '100%' }}
+                                        center={mapCenter}
+                                        zoom={12}
+                                        options={{
+                                            streetViewControl: false,
+                                            mapTypeControl: false,
+                                            fullscreenControl: true,
+                                            gestureHandling: 'greedy'
+                                        }}
+                                    >
+                                        <Marker position={mapCenter} />
+                                    </GoogleMap>
+                                ) : (
+                                    <MapPlaceholder>Loading map...</MapPlaceholder>
+                                )}
+                            </MapWrapper>
+                        )}
                     </MapContainer>
 
                     {/* Shipment Details Card */}
@@ -495,34 +635,231 @@ const ShipmentDetailsPage = () => {
                                     </DetailContentValue>
                                 </DetailContent>
                             </DetailItem>
+
+                            {isStaff && (
+                                <>
+                                    <DetailItem>
+                                        <DetailIcon>
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7h18M3 12h18M3 17h18" />
+                                            </svg>
+                                        </DetailIcon>
+                                        <DetailContent>
+                                            <DetailContentLabel>Carrier Tracking #</DetailContentLabel>
+                                            <DetailContentValue>{carrierTrackingNumber || 'Not assigned'}</DetailContentValue>
+                                        </DetailContent>
+                                    </DetailItem>
+                                    <DetailItem>
+                                        <DetailIcon>
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 010 5.656m1.414-7.07a6 6 0 010 8.484m-9.9-1.414a4 4 0 010-5.656m-1.414 7.07a6 6 0 010-8.484M12 12h.01" />
+                                            </svg>
+                                        </DetailIcon>
+                                        <DetailContent>
+                                            <DetailContentLabel>Carrier Tracking Link</DetailContentLabel>
+                                            <DetailContentValue>
+                                                {carrierTrackingUrl ? (
+                                                    <TrackingLink href={carrierTrackingUrl} target="_blank" rel="noreferrer">
+                                                        Open Tracking
+                                                    </TrackingLink>
+                                                ) : (
+                                                    'Not available'
+                                                )}
+                                            </DetailContentValue>
+                                        </DetailContent>
+                                    </DetailItem>
+                                </>
+                            )}
                         </DetailsGrid>
                     </DetailsCard>
                 </ContentGrid>
             )}
 
             {activeTab === 'parcels' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Parcels view - Coming soon
+                <div>
+                    <SectionCard>
+                        <SectionTitle>Parcels</SectionTitle>
+                        {parcels.length === 0 ? (
+                            <EmptyState>No parcels recorded for this shipment yet.</EmptyState>
+                        ) : (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Description</th>
+                                        <th>Weight (kg)</th>
+                                        <th>Dimensions (cm)</th>
+                                        <th>Reference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {parcels.map((parcel, index) => (
+                                        <tr key={`${parcel.trackingReference || parcel.description || 'parcel'}-${index}`}>
+                                            <td>{index + 1}</td>
+                                            <td>{parcel.description || 'Parcel'}</td>
+                                            <td>{Number(parcel.weight || 0).toFixed(2)}</td>
+                                            <td>
+                                                {parcel.dimensions
+                                                    ? `${parcel.dimensions.length || 0}×${parcel.dimensions.width || 0}×${parcel.dimensions.height || 0}`
+                                                    : 'N/A'}
+                                            </td>
+                                            <td>{parcel.trackingReference || shipment.reference || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        )}
+                    </SectionCard>
+
+                    <SectionCard>
+                        <SectionTitle>Items / Contents</SectionTitle>
+                        {items.length === 0 ? (
+                            <EmptyState>No line items recorded for this shipment yet.</EmptyState>
+                        ) : (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Description</th>
+                                        <th>Qty</th>
+                                        <th>Value</th>
+                                        <th>HS Code</th>
+                                        <th>Origin</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {items.map((item, index) => (
+                                        <tr key={`${item.sku || item.description || 'item'}-${index}`}>
+                                            <td>{index + 1}</td>
+                                            <td>{item.description || 'Item'}</td>
+                                            <td>{item.quantity || 1}</td>
+                                            <td>
+                                                {item.declaredValue != null ? `${item.declaredValue} ${shipment.currency || ''}` : '—'}
+                                            </td>
+                                            <td>{item.hsCode || '—'}</td>
+                                            <td>{item.countryOfOrigin || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </Table>
+                        )}
+                    </SectionCard>
                 </div>
             )}
 
             {activeTab === 'activity' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Activity timeline - Coming soon
+                <div style={{ padding: '24px' }}>
+                    <TrackingTimeline history={shipment.history || []} currentStatus={shipment.status} />
                 </div>
             )}
 
             {activeTab === 'documents' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Documents - Coming soon
+                <div>
+                    <SectionCard>
+                        <SectionTitle>Generated Documents</SectionTitle>
+                        {documents.length === 0 && !shipment.labelUrl && !shipment.invoiceUrl ? (
+                            <EmptyState>No documents are available yet.</EmptyState>
+                        ) : (
+                            <Table>
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Format</th>
+                                        <th>Link</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {documents.map((doc) => (
+                                        <tr key={`${doc.type}-${doc.createdAt || doc.url}`}>
+                                            <td>{doc.type}</td>
+                                            <td>{doc.format || 'pdf'}</td>
+                                            <td>
+                                                {doc.url ? (
+                                                    <TrackingLink href={doc.url} target="_blank" rel="noreferrer">
+                                                        View
+                                                    </TrackingLink>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {shipment.labelUrl && (
+                                        <tr>
+                                            <td>Label</td>
+                                            <td>pdf</td>
+                                            <td>
+                                                <TrackingLink href={shipment.labelUrl} target="_blank" rel="noreferrer">
+                                                    View
+                                                </TrackingLink>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {shipment.invoiceUrl && (
+                                        <tr>
+                                            <td>Invoice</td>
+                                            <td>pdf</td>
+                                            <td>
+                                                <TrackingLink href={shipment.invoiceUrl} target="_blank" rel="noreferrer">
+                                                    View
+                                                </TrackingLink>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </Table>
+                        )}
+                    </SectionCard>
                 </div>
             )}
 
             {activeTab === 'management' && (
-                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    Management - Coming soon
+                <div>
+                    <SectionCard>
+                        <SectionTitle>Shipment Settings</SectionTitle>
+                        <Table>
+                            <thead>
+                                <tr>
+                                    <th>Setting</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Public Location Updates</td>
+                                    <td>{shipment.allowPublicLocationUpdate ? 'Enabled' : 'Disabled'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Public Info Updates</td>
+                                    <td>{shipment.allowPublicInfoUpdate ? 'Enabled' : 'Disabled'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Incoterm</td>
+                                    <td>{shipment.incoterm || '—'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Export Reason</td>
+                                    <td>{shipment.exportReason || '—'}</td>
+                                </tr>
+                                <tr>
+                                    <td>Reference</td>
+                                    <td>{shipment.reference || '—'}</td>
+                                </tr>
+                            </tbody>
+                        </Table>
+                    </SectionCard>
                 </div>
             )}
+
+            <ShipmentApprovalDialog
+                open={approvalOpen}
+                onClose={() => setApprovalOpen(false)}
+                shipment={shipment}
+                onShipmentUpdated={() => {
+                    setApprovalOpen(false);
+                    getShipment(shipment.trackingNumber);
+                }}
+            />
         </div>
     );
 };
