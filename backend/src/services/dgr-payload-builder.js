@@ -8,6 +8,20 @@ const { normalizeShipment } = require('../utils/shipmentNormalizer');
 const normalizeDigits = (val) => (val || '').replace(/\D/g, '');
 
 /**
+ * Normalize country code to ISO2 if possible.
+ * Falls back to provided fallback when input is not ISO2.
+ * @param {string} input
+ * @param {string} fallback
+ * @returns {string}
+ */
+const normalizeCountryCode = (input, fallback) => {
+    const code = (input || '').toString().trim().toUpperCase();
+    if (code.length === 2) return code;
+    const fallbackCode = (fallback || '').toString().trim().toUpperCase();
+    return fallbackCode.length === 2 ? fallbackCode : code;
+};
+
+/**
  * Formatting helper for 3 decimal places
  * @param {number} num 
  * @returns {number}
@@ -147,6 +161,7 @@ function buildExportDeclaration(order, config = {}) {
         const description = composeItemDescription(item, order.dangerousGoods);
         const commCode = normalizeDigits(item.hsCode);
         const qty = Number(item.quantity || 1);
+        const manufacturerCountryCode = normalizeCountryCode(item.countryOfOrigin, sender.countryCode);
 
         // Calculate a proportional share of the gross weight if multiple items exist, 
         // otherwise just use the item's own weight logic.
@@ -171,7 +186,7 @@ function buildExportDeclaration(order, config = {}) {
                 typeCode: 'outbound',
                 value: commCode
             }],
-            manufacturerCountry: item.countryOfOrigin || sender.countryCode,
+            manufacturerCountry: manufacturerCountryCode,
             weight: {
                 netValue: formatWeight(totalLineNet),
                 grossValue: formatWeight(itemGrossWeight)
@@ -266,6 +281,8 @@ function buildDgrShipmentPayload(order, config = {}) {
     }
 
     const { sender, receiver, packages } = order;
+    const senderCountryCode = normalizeCountryCode(sender.countryCode);
+    const receiverCountryCode = normalizeCountryCode(receiver.countryCode);
 
     // Calculate total declared value and validate currency consistency
     const currencies = new Set(order.items.map(i => i.currency || 'KWD'));
@@ -340,7 +357,7 @@ function buildDgrShipmentPayload(order, config = {}) {
                 postalAddress: {
                     postalCode: sender.postalCode,
                     cityName: sender.city,
-                    countryCode: sender.countryCode,
+                    countryCode: senderCountryCode,
                     addressLine1: shipperAddress.line1,
                     addressLine2: shipperAddress.line2,
                     addressLine3: shipperAddress.line3
@@ -358,7 +375,7 @@ function buildDgrShipmentPayload(order, config = {}) {
                 postalAddress: {
                     postalCode: receiver.postalCode,
                     cityName: receiver.city,
-                    countryCode: receiver.countryCode,
+                    countryCode: receiverCountryCode,
                     addressLine1: receiverAddress.line1,
                     addressLine2: receiverAddress.line2,
                     addressLine3: receiverAddress.line3
@@ -400,11 +417,12 @@ function buildDgrShipmentPayload(order, config = {}) {
 
     // Populate Registration Numbers (VAT/EORI Only)
     const addRegParams = (targetArr, party) => {
-        if (party.vatNumber) {
-            targetArr.push({ typeCode: 'VAT', number: party.vatNumber, issuerCountryCode: party.countryCode });
+        const issuerCountryCode = normalizeCountryCode(party.countryCode);
+        if (party.vatNumber && issuerCountryCode) {
+            targetArr.push({ typeCode: 'VAT', number: party.vatNumber, issuerCountryCode });
         }
-        if (party.eoriNumber) {
-            targetArr.push({ typeCode: 'EOR', number: party.eoriNumber, issuerCountryCode: party.countryCode });
+        if (party.eoriNumber && issuerCountryCode) {
+            targetArr.push({ typeCode: 'EOR', number: party.eoriNumber, issuerCountryCode });
         }
         // TaxID intentionally omitted here (Moved to Invoice Instructions to avoid 'STN' error)
     };
