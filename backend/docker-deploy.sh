@@ -21,7 +21,7 @@ docker-compose up -d --build
 # Check if containers are running
 if [ $? -eq 0 ]; then
   echo -e "${GREEN}✅ Shipment Tracker API is now running!${NC}"
-  echo -e "${GREEN}📊 API is available at: http://localhost:5000${NC}"
+  echo -e "${GREEN}📊 API is available at: http://localhost:8899${NC}"
   echo -e "${YELLOW}📝 To view logs: docker-compose logs -f${NC}"
   echo -e "${YELLOW}🛑 To stop: docker-compose down${NC}"
 else
