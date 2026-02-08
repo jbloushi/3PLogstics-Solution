@@ -49,6 +49,9 @@ module.exports = {
 
   // Optional Configuration
   sentryDsn: process.env.SENTRY_DSN,
-  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100,
+  rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== 'false',
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100, // Legacy
+  rateLimitGlobalMax: parseInt(process.env.RATE_LIMIT_GLOBAL_MAX, 10) || 100,
+  rateLimitAuthMax: parseInt(process.env.RATE_LIMIT_AUTH_MAX, 10) || 20,
   maxUploadSize: parseInt(process.env.MAX_UPLOAD_SIZE, 10) || 10485760, // 10MB default
 };

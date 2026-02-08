@@ -23,6 +23,10 @@ const paymentAllocationSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    isFifo: {
+        type: Boolean,
+        default: false
+    },
     status: {
         type: String,
         enum: ['ACTIVE', 'REVERSED'],

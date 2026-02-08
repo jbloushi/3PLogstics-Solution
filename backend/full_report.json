@@ -1,0 +1,76 @@
+{
+  "orgId": "698273cf57a962a82343dcd3",
+  "shipmentsCount": 3,
+  "shipments": [
+    {
+      "id": "698701d729215721cbf5925d",
+      "tracking": "DGR-I6MY3V3I",
+      "paid": false,
+      "price": 15
+    },
+    {
+      "id": "69870384b6262e5c387045cf",
+      "tracking": "DGR-LM2A7B5D",
+      "paid": false,
+      "price": 15
+    },
+    {
+      "id": "69870482b6262e5c38704cc4",
+      "tracking": "DGR-SEU6JFVJ",
+      "paid": false,
+      "price": 17.25
+    }
+  ],
+  "allocationsCount": 7,
+  "allocations": [
+    {
+      "id": "698705fbb6262e5c38704ff6",
+      "shipmentId": "69870482b6262e5c38704cc4",
+      "amount": 17.25,
+      "status": "ACTIVE",
+      "createdAt": "2026-02-07T09:29:31.249Z"
+    },
+    {
+      "id": "69870612b6262e5c387050e9",
+      "shipmentId": "69870482b6262e5c38704cc4",
+      "amount": 17.25,
+      "status": "ACTIVE",
+      "createdAt": "2026-02-07T09:29:54.555Z"
+    },
+    {
+      "id": "698707990007bc7c871cac81",
+      "shipmentId": "69870482b6262e5c38704cc4",
+      "amount": 17.25,
+      "status": "ACTIVE",
+      "createdAt": "2026-02-07T09:36:25.146Z"
+    },
+    {
+      "id": "698707990007bc7c871cac9a",
+      "shipmentId": "69870384b6262e5c387045cf",
+      "amount": 15,
+      "status": "ACTIVE",
+      "createdAt": "2026-02-07T09:36:25.261Z"
+    },
+    {
+      "id": "698707a20007bc7c871cace7",
+      "shipmentId": "69870482b6262e5c38704cc4",
+      "amount": 17.25,
+      "status": "ACTIVE",
+      "createdAt": "2026-02-07T09:36:34.917Z"
+    },
+    {
+      "id": "698707a20007bc7c871cad00",
+      "shipmentId": "69870384b6262e5c387045cf",
+      "amount": 15,
+      "status": "ACTIVE",
+      "createdAt": "2026-02-07T09:36:34.998Z"
+    },
+    {
+      "id": "698707b20007bc7c871cad4d",
+      "shipmentId": "69870482b6262e5c38704cc4",
+      "amount": 17.25,
+      "status": "ACTIVE",
+      "createdAt": "2026-02-07T09:36:50.495Z"
+    }
+  ]
+}

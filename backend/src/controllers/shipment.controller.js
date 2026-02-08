@@ -408,12 +408,30 @@ exports.getAllShipments = async (req, res) => {
       }
     }
 
-    const { status, sortBy, sortOrder, limit = 50, page = 1 } = req.query;
+    const { status, sortBy, sortOrder, limit = 50, page = 1, organization, paid } = req.query;
     const query = {};
 
     // Apply filters
     if (status) {
       query.status = status;
+    }
+
+    if (organization) {
+      if (organization === 'none') {
+        query.organization = null;
+      } else {
+        query.organization = organization;
+      }
+    }
+
+    if (paid !== undefined) {
+      const isPaid = paid === 'true' || paid === true;
+      if (isPaid) {
+        query.paid = true;
+      } else {
+        // Use $ne: true to catch false, undefined, and null
+        query.paid = { $ne: true };
+      }
     }
 
     // Role-based filtering: Clients only see their own shipments, staff see all

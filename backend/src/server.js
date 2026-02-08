@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
-const { port, mongoUri, corsOrigin } = require('./config/config');
+const { port, mongoUri, corsOrigin, rateLimitGlobalMax, rateLimitAuthMax, rateLimitEnabled } = require('./config/config');
 const { connectDB } = require('./config/database');
 const logger = require('./utils/logger');
 const { errorHandler } = require('./middleware/error.middleware');
@@ -16,38 +16,57 @@ const seedDemoData = require('./services/seedDemoData');
 
 // Initialize Express app
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (Nginx)
+
+// Enable CORS early to ensure all responses (including errors/rate limits) have CORS headers
+const corsOptions = {
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (corsOrigin === '*') return callback(null, true);
+
+    const allowedOrigins = corsOrigin.split(',').map(o => o.trim());
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      logger.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 
 // Security middleware
 app.use(helmet());
 
 // Rate Limiting
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 100, // Limit each IP to 100 requests per window
-  message: { success: false, error: 'Too many requests, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+if (rateLimitEnabled) {
+  const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: rateLimitGlobalMax,
+    message: { success: false, error: 'Too many requests, please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
-// Apply global rate limiter
-app.use('/api', globalLimiter);
+  // Apply global rate limiter to all /api routes
+  // CORS middleware already ran, so these responses will have CORS headers
+  app.use('/api', globalLimiter);
 
-// Stricter limiter for auth and public routes
-const authLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // 10 attempts per hour
-  message: { success: false, error: 'Security limit reached. Please try again later.' }
-});
-app.use('/api/auth', authLimiter);
-app.use('/api/shipments/public', authLimiter);
-
-// CORS configuration with origin whitelisting
-const corsOptions = {
-  origin: corsOrigin === '*' ? '*' : corsOrigin.split(',').map(origin => origin.trim()),
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
+  // Stricter limiter for auth and public routes
+  const authLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: rateLimitAuthMax,
+    message: { success: false, error: 'Security limit reached. Please try again later.' }
+  });
+  app.use('/api/auth', authLimiter);
+  app.use('/api/shipments/public', authLimiter);
+} else {
+  logger.info('Rate limiting is disabled');
+}
 
 app.use('/uploads', express.static('uploads'));
 

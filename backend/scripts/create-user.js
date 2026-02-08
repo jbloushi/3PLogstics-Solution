@@ -16,7 +16,10 @@ const readline = require('readline');
 const path = require('path');
 
 // Load environment variables
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+// Load environment variables if not already provided (e.g., local dev)
+if (!process.env.MONGO_URI) {
+    require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+}
 
 const User = require('../src/models/user.model');
 const Organization = require('../src/models/organization.model');

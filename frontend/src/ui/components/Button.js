@@ -72,12 +72,13 @@ const ButtonBase = styled.button`
   `}
 `;
 
-const Button = ({ children, variant = 'primary', ...props }) => {
-    return (
-        <ButtonBase $variant={variant} {...props}>
-            {children}
-        </ButtonBase>
-    );
+const Button = ({ children, variant = 'primary', icon, ...props }) => {
+  return (
+    <ButtonBase $variant={variant} {...props}>
+      {icon && <span className="btn-icon" style={{ display: 'flex', alignItems: 'center' }}>{icon}</span>}
+      {children}
+    </ButtonBase>
+  );
 };
 
 export default Button;

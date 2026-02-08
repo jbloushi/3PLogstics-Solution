@@ -4,16 +4,25 @@ const organizationLedgerSchema = new mongoose.Schema({
     organization: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Organization',
-        required: true,
+        required: false,
         index: true
     },
-    shipment: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Shipment'
+    // Consolidation of references for better traceability
+    sourceRepo: {
+        type: String,
+        enum: ['Shipment', 'Payment', 'Adjustment', 'Reversal'],
+        required: true
     },
-    payment: {
+    sourceId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Payment'
+        required: true,
+        refPath: 'sourceRepo',
+        index: true
+    },
+    parentEntryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'OrganizationLedger',
+        index: true // Used for Reversals to point back to the original entry
     },
     amount: {
         type: Number,
@@ -26,7 +35,7 @@ const organizationLedgerSchema = new mongoose.Schema({
     },
     category: {
         type: String,
-        enum: ['SHIPMENT_CHARGE', 'PAYMENT', 'ADJUSTMENT', 'REVERSAL'],
+        enum: ['SHIPMENT_CHARGE', 'PAYMENT', 'ADJUSTMENT', 'REVERSAL', 'ALLOCATION'],
         default: 'SHIPMENT_CHARGE'
     },
     description: {

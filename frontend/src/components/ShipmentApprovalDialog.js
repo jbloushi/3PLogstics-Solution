@@ -177,8 +177,6 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
         } catch (err) { setError(err.message); } finally { setLoading(false); }
     };
 
-    if (!shipment || !formData) return null;
-
     const [financeSummary, setFinanceSummary] = useState(null);
 
     useEffect(() => {
@@ -199,8 +197,12 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
             }
         };
 
-        loadFinance();
-    }, [shipment, isClient]);
+        if (open && shipment) {
+            loadFinance();
+        }
+    }, [shipment, isClient, open]);
+
+    if (!shipment || !formData) return null;
 
     const totalPrice = parseFloat(formData.price || shipment.price || 0);
     const availableFunds = financeSummary?.availableCredit ?? 0;

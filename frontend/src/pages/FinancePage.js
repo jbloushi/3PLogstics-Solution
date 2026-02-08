@@ -75,8 +75,116 @@ const TransactionIcon = styled.div`
     font-weight: 700;
 `;
 
+const AllocationGrid = styled.div`
+    display: grid;
+    grid-template-columns: 400px 1fr;
+    gap: 24px;
+    margin-top: 24px;
+    align-items: start;
+
+    @media (max-width: 1024px) {
+        grid-template-columns: 1fr;
+    }
+`;
+
+const ListCard = styled(Card)`
+    display: flex;
+    flex-direction: column;
+    height: 600px;
+    overflow: hidden;
+`;
+
+const ListHeader = styled.div`
+    padding: 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+`;
+
+const ScrollableList = styled.div`
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+`;
+
+const ListItem = styled.div`
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    background: ${props => props.$selected ? 'var(--accent-primary-transparent)' : 'transparent'};
+    border: 1px solid ${props => props.$selected ? 'var(--accent-primary)' : 'var(--border-color)'};
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    &:hover {
+        border-color: var(--accent-primary);
+        background: var(--bg-tertiary);
+    }
+
+    ${props => props.$disabled && `
+        opacity: 0.6;
+        cursor: not-allowed;
+        text-decoration: line-through;
+        background: var(--bg-tertiary);
+        &:hover {
+            border-color: var(--border-color);
+        }
+    `}
+`;
+
+const FilterRow = styled.div`
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 0 16px 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+`;
+
+const CheckboxLabel = styled.label`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-secondary);
+`;
+
+const ItemInfo = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+`;
+
+const ItemTitle = styled.div`
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-primary);
+`;
+
+const ItemSub = styled.div`
+    font-size: 12px;
+    color: var(--text-secondary);
+`;
+
+const AllocationFooter = styled.div`
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+`;
+
 const FinancePage = () => {
     const { user, refreshUser } = useAuth();
+    const { enqueueSnackbar } = useSnackbar();
     const [ledger, setLedger] = useState([]);
     const [loading, setLoading] = useState(true);
     const [pagination, setPagination] = useState({ page: 1, total: 0 });
@@ -87,9 +195,15 @@ const FinancePage = () => {
     const [payments, setPayments] = useState([]);
     const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'manual', reference: '', notes: '' });
     const [shipments, setShipments] = useState([]);
-    const [allocationForm, setAllocationForm] = useState({ paymentId: '', shipmentId: '', amount: '' });
+    const [selectedPaymentId, setSelectedPaymentId] = useState('');
+    const [selectedShipmentIds, setSelectedShipmentIds] = useState([]);
+    const [shipmentSearch, setShipmentSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [allocationLoading, setAllocationLoading] = useState(false);
 
-    const fetchLedger = async (orgId) => {
+    const fetchLedger = React.useCallback(async (orgId) => {
         try {
             setLoading(true);
             const response = await financeService.getLedger({ page: pagination.page, orgId });
@@ -101,42 +215,88 @@ const FinancePage = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [pagination.page, refreshUser]);
+
+    // Reset pagination and clear ALL selections/data when organization changes
+    useEffect(() => {
+        if (!selectedOrgId) return;
+        console.log('--- Organization Reset Triggers ---', selectedOrgId);
+        setPagination(prev => ({ ...prev, page: 1 }));
+        setLedger([]);
+        setPayments([]);
+        setShipments([]);
+        setSelectedPaymentId('');
+        setSelectedShipmentIds([]);
+    }, [selectedOrgId]);
+
+    const currentOrgName = selectedOrgId === 'none'
+        ? 'Solo Shippers (Unorganized)'
+        : organizations.find(o => o._id === selectedOrgId)?.name || 'Selected Organization';
+
+    const isFirstOrgLoad = React.useRef(true);
 
     useEffect(() => {
         const loadOrganizations = async () => {
+            console.log('Loading organizations list for role:', user?.role);
             if (user?.role === 'admin' || user?.role === 'staff') {
                 try {
                     const response = await organizationService.getOrganizations();
-                    setOrganizations(response.data || []);
-                    if (!selectedOrgId && response.data?.length) {
-                        setSelectedOrgId(response.data[0]._id);
+                    const orgs = response.data || [];
+                    setOrganizations(orgs);
+                    console.log('Organizations loaded:', orgs.length);
+
+                    // Only auto-select on first load to avoid overwriting user choice
+                    if (isFirstOrgLoad.current && !selectedOrgId) {
+                        console.log('Auto-selecting "Solo Shippers" (Initial)');
+                        setSelectedOrgId('none');
+                        isFirstOrgLoad.current = false;
                     }
                 } catch (error) {
                     console.error('Failed to fetch organizations:', error);
                 }
             } else if (user?.organization?._id) {
+                console.log('Setting user constant org:', user.organization._id);
                 setSelectedOrgId(user.organization._id);
             }
         };
 
         loadOrganizations();
-    }, [user]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, user?.role, user?.organization?._id]); // selectedOrgId intentionally omitted as we handle it via Ref
 
-    useEffect(() => {
-        if (!selectedOrgId) return;
-        const loadFinance = async () => {
+    const loadFinance = React.useCallback(async () => {
+        console.log('loadFinance triggered for org:', selectedOrgId);
+        if (!selectedOrgId) {
+            console.log('No orgId selected, skipping load');
+            return;
+        }
+
+        try {
+            setLoading(true);
             if (user?.role === 'admin' || user?.role === 'staff') {
-                await Promise.all([
-                    fetchLedger(selectedOrgId),
-                    financeService.getOrganizationOverview(selectedOrgId).then((res) => setOverview(res.data)),
-                    financeService.listPayments(selectedOrgId).then((res) => setPayments(res.data || [])),
-                    shipmentService.getAllShipments().then((res) => {
-                        const data = res.data || [];
-                        setShipments(data.filter((shipment) => shipment.organization === selectedOrgId));
-                    })
+                console.log('Fetching detailed finance data for Admin/Staff...');
+                const [ledgerRes, overviewRes, paymentsRes, shipmentsRes] = await Promise.all([
+                    financeService.getLedger({ page: pagination.page, orgId: selectedOrgId }),
+                    financeService.getOrganizationOverview(selectedOrgId),
+                    financeService.listPayments(selectedOrgId),
+                    shipmentService.getAllShipments({ organization: selectedOrgId, limit: 200 }) // Fetch more for manual list, no paid filter
                 ]);
+
+                console.log('[DEBUG] API Responses:', {
+                    ledger: (ledgerRes.data || []).length,
+                    payments: (paymentsRes.data || []).length,
+                    shipments: (shipmentsRes.data || []).length
+                });
+
+                setLedger(ledgerRes.data || []);
+                setPagination(prev => ({ ...prev, total: ledgerRes.pagination?.total || 0 }));
+                setOverview(overviewRes.data);
+
+                const unappliedPayments = (paymentsRes.data || []).filter(p => p.status !== 'APPLIED');
+                setPayments(unappliedPayments);
+                setShipments(shipmentsRes.data || []);
             } else {
+                console.log('Fetching Client-side finance data...');
                 await fetchLedger(selectedOrgId);
                 const balanceResponse = await financeService.getBalance();
                 setOverview({
@@ -148,69 +308,138 @@ const FinancePage = () => {
                     agingBuckets: { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 }
                 });
             }
-        };
+        } catch (err) {
+            console.error('CRITICAL: Load finance failed:', err);
+        } finally {
+            setLoading(false);
+            console.log('Finance loading state cleared');
+        }
+    }, [selectedOrgId, pagination.page, user?.role, fetchLedger]);
+
+    useEffect(() => {
         loadFinance();
-    }, [selectedOrgId, pagination.page, user?.role]);
+    }, [loadFinance]);
 
     const getCategoryPill = (category) => {
         const style = {
             'SHIPMENT_CHARGE': 'info',
             'PAYMENT': 'success',
             'REVERSAL': 'warning',
-            'ADJUSTMENT': 'neutral'
+            'ADJUSTMENT': 'neutral',
+            'ALLOCATION': 'info'
         };
-        return <StatusPill status={style[category] || 'neutral'} text={category.replace('_', ' ')} />;
+        const status = style[category] || 'neutral';
+        return <StatusPill status={status} />;
     };
 
     const handlePostPayment = async () => {
-        if (!paymentForm.amount) {
-            return;
-        }
+        if (!paymentForm.amount) return;
         try {
             await financeService.postPayment(selectedOrgId, {
                 ...paymentForm,
                 amount: parseFloat(paymentForm.amount)
             });
+            enqueueSnackbar('Payment posted successfully', { variant: 'success' });
             setPaymentForm({ amount: '', method: 'manual', reference: '', notes: '' });
-            const response = await financeService.listPayments(selectedOrgId);
-            setPayments(response.data || []);
-            const overviewResponse = await financeService.getOrganizationOverview(selectedOrgId);
-            setOverview(overviewResponse.data);
+            loadFinance();
         } catch (error) {
-            console.error('Failed to post payment:', error);
+            enqueueSnackbar('Failed to post payment', { variant: 'error' });
         }
     };
 
     const handleAllocateFifo = async () => {
         try {
             await financeService.allocatePaymentsFifo(selectedOrgId);
-            const response = await financeService.listPayments(selectedOrgId);
-            setPayments(response.data || []);
-            const overviewResponse = await financeService.getOrganizationOverview(selectedOrgId);
-            setOverview(overviewResponse.data);
+            enqueueSnackbar('FIFO Allocation completed', { variant: 'success' });
+            await loadFinance();
         } catch (error) {
-            console.error('Failed to allocate FIFO:', error);
+            enqueueSnackbar('Failed to allocate FIFO', { variant: 'error' });
         }
     };
 
     const handleManualAllocation = async () => {
-        if (!allocationForm.paymentId || !allocationForm.shipmentId || !allocationForm.amount) {
+        if (!selectedPaymentId || selectedShipmentIds.length === 0) {
+            enqueueSnackbar('Please select a payment and at least one shipment', { variant: 'warning' });
             return;
         }
+
+        const payment = payments.find(p => p._id === selectedPaymentId);
+        if (!payment) {
+            enqueueSnackbar('Selected payment not found', { variant: 'error' });
+            return;
+        }
+
+        // Calculate unapplied amount safely
+        const totalAllocated = parseFloat(payment.allocatedAmount || 0);
+        const unappliedAmount = parseFloat(payment.amount) - totalAllocated;
+
+        console.log('Manual Allocation Debug:', {
+            paymentId: selectedPaymentId,
+            shipmentIds: selectedShipmentIds,
+            amount: unappliedAmount,
+            paymentAmount: payment.amount,
+            totalAllocated
+        });
+
+        if (unappliedAmount <= 0) {
+            enqueueSnackbar('This payment has no remaining balance to allocate', { variant: 'warning' });
+            return;
+        }
+
+        setAllocationLoading(true);
         try {
-            await financeService.allocatePaymentManual(selectedOrgId, {
-                ...allocationForm,
-                amount: parseFloat(allocationForm.amount)
+            const response = await financeService.allocatePaymentManual(selectedOrgId, {
+                paymentId: selectedPaymentId,
+                shipmentIds: selectedShipmentIds,
+                amount: unappliedAmount
             });
-            setAllocationForm({ paymentId: '', shipmentId: '', amount: '' });
-            const response = await financeService.listPayments(selectedOrgId);
-            setPayments(response.data || []);
-            const overviewResponse = await financeService.getOrganizationOverview(selectedOrgId);
-            setOverview(overviewResponse.data);
+            console.log('Allocation Response:', response);
+            enqueueSnackbar('Payment allocated successfully', { variant: 'success' });
+            setSelectedShipmentIds([]);
+            // Don't clear selectedPaymentId if funds might remain
+            await loadFinance();
         } catch (error) {
-            console.error('Failed to allocate payment:', error);
+            console.error('Allocation Error:', error);
+            const errorMsg = error.response?.data?.error || error.message || 'Failed to allocate payment';
+            enqueueSnackbar(errorMsg, { variant: 'error' });
+        } finally {
+            setAllocationLoading(false);
         }
     };
+
+    const toggleShipmentSelection = (shipment) => {
+        if (shipment.paid) return;
+        setSelectedShipmentIds(prev =>
+            prev.includes(shipment._id) ? prev.filter(i => i !== shipment._id) : [...prev, shipment._id]
+        );
+    };
+
+    const filteredShipments = shipments
+        .filter(s => {
+            const matchesSearch = (s.trackingNumber || '').toLowerCase().includes(shipmentSearch.toLowerCase()) ||
+                (s.origin?.contactPerson || '').toLowerCase().includes(shipmentSearch.toLowerCase()) ||
+                (s.receiver?.contactPerson || '').toLowerCase().includes(shipmentSearch.toLowerCase());
+
+            let matchesStatus = true;
+            if (statusFilter === 'paid') matchesStatus = s.paid;
+            else if (statusFilter === 'unpaid') matchesStatus = !s.paid && (s.totalPaid || 0) === 0;
+            else if (statusFilter === 'partial') matchesStatus = !s.paid && (s.totalPaid || 0) > 0;
+
+            const start = startDate ? new Date(startDate) : null;
+            const end = endDate ? new Date(endDate) : null;
+            if (end) end.setHours(23, 59, 59, 999);
+
+            const matchesDate = (!start || new Date(s.createdAt) >= start) &&
+                (!end || new Date(s.createdAt) <= end);
+
+            return matchesSearch && matchesStatus && matchesDate;
+        })
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    const selectedPayment = payments.find(p => p._id === selectedPaymentId);
+    const selectedShipmentsTotal = shipments
+        .filter(s => selectedShipmentIds.includes(s._id))
+        .reduce((sum, s) => sum + (s.pricingSnapshot?.totalPrice || s.price || 0), 0);
 
     const summary = overview || {
         balance: 0,
@@ -234,7 +463,7 @@ const FinancePage = () => {
                     )
                 }
                 secondaryAction={
-                    <Button variant="secondary" onClick={() => fetchLedger(selectedOrgId)}>
+                    <Button variant="secondary" onClick={() => loadFinance()}>
                         Refresh
                     </Button>
                 }
@@ -249,6 +478,9 @@ const FinancePage = () => {
                                 value={selectedOrgId}
                                 onChange={(e) => setSelectedOrgId(e.target.value)}
                             >
+                                <option value="none" style={{ fontWeight: 'bold', color: 'var(--accent-primary)' }}>
+                                    Solo Shippers (Unorganized)
+                                </option>
                                 {organizations.map((org) => (
                                     <option key={org._id} value={org._id}>{org.name}</option>
                                 ))}
@@ -266,25 +498,7 @@ const FinancePage = () => {
                     <div>
                         <StatLabel>Outstanding Balance</StatLabel>
                         <StatValue>
-                            {parseFloat(summary.balance).toFixed(3)} <span>KD</span>
-                        </StatValue>
-                    </div>
-                </StatCard>
-
-                <StatCard>
-                    <div>
-                        <StatLabel>Credit Limit</StatLabel>
-                        <StatValue>
-                            {parseFloat(summary.creditLimit).toFixed(3)} <span>KD</span>
-                        </StatValue>
-                    </div>
-                </StatCard>
-
-                <StatCard>
-                    <div>
-                        <StatLabel>Available Credit</StatLabel>
-                        <StatValue $highlight>
-                            {parseFloat(summary.availableCredit).toFixed(3)} <span>KD</span>
+                            {loading ? <Loader /> : `${parseFloat(summary.balance).toFixed(3)}`} <span>KD</span>
                         </StatValue>
                     </div>
                 </StatCard>
@@ -292,9 +506,20 @@ const FinancePage = () => {
                 <StatCard>
                     <div>
                         <StatLabel>Unapplied Cash</StatLabel>
-                        <StatValue>
-                            {parseFloat(summary.unappliedCash).toFixed(3)} <span>KD</span>
+                        <StatValue $highlight>
+                            {loading ? <Loader /> : `${parseFloat(summary.unappliedCash).toFixed(3)}`} <span>KD</span>
                         </StatValue>
+                        <ItemSub style={{ marginTop: '8px' }}>Available funds for allocation</ItemSub>
+                    </div>
+                </StatCard>
+
+                <StatCard>
+                    <div>
+                        <StatLabel>Available Credit</StatLabel>
+                        <StatValue>
+                            {loading ? <Loader /> : `${parseFloat(summary.availableCredit).toFixed(3)}`} <span>KD</span>
+                        </StatValue>
+                        <ItemSub style={{ marginTop: '8px' }}>Limit: {summary.creditLimit.toFixed(3)} KD</ItemSub>
                     </div>
                 </StatCard>
 
@@ -307,130 +532,218 @@ const FinancePage = () => {
                     </div>
                 </StatCard>
 
-                <StatCard>
-                    <div>
-                        <StatLabel>Aging Buckets</StatLabel>
-                        <StatValue style={{ fontSize: '18px', display: 'grid', gap: '6px' }}>
-                            <div>0–30: {summary.agingBuckets['0-30'].toFixed(3)} KD</div>
-                            <div>31–60: {summary.agingBuckets['31-60'].toFixed(3)} KD</div>
-                            <div>61–90: {summary.agingBuckets['61-90'].toFixed(3)} KD</div>
-                            <div>90+: {summary.agingBuckets['90+'].toFixed(3)} KD</div>
-                        </StatValue>
+                <StatCard style={{ gridColumn: 'span 2' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <StatLabel>Aging Buckets</StatLabel>
+                            <StatValue style={{ fontSize: '18px', display: 'flex', gap: '16px', marginTop: '12px' }}>
+                                <div><div style={{ fontSize: '10px', opacity: 0.7 }}>0–30</div>{summary.agingBuckets['0-30'].toFixed(3)}</div>
+                                <div><div style={{ fontSize: '10px', opacity: 0.7 }}>31–60</div>{summary.agingBuckets['31-60'].toFixed(3)}</div>
+                                <div><div style={{ fontSize: '10px', opacity: 0.7 }}>61–90</div>{summary.agingBuckets['61-90'].toFixed(3)}</div>
+                                <div><div style={{ fontSize: '10px', opacity: 0.7 }}>90+</div>{summary.agingBuckets['90+'].toFixed(3)}</div>
+                            </StatValue>
+                        </div>
                     </div>
                 </StatCard>
             </StatsGrid>
 
             {(user?.role === 'admin' || user?.role === 'staff') && (
-            <Card title="Payments Management">
-                <div style={{ display: 'grid', gap: '16px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                        <Input
-                            label="Payment Amount (KD)"
-                            type="number"
-                            value={paymentForm.amount}
-                            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
-                        />
-                        <Input
-                            label="Reference"
-                            value={paymentForm.reference}
-                            onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
-                        />
-                        <Select
-                            label="Method"
-                            value={paymentForm.method}
-                            onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
-                        >
-                            <option value="manual">Manual</option>
-                            <option value="bank_transfer">Bank Transfer</option>
-                            <option value="cash">Cash</option>
-                        </Select>
-                        <Input
-                            label="Notes"
-                            value={paymentForm.notes}
-                            onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                        <Button variant="primary" onClick={handlePostPayment} disabled={!paymentForm.amount || !selectedOrgId}>
-                            Post Payment
-                        </Button>
-                        <Button variant="secondary" onClick={handleAllocateFifo} disabled={!selectedOrgId}>
-                            Allocate FIFO
-                        </Button>
-                    </div>
-                    <div style={{ borderTop: '1px solid var(--border-color)', margin: '16px 0' }} />
-                    <div style={{ display: 'grid', gap: '12px' }}>
-                        <div style={{ textTransform: 'uppercase', letterSpacing: '1px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                            Manual Allocation
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                <>
+                    <Card title={`Posting Payment: ${currentOrgName}`} style={{ marginBottom: '24px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+                            <Input
+                                label="Amount (KD)"
+                                type="number"
+                                value={paymentForm.amount}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                            />
+                            <Input
+                                label="Reference / Receipt #"
+                                value={paymentForm.reference}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
+                            />
                             <Select
-                                label="Payment"
-                                value={allocationForm.paymentId}
-                                onChange={(e) => setAllocationForm({ ...allocationForm, paymentId: e.target.value })}
+                                label="Method"
+                                value={paymentForm.method}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
                             >
-                                <option value="">Select Payment</option>
-                                {payments.map((payment) => (
-                                    <option key={payment._id} value={payment._id}>
-                                        {payment.reference || payment._id.slice(-6)} • {payment.amount.toFixed(3)} KD • {payment.status}
-                                    </option>
-                                ))}
-                            </Select>
-                            <Select
-                                label="Shipment"
-                                value={allocationForm.shipmentId}
-                                onChange={(e) => setAllocationForm({ ...allocationForm, shipmentId: e.target.value })}
-                            >
-                                <option value="">Select Shipment</option>
-                                {shipments.map((shipment) => (
-                                    <option key={shipment._id} value={shipment._id}>
-                                        {shipment.trackingNumber} • {Number(shipment.pricingSnapshot?.totalPrice || shipment.price || 0).toFixed(3)} KD
-                                    </option>
-                                ))}
+                                <option value="manual">Manual Entry</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="cash">Cash</option>
+                                <option value="knet">K-Net</option>
                             </Select>
                             <Input
-                                label="Allocation Amount (KD)"
-                                type="number"
-                                value={allocationForm.amount}
-                                onChange={(e) => setAllocationForm({ ...allocationForm, amount: e.target.value })}
+                                label="Internal Notes"
+                                value={paymentForm.notes}
+                                onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
                             />
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <Button variant="primary" onClick={handlePostPayment} disabled={!paymentForm.amount}>
+                                    Post Payment
+                                </Button>
+                                <Button variant="secondary" onClick={handleAllocateFifo} title="Apply available funds to oldest shipments first">
+                                    FIFO Allocate
+                                </Button>
+                            </div>
                         </div>
-                        <Button variant="outline" onClick={handleManualAllocation} disabled={!allocationForm.paymentId || !allocationForm.shipmentId || !allocationForm.amount}>
-                            Allocate Payment
-                        </Button>
-                    </div>
+                    </Card>
 
-                    <div style={{ borderTop: '1px solid var(--border-color)', margin: '16px 0' }} />
-                    <TableWrapper>
-                        <Table>
-                            <Thead>
-                                <Tr>
-                                    <Th>Date</Th>
-                                    <Th>Reference</Th>
-                                    <Th>Status</Th>
-                                    <Th style={{ textAlign: 'right' }}>Amount</Th>
-                                </Tr>
-                            </Thead>
-                            <Tbody>
-                                {payments.length > 0 ? payments.map((payment) => (
-                                    <Tr key={payment._id}>
-                                        <Td>{format(new Date(payment.postedAt || payment.createdAt), 'MMM dd, yyyy')}</Td>
-                                        <Td>{payment.reference || payment._id.slice(-6)}</Td>
-                                        <Td><StatusPill status={payment.status === 'APPLIED' ? 'success' : payment.status === 'PARTIALLY_APPLIED' ? 'warning' : 'neutral'} text={payment.status.replace('_', ' ')} /></Td>
-                                        <Td style={{ textAlign: 'right' }}>{payment.amount.toFixed(3)} KD</Td>
-                                    </Tr>
+                    <h3 style={{ margin: '32px 0 16px 0', fontSize: '20px', fontWeight: 800 }}>
+                        Manual Allocation: {currentOrgName}
+                    </h3>
+
+                    <AllocationGrid>
+                        {/* LEFT: Payment Selection */}
+                        <ListCard>
+                            <ListHeader>
+                                <div style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px' }}>
+                                    1. Select Payment
+                                </div>
+                            </ListHeader>
+                            <ScrollableList>
+                                {loading ? (
+                                    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><Loader /></div>
+                                ) : payments.length > 0 ? payments.map(p => (
+                                    <ListItem
+                                        key={p._id}
+                                        $selected={selectedPaymentId === p._id}
+                                        onClick={() => setSelectedPaymentId(p._id)}
+                                    >
+                                        <ItemInfo>
+                                            <ItemTitle>{p.reference || 'No Reference'}</ItemTitle>
+                                            <ItemSub>
+                                                {format(new Date(p.postedAt || p.createdAt), 'MMM dd, yyyy')} • {p.method}
+                                            </ItemSub>
+                                        </ItemInfo>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontWeight: 800, color: 'var(--accent-primary)', fontSize: '15px' }}>
+                                                {(p.amount - (p.allocatedAmount || 0)).toFixed(3)} KD
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                                                Total: {p.amount.toFixed(3)} KD
+                                            </div>
+                                        </div>
+                                    </ListItem>
                                 )) : (
-                                    <Tr><Td colSpan={4} style={{ textAlign: 'center', padding: '24px' }}>No payments posted</Td></Tr>
+                                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        No unapplied payments found
+                                    </div>
                                 )}
-                            </Tbody>
-                        </Table>
-                    </TableWrapper>
-                </div>
-            </Card>
-            )}
+                            </ScrollableList>
+                        </ListCard>
 
-            {/* Ledger Table */}
-            <Card title="Transaction History">
+                        {/* RIGHT: Shipment Selection */}
+                        <ListCard>
+                            <ListHeader>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '12px', letterSpacing: '1px' }}>
+                                        2. Select Shipments ({selectedShipmentIds.length})
+                                    </div>
+                                    <div style={{ width: '250px' }}>
+                                        <Input
+                                            placeholder="Search tracking, sender..."
+                                            value={shipmentSearch}
+                                            onChange={(e) => setShipmentSearch(e.target.value)}
+                                            style={{ margin: 0 }}
+                                        />
+                                    </div>
+                                </div>
+                            </ListHeader>
+                            <FilterRow>
+                                <div style={{ display: 'flex', gap: '8px', flex: 1 }}>
+                                    <Input
+                                        type="date"
+                                        label="From"
+                                        value={startDate}
+                                        onChange={(e) => setStartDate(e.target.value)}
+                                        style={{ margin: 0, fontSize: '11px' }}
+                                    />
+                                    <Input
+                                        type="date"
+                                        label="To"
+                                        value={endDate}
+                                        onChange={(e) => setEndDate(e.target.value)}
+                                        style={{ margin: 0, fontSize: '11px' }}
+                                    />
+                                </div>
+                                <div style={{ minWidth: '150px' }}>
+                                    <Select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        style={{ margin: 0, height: '38px', fontSize: '12px' }}
+                                    >
+                                        <option value="all">All Status</option>
+                                        <option value="unpaid">Unpaid Only</option>
+                                        <option value="partial">Partial Only</option>
+                                        <option value="paid">Paid Only</option>
+                                    </Select>
+                                </div>
+                            </FilterRow>
+                            <ScrollableList>
+                                {loading ? (
+                                    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}><Loader /></div>
+                                ) : filteredShipments.length > 0 ? filteredShipments.map(s => (
+                                    <ListItem
+                                        key={s._id}
+                                        $selected={selectedShipmentIds.includes(s._id)}
+                                        $disabled={s.paid}
+                                        onClick={() => toggleShipmentSelection(s)}
+                                    >
+                                        <ItemInfo>
+                                            <ItemTitle>{s.trackingNumber}</ItemTitle>
+                                            <ItemSub>
+                                                {format(new Date(s.createdAt), 'MMM dd, yyyy')} • From: {s.origin?.contactPerson}
+                                            </ItemSub>
+                                        </ItemInfo>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontWeight: 800, fontSize: '15px' }}>
+                                                {(s.paid ? 0 : (s.remainingBalance !== undefined ? s.remainingBalance : (s.pricingSnapshot?.totalPrice || s.price || 0) - (s.totalPaid || 0))).toFixed(3)} KD
+                                            </div>
+                                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                                                Total: {(s.pricingSnapshot?.totalPrice || s.price || 0).toFixed(3)} KD
+                                            </div>
+                                            <div style={{
+                                                fontSize: '10px',
+                                                fontWeight: 700,
+                                                color: s.paid ? 'var(--accent-success)' : ((s.totalPaid || 0) > 0 ? '#ffb300' : 'var(--text-secondary)')
+                                            }}>
+                                                {s.paid ? 'PAID' : ((s.totalPaid || 0) > 0 ? 'PARTIAL' : 'UNPAID')}
+                                            </div>
+                                            {(s.totalPaid || 0) > 0 && !s.paid && (
+                                                <div style={{ fontSize: '9px', opacity: 0.7 }}>
+                                                    Paid: {(s.totalPaid || 0).toFixed(3)}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </ListItem>
+                                )) : (
+                                    <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                        No shipments found for criteria
+                                    </div>
+                                )}
+                            </ScrollableList>
+                            <AllocationFooter>
+                                <div style={{ fontSize: '14px' }}>
+                                    {selectedPayment && (
+                                        <span>Allocating from: <strong>{selectedPayment.amount.toFixed(3)} KD</strong></span>
+                                    )}
+                                    {selectedShipmentsTotal > 0 && (
+                                        <span style={{ marginLeft: '16px' }}>Total to pay: <strong>{selectedShipmentsTotal.toFixed(3)} KD</strong></span>
+                                    )}
+                                </div>
+                                <Button
+                                    variant="primary"
+                                    onClick={handleManualAllocation}
+                                    disabled={!selectedPaymentId || selectedShipmentIds.length === 0 || allocationLoading}
+                                >
+                                    {allocationLoading ? 'Allocating...' : 'Confirm Allocation'}
+                                </Button>
+                            </AllocationFooter>
+                        </ListCard>
+                    </AllocationGrid>
+                </>
+            )}
+            <Card title="Transaction History" style={{ marginTop: '24px' }}>
                 <TableWrapper>
                     <Table>
                         <Thead>
@@ -497,7 +810,7 @@ const FinancePage = () => {
                     }
                 }}
             />
-        </div>
+        </div >
     );
 };
 

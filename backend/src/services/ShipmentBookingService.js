@@ -101,6 +101,7 @@ class ShipmentBookingService {
             freshShipment.carrierShipmentId = carrierResult.carrierShipmentId || carrierResult.trackingNumber;
             freshShipment.dhlTrackingNumber = carrierResult.trackingNumber; // Legacy
             freshShipment.status = 'created';
+            freshShipment.organization = organizationId;
 
             // Update Attempt
             attempt.status = 'succeeded';
@@ -123,7 +124,8 @@ class ShipmentBookingService {
             const finalPrice = freshShipment.pricingSnapshot?.totalPrice ?? freshShipment.price ?? 0;
             if (finalPrice > 0) {
                 await financeLedgerService.createLedgerEntry(organizationId, {
-                    shipment: freshShipment._id,
+                    sourceRepo: 'Shipment',
+                    sourceId: freshShipment._id,
                     amount: finalPrice,
                     entryType: 'DEBIT',
                     category: 'SHIPMENT_CHARGE',

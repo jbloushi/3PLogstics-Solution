@@ -61,6 +61,7 @@ class ShipmentDraftService {
             estimatedDelivery,
             currentLocation: cleanData.origin, // Initial location is origin
             user: targetUserId,
+            organization: targetUser.organization?._id || targetUser.organization,
             status: cleanData.status || 'ready_for_pickup',
             pricingSnapshot: snapshot,
 

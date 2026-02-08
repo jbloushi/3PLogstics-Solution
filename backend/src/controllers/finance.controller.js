@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/user.model');
 const Organization = require('../models/organization.model');
 const OrganizationLedger = require('../models/organizationLedger.model');
@@ -56,17 +57,27 @@ exports.getLedger = async (req, res) => {
             }
             query.organization = currentUser.organization;
         } else if (orgId) {
-            query.organization = orgId;
+            query.organization = orgId === 'none' ? null : orgId;
         }
 
         const skip = (page - 1) * limit;
 
-        const transactions = await OrganizationLedger.find(query)
+        const rawTransactions = await OrganizationLedger.find(query)
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit))
-            .populate('shipment', 'trackingNumber status')
-            .populate('payment', 'reference amount');
+            .populate({
+                path: 'sourceId',
+                select: 'trackingNumber status reference amount'
+            });
+
+        // Map results for backward compatibility with frontend
+        const transactions = rawTransactions.map(t => {
+            const doc = t.toObject();
+            if (doc.sourceRepo === 'Shipment') doc.shipment = doc.sourceId;
+            if (doc.sourceRepo === 'Payment') doc.payment = doc.sourceId;
+            return doc;
+        });
 
         const total = await OrganizationLedger.countDocuments(query);
 
@@ -127,12 +138,18 @@ exports.adjustBalance = async (req, res) => {
 
 exports.getOrganizationOverview = async (req, res) => {
     try {
-        const organization = await Organization.findById(req.params.orgId);
-        if (!organization) {
-            return res.status(404).json({ success: false, error: 'Organization not found' });
+        let organization = null;
+        if (req.params.orgId !== 'none') {
+            organization = await Organization.findById(req.params.orgId);
+            if (!organization) {
+                return res.status(404).json({ success: false, error: 'Organization not found' });
+            }
         }
 
-        const overview = await financeLedgerService.getOrganizationOverview(organization._id, organization.creditLimit);
+        const orgId = organization ? organization._id : null;
+        const creditLimit = organization ? organization.creditLimit : 0;
+
+        const overview = await financeLedgerService.getOrganizationOverview(orgId, creditLimit);
 
         res.status(200).json({ success: true, data: overview });
     } catch (error) {
@@ -167,9 +184,55 @@ exports.getShipmentAccounting = async (req, res) => {
 
 exports.listPayments = async (req, res) => {
     try {
-        const payments = await Payment.find({ organization: req.params.orgId })
-            .sort({ postedAt: -1 })
-            .populate('ledgerEntry', 'entryType amount');
+        const isNone = req.params.orgId === 'none';
+        if (!isNone && !mongoose.Types.ObjectId.isValid(req.params.orgId)) {
+            return res.status(400).json({ success: false, error: 'Invalid organization ID' });
+        }
+        const query = {
+            organization: isNone ? null : new mongoose.Types.ObjectId(req.params.orgId)
+        };
+
+        const payments = await Payment.aggregate([
+            { $match: query },
+            {
+                $lookup: {
+                    from: 'paymentallocations',
+                    localField: '_id',
+                    foreignField: 'payment',
+                    as: 'allocations'
+                }
+            },
+            {
+                $addFields: {
+                    allocatedAmount: {
+                        $sum: {
+                            $map: {
+                                input: {
+                                    $filter: {
+                                        input: '$allocations',
+                                        as: 'a',
+                                        cond: { $eq: ['$$a.status', 'ACTIVE'] }
+                                    }
+                                },
+                                as: 'activeAlloc',
+                                in: '$$activeAlloc.amount'
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'organizationledgers',
+                    localField: 'ledgerEntry',
+                    foreignField: '_id',
+                    as: 'ledgerEntry'
+                }
+            },
+            { $unwind: { path: '$ledgerEntry', preserveNullAndEmptyArrays: true } },
+            { $sort: { postedAt: -1 } }
+        ]);
+
         res.status(200).json({ success: true, data: payments });
     } catch (error) {
         logger.error('Error listing payments:', error);
@@ -180,29 +243,44 @@ exports.listPayments = async (req, res) => {
 exports.postPayment = async (req, res) => {
     try {
         const { amount, method, reference, notes } = req.body;
-        const organization = await Organization.findById(req.params.orgId);
-        if (!organization) {
-            return res.status(404).json({ success: false, error: 'Organization not found' });
+        const isNone = req.params.orgId === 'none';
+        let organization = null;
+        if (!isNone) {
+            organization = await Organization.findById(req.params.orgId);
+            if (!organization) {
+                return res.status(404).json({ success: false, error: 'Organization not found' });
+            }
         }
 
-        const ledgerEntry = await financeLedgerService.createLedgerEntry(organization._id, {
-            amount,
-            entryType: 'CREDIT',
-            category: 'PAYMENT',
-            description: `Payment posted${reference ? ` (${reference})` : ''}`,
-            reference,
-            createdBy: req.user._id
-        });
-
         const payment = await Payment.create({
-            organization: organization._id,
+            organization: organization ? organization._id : null,
             amount,
             method,
             reference,
             notes,
-            createdBy: req.user._id,
-            ledgerEntry: ledgerEntry._id
+            createdBy: req.user._id
         });
+
+        const ledgerEntry = await financeLedgerService.createLedgerEntry(isNone ? null : organization._id, {
+            sourceRepo: 'Payment',
+            sourceId: payment._id,
+            amount,
+            entryType: 'CREDIT',
+            category: 'PAYMENT',
+            description: `Payment posted${reference ? ` (${reference})` : ''} by ${req.user.name || 'Staff'}`,
+            reference,
+            createdBy: req.user._id
+        });
+
+        // Atomically update the unappliedBalance on the organization
+        if (organization) {
+            await Organization.findByIdAndUpdate(organization._id, {
+                $inc: { unappliedBalance: amount }
+            });
+        }
+
+        payment.ledgerEntry = ledgerEntry._id;
+        await payment.save();
 
         res.status(201).json({ success: true, data: payment });
     } catch (error) {
@@ -213,30 +291,57 @@ exports.postPayment = async (req, res) => {
 
 exports.allocatePaymentManual = async (req, res) => {
     try {
-        const { paymentId, shipmentId, amount } = req.body;
-        if (!paymentId || !shipmentId || !amount) {
+        const { paymentId, shipmentId, shipmentIds, amount } = req.body;
+
+        // Ensure we have at least one shipment ID
+        const finalShipmentIds = Array.isArray(shipmentIds) ? shipmentIds : (shipmentId ? [shipmentId] : []);
+
+        if (!paymentId || finalShipmentIds.length === 0 || amount === undefined || amount === null) {
+            logger.warn('Allocation attempt with missing fields:', { paymentId, finalShipmentIds, amount });
             return res.status(400).json({ success: false, error: 'Missing required fields' });
         }
 
-        const allocation = await financeLedgerService.allocatePayment({
-            organizationId: req.params.orgId,
-            paymentId,
-            shipmentId,
-            amount,
-            createdBy: req.user._id
-        });
+        let remainingToAllocate = parseFloat(amount);
+        const results = [];
 
-        res.status(201).json({ success: true, data: allocation });
+        logger.info(`Starting manual allocation: Payment ${paymentId}, Amount ${amount}, Shipments: ${finalShipmentIds.join(', ')}`);
+
+        for (const id of finalShipmentIds) {
+            if (remainingToAllocate <= 0) break;
+
+            const orgId = req.params.orgId === 'none' ? null : req.params.orgId;
+
+            // Get shipment accounting to see how much is needed
+            const accounting = await financeLedgerService.getShipmentAccounting(id);
+            if (!accounting) continue;
+
+            const allocationAmount = Math.min(remainingToAllocate, accounting.remainingBalance);
+            if (allocationAmount <= 0) continue;
+
+            const allocation = await financeLedgerService.allocatePayment({
+                organizationId: orgId,
+                paymentId,
+                shipmentId: id,
+                amount: allocationAmount,
+                createdBy: req.user._id
+            });
+
+            results.push(allocation);
+            remainingToAllocate -= allocationAmount;
+        }
+
+        res.status(201).json({ success: true, data: results });
     } catch (error) {
         logger.error('Error allocating payment:', error);
-        res.status(500).json({ success: false, error: 'Failed to allocate payment' });
+        res.status(500).json({ success: false, error: error.message || 'Failed to allocate payment' });
     }
 };
 
 exports.allocatePaymentsFifo = async (req, res) => {
     try {
+        const orgId = req.params.orgId === 'none' ? null : req.params.orgId;
         const allocations = await financeLedgerService.allocatePaymentsFifo({
-            organizationId: req.params.orgId,
+            organizationId: orgId,
             createdBy: req.user._id
         });
 

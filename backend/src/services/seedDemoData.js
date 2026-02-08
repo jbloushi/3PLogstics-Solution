@@ -55,6 +55,8 @@ const seedDemoData = async () => {
         const existingBalance = await financeLedgerService.getOrganizationBalance(org._id);
         if (existingBalance === 0 && seedBalance > 0) {
             await financeLedgerService.createLedgerEntry(org._id, {
+                sourceRepo: 'Adjustment',
+                sourceId: org._id,
                 amount: seedBalance,
                 entryType: 'CREDIT',
                 category: 'ADJUSTMENT',

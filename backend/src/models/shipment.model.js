@@ -247,6 +247,14 @@ const shipmentSchema = new mongoose.Schema({
     default: false,
     index: true
   },
+  totalPaid: {
+    type: Number,
+    default: 0
+  },
+  remainingBalance: {
+    type: Number,
+    default: 0
+  },
   financeHold: {
     status: {
       type: Boolean,
