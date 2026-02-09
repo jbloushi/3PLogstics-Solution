@@ -96,8 +96,8 @@ const AUTOFILL_SCENARIOS = {
                 sender: {
                     company: 'Target Logistics Hub KW', contactPerson: 'Ahmed Al-Sabah', phone: '90001234', phoneCountryCode: '+965', email: 'shipments@target-kw.com',
                     streetLines: ['Street 20, Plot 5'],
-                    buildingName: 'Logistics Center', unitNumber: 'Dock 4', landmark: 'Near Port Authority',
-                    area: 'Shuwaikh Industrial', city: 'Kuwait City', state: 'Asimah', countryCode: 'KW', postalCode: '70050',
+                    buildingName: 'Logistics Center', unitNumber: 'Dock 4',
+                    area: 'Shuwaikh Industrial', city: 'KUWAIT', state: 'Asimah', countryCode: 'KW', postalCode: '70050',
                     vatNumber: 'KW-VAT-12345', eoriNumber: 'KW-EORI-98765', taxId: 'KW-TAX-112233', traderType: 'business', reference: 'REF-KW-001'
                 },
                 receiver: {
@@ -119,7 +119,7 @@ const AUTOFILL_SCENARIOS = {
                 sender: {
                     company: 'ColdChain KW', contactPerson: 'Sara K', phone: '90005555', phoneCountryCode: '+965', email: 'cold@test.kw',
                     streetLines: ['Block 5, Street 12'],
-                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
+                    city: 'KUWAIT', countryCode: 'KW', postalCode: '70051',
                     buildingName: 'Frozen Logistics', unitNumber: 'Dock 1', area: 'Sulaibiya',
                     vatNumber: 'KW-COLD-123', taxId: 'KW-TAX-456', reference: 'ICE-999', traderType: 'business'
                 },
@@ -147,7 +147,7 @@ const AUTOFILL_SCENARIOS = {
                 sender: {
                     company: 'KWT Tech', contactPerson: 'Ali A', phone: '90000001', phoneCountryCode: '+965', email: 'tech@test.kw',
                     streetLines: ['Tech Park, Building 2'],
-                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
+                    city: 'KUWAIT', countryCode: 'KW', postalCode: '70051',
                     area: 'Ardiya', vatNumber: 'VAT-TECH-1', eoriNumber: 'EORI-TECH-1', taxId: 'TAX-TECH-1', reference: 'BAT-001', traderType: 'business'
                 },
                 receiver: {
@@ -172,7 +172,7 @@ const AUTOFILL_SCENARIOS = {
                 sender: {
                     company: 'Retail KW', contactPerson: 'Mona M', phone: '90000002', phoneCountryCode: '+965', email: 'retail@test.kw',
                     streetLines: ['Retail Hub, Gate 3'],
-                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
+                    city: 'KUWAIT', countryCode: 'KW', postalCode: '70051',
                     buildingName: 'Mall of Kuwait', area: 'Fahaheel',
                     vatNumber: 'KW-VAT-888', eoriNumber: 'KW-EORI-888', taxId: 'KW-TAX-888', reference: 'RETAIL-001', traderType: 'business'
                 },
@@ -201,7 +201,7 @@ const AUTOFILL_SCENARIOS = {
             'Perfumes (UN1266) - Passenger': {
                 sender: {
                     company: 'Kuwait Fragrance', contactPerson: 'Ahmed F', phone: '90000005', phoneCountryCode: '+965', email: 'factory@test.kw',
-                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
+                    city: 'KUWAIT', countryCode: 'KW', postalCode: '70051',
                     streetLines: ['Sanam Industrial Area'],
                     buildingName: 'Fragrance Factory', area: 'Industrial 1',
                     vatNumber: '0258', eoriNumber: '753', taxId: 'TAX123', reference: 'SHIP-456', traderType: 'business'
@@ -229,7 +229,7 @@ const AUTOFILL_SCENARIOS = {
             'Perfumes (UN1266) - Cargo': {
                 sender: {
                     company: 'Kuwait Fragrance', contactPerson: 'Ahmed F', phone: '90000005', phoneCountryCode: '+965', email: 'factory@test.kw',
-                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
+                    city: 'KUWAIT', countryCode: 'KW', postalCode: '70051',
                     streetLines: ['Sanam Industrial Area'],
                     buildingName: 'Fragrance Factory', area: 'Industrial 1',
                     vatNumber: '0258', eoriNumber: '753', taxId: 'TAX123', reference: 'SHIP-CARGO', traderType: 'business'
@@ -257,7 +257,7 @@ const AUTOFILL_SCENARIOS = {
             'Excepted Quantities (E01)': {
                 sender: {
                     company: 'Test Labs KW', contactPerson: 'Testing Lab', phone: '90000003', phoneCountryCode: '+965', email: 'lab@test.kw',
-                    city: 'Kuwait City', countryCode: 'KW', postalCode: '70051',
+                    city: 'KUWAIT', countryCode: 'KW', postalCode: '70051',
                     streetLines: ['Block 1, Street 1'], buildingName: 'Research Wing', area: 'Shuwaikh',
                     vatNumber: 'KW-LAB-1', eoriNumber: 'KW-LAB-EORI', taxId: 'KW-TAX-LAB', reference: 'EXP-001', traderType: 'business'
                 },

@@ -22,6 +22,41 @@ const normalizeCountryCode = (input, fallback) => {
 };
 
 /**
+ * Normalizes city name for carrier compatibility.
+ * Specifically handles Kuwait cases.
+ * @param {string} city 
+ * @param {string} countryCode 
+ * @returns {string}
+ */
+const normalizeCityForCarrier = (city, countryCode) => {
+    const c = (city || '').toString().trim().toUpperCase();
+    if (countryCode === 'KW') {
+        if (c === 'KUWAIT CITY' || c === 'CITY') return 'KUWAIT';
+    }
+    return c;
+};
+
+/**
+ * Normalizes phone number to have + prefix and digits only.
+ * @param {string} phone 
+ * @param {string} countryCode 
+ * @returns {string}
+ */
+const normalizePhoneForCarrier = (phone, countryCode) => {
+    let p = (phone || '').toString().trim();
+    if (!p) return p;
+    // Remove all non-digit characters except leading +
+    const hasPlus = p.startsWith('+');
+    p = p.replace(/\D/g, '');
+    if (hasPlus) return `+${p}`;
+
+    // Default prefix if missing and it's a known country logic could go here, 
+    // but for now just ensure at least one + if it looks like it needs one.
+    // DHL strictly requires leading +
+    return `+${p}`;
+};
+
+/**
  * Formatting helper for 3 decimal places
  * @param {number} num 
  * @returns {number}
@@ -40,16 +75,24 @@ function validateShipmentForDgr(order) {
 
     // Shipper
     if (!sender.company && !sender.contactPerson) errors.push('Shipper: Company or Contact Person is required.');
-    if (!sender.streetLines || sender.streetLines.length === 0) errors.push('Shipper: Address Line 1 is required.');
+
+    const shipperLines = splitAddressLines(sender);
+    if (!shipperLines.line1) errors.push('Shipper: Address Line 1 (Street) is required.');
+
     if (!sender.city) errors.push('Shipper: City is required.');
     if (!sender.countryCode) errors.push('Shipper: Country Code is required.');
+    if (!sender.postalCode) errors.push('Shipper: Postal Code is required.');
     if (!sender.phone) errors.push('Shipper: Phone is required.');
 
     // Consignee
     if (!receiver.contactPerson) errors.push('Consignee: Contact Person is required.');
-    if (!receiver.streetLines || receiver.streetLines.length === 0) errors.push('Consignee: Address Line 1 is required.');
+
+    const receiverLines = splitAddressLines(receiver);
+    if (!receiverLines.line1) errors.push('Consignee: Address Line 1 (Street) is required.');
+
     if (!receiver.city) errors.push('Consignee: City is required.');
     if (!receiver.countryCode) errors.push('Consignee: Country Code is required.');
+    if (!receiver.postalCode) errors.push('Consignee: Postal Code is required.');
     if (!receiver.phone) errors.push('Consignee: Phone is required.');
 
     // Invoice
@@ -112,35 +155,61 @@ function composeItemDescription(item, dangerousGoods) {
     return desc.replace(/[\r\n]+/g, ' ').substring(0, 75); // DGR often has line limits
 }
 
-// Helper to split address into max 3 lines of 45 chars
-const splitAddressLines = (streetLines) => {
-    const fullAddress = Array.isArray(streetLines) ? streetLines.join(' ') : (streetLines || '');
-    const maxLen = 45;
-    const lines = [];
+/**
+ * Helper to split address into max 3 lines of 45 chars.
+ * Intelligently combines structured components if streetLines are minimal.
+ * @param {Object} party - Sender or Receiver normalized object
+ * @returns {Object} {line1, line2, line3}
+ */
+function splitAddressLines(party) {
+    const { streetLines, buildingName, unitNumber, area, landmark } = party;
 
-    let remaining = fullAddress;
-    while (remaining.length > 0 && lines.length < 3) {
+    // Start with streetLines
+    let baseLines = Array.isArray(streetLines) ? [...streetLines] : [(streetLines || '')];
+
+    // Add building/unit if provided and not already in lines
+    const subLine = [buildingName, unitNumber].filter(Boolean).join(', ');
+    if (subLine && !baseLines.some(l => l.includes(subLine))) {
+        baseLines.push(subLine);
+    }
+
+    // Add area if provided
+    if (area && !baseLines.some(l => l.includes(area))) {
+        baseLines.push(area);
+    }
+
+    // Add landmark if provided
+    if (landmark && !baseLines.some(l => l.includes(landmark))) {
+        baseLines.push(landmark);
+    }
+
+    const fullText = baseLines.filter(Boolean).join(' ').trim();
+    const maxLen = 45;
+    const finalLines = [];
+
+    let remaining = fullText;
+    while (remaining.length > 0 && finalLines.length < 3) {
         if (remaining.length <= maxLen) {
-            lines.push(remaining);
+            finalLines.push(remaining);
             break;
         }
 
         let splitIdx = remaining.lastIndexOf(' ', maxLen);
         if (splitIdx === -1) splitIdx = maxLen; // Force split if no space
 
-        lines.push(remaining.substring(0, splitIdx).trim());
+        finalLines.push(remaining.substring(0, splitIdx).trim());
         remaining = remaining.substring(splitIdx).trim();
     }
 
     // Ensure we send at least one line if empty (validation requires it elsewhere)
-    if (lines.length === 0) lines.push('.');
+    if (finalLines.length === 0) finalLines.push('.');
 
     return {
-        line1: lines[0],
-        line2: lines[1] || undefined,
-        line3: lines[2] || undefined
+        line1: finalLines[0],
+        line2: finalLines[1] || undefined,
+        line3: finalLines[2] || undefined
     };
-};
+}
 
 /**
  * Builds the Export Declaration (Commercial Invoice) section.
@@ -294,8 +363,8 @@ function buildDgrShipmentPayload(order, config = {}) {
     const totalDeclaredValue = order.items.reduce((sum, item) => sum + (item.value * item.quantity), 0);
 
     // 2. Prepare Addresses
-    const shipperAddress = splitAddressLines(sender.streetLines);
-    const receiverAddress = splitAddressLines(receiver.streetLines);
+    const shipperAddress = splitAddressLines(sender);
+    const receiverAddress = splitAddressLines(receiver);
 
     // 3. Export Declaration
     const exportDeclaration = buildExportDeclaration(order, config);
@@ -356,7 +425,7 @@ function buildDgrShipmentPayload(order, config = {}) {
             shipperDetails: {
                 postalAddress: {
                     postalCode: sender.postalCode,
-                    cityName: sender.city,
+                    cityName: normalizeCityForCarrier(sender.city, senderCountryCode),
                     countryCode: senderCountryCode,
                     addressLine1: shipperAddress.line1,
                     addressLine2: shipperAddress.line2,
@@ -365,7 +434,7 @@ function buildDgrShipmentPayload(order, config = {}) {
                 contactInformation: {
                     companyName: sender.company || sender.contactPerson,
                     fullName: sender.contactPerson,
-                    phone: sender.phone,
+                    phone: normalizePhoneForCarrier(sender.phone, senderCountryCode),
                     email: sender.email
                 },
                 typeCode: sender.traderType || 'business',
@@ -374,7 +443,7 @@ function buildDgrShipmentPayload(order, config = {}) {
             receiverDetails: {
                 postalAddress: {
                     postalCode: receiver.postalCode,
-                    cityName: receiver.city,
+                    cityName: normalizeCityForCarrier(receiver.city, receiverCountryCode),
                     countryCode: receiverCountryCode,
                     addressLine1: receiverAddress.line1,
                     addressLine2: receiverAddress.line2,
@@ -383,7 +452,7 @@ function buildDgrShipmentPayload(order, config = {}) {
                 contactInformation: {
                     companyName: receiver.company || receiver.contactPerson,
                     fullName: receiver.contactPerson,
-                    phone: receiver.phone,
+                    phone: normalizePhoneForCarrier(receiver.phone, receiverCountryCode),
                     email: receiver.email
                 },
                 typeCode: receiver.traderType || 'business',

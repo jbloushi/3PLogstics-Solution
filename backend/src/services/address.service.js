@@ -297,7 +297,18 @@ class AddressService {
      * @returns {Object} DHL-formatted contact
      */
     normalizeContactForDhl(address) {
-        const fullPhone = `${address.phoneCountryCode || '+965'}${address.phone || ''}`;
+        let fullPhone = address.phone || '';
+        const prefix = address.phoneCountryCode || '+965';
+
+        if (!fullPhone.startsWith(prefix)) {
+            const prefixDigits = prefix.replace('+', '');
+            if (fullPhone.startsWith(prefixDigits) && prefix.startsWith('+')) {
+                fullPhone = `+${fullPhone}`;
+            } else {
+                fullPhone = `${prefix}${fullPhone}`;
+            }
+        }
+
         return {
             fullName: address.contactPerson || '',
             companyName: address.company || address.contactPerson || '',

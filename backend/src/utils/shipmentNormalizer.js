@@ -8,6 +8,7 @@ function normalizeShipment(data) {
         company: party.company || party.contactPerson,
         contactPerson: party.contactPerson,
         phone: party.phone,
+        phoneCountryCode: party.phoneCountryCode || '+965',
         email: party.email,
         streetLines: party.streetLines || [party.addressLine1 || '', party.addressLine2 || '', party.addressLine3 || ''].filter(Boolean),
         city: party.city || party.cityName,
@@ -18,7 +19,13 @@ function normalizeShipment(data) {
         vatNumber: party.vatNumber || party.vatNo,
         eoriNumber: party.eoriNumber || party.eori,
         traderType: party.traderType,
-        reference: party.reference
+        reference: party.reference,
+        // Structured Components
+        unitNumber: party.unitNumber,
+        buildingName: party.buildingName,
+        area: party.area,
+        landmark: party.landmark,
+        deliveryNotes: party.deliveryNotes
     });
 
     const items = (data.items || []).map(item => ({
