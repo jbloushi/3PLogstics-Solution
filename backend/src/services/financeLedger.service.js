@@ -442,7 +442,7 @@ const allocatePaymentsFifo = async ({ organizationId, createdBy }) => {
 };
 
 const syncOrganizationShipmentFinancials = async (organizationId) => {
-    const orgQuery = organizationId === 'none' ? null : organizationId;
+    const orgQuery = (organizationId === 'none' || !organizationId) ? null : organizationId;
     const shipments = await Shipment.find({ organization: orgQuery });
     for (const shipment of shipments) {
         await updateShipmentPaidStatus(shipment._id);

@@ -110,7 +110,7 @@ const SignupPage = () => {
                 {error && (
                     <div style={{ width: '100%', marginBottom: '24px' }}>
                         <Alert type="error" title="Registration Failed">
-                            {error}
+                            {typeof error === 'string' ? error : 'An unexpected error occurred'}
                         </Alert>
                     </div>
                 )}

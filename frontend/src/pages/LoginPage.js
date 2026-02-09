@@ -168,7 +168,7 @@ const LoginPage = () => {
                 {error && (
                     <div style={{ width: '100%', marginBottom: '24px' }}>
                         <Alert type="error" title="Login Failed">
-                            {error}
+                            {typeof error === 'string' ? error : 'An unexpected error occurred'}
                         </Alert>
                     </div>
                 )}

@@ -77,6 +77,7 @@ class ShipmentDraftService {
         };
 
         const shipment = new Shipment(shipmentData);
+        logger.debug(`ShipmentDraftService: Draft created with Tracking ${trackingNumber}, Org: ${shipmentData.organization}`);
         await shipment.save();
 
         return shipment;

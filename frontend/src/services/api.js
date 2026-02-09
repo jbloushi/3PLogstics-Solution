@@ -76,7 +76,7 @@ export const shipmentService = {
   // Get all shipments
   getAllShipments: async (filters = {}) => {
     try {
-      const response = await api.get('/shipments', { params: filters });
+      const response = await api.get('shipments', { params: filters });
       return response.data;
     } catch (error) {
       console.error('Error fetching shipments:', error);
@@ -87,7 +87,7 @@ export const shipmentService = {
   // Get shipment by tracking number
   getShipment: async (trackingNumber) => {
     try {
-      const response = await api.get(`/shipments/${trackingNumber}`);
+      const response = await api.get(`shipments/${trackingNumber}`);
 
       // Check if the response has the expected format
       if (!response.data) {
@@ -112,7 +112,7 @@ export const shipmentService = {
 
   getAvailableCarriers: async () => {
     try {
-      const response = await api.get('/shipments/carriers');
+      const response = await api.get('shipments/carriers');
       return response.data;
     } catch (error) {
       console.error('Error fetching carriers:', error);
@@ -123,7 +123,7 @@ export const shipmentService = {
   // Get Rate Quotes
   getQuotes: async (quoteData) => {
     try {
-      const response = await api.post('/shipments/quote', quoteData);
+      const response = await api.post('shipments/quote', quoteData);
       return response.data;
     } catch (error) {
       console.error('Error fetching quotes:', error);
@@ -134,7 +134,7 @@ export const shipmentService = {
   // Create new shipment
   createShipment: async (shipmentData) => {
     try {
-      const response = await api.post('/shipments', shipmentData);
+      const response = await api.post('shipments', shipmentData);
 
       // Check if the response has the expected format
       if (!response.data) {
@@ -168,7 +168,7 @@ export const shipmentService = {
   // Delete shipment
   deleteShipment: async (trackingNumber) => {
     try {
-      const response = await api.delete(`/shipments/${trackingNumber}`);
+      const response = await api.delete(`shipments/${trackingNumber}`);
       return response.data;
     } catch (error) {
       console.error(`Error deleting shipment ${trackingNumber}:`, error);
@@ -179,7 +179,7 @@ export const shipmentService = {
   // Update shipment details (General)
   updateShipmentDetails: async (trackingNumber, updates) => {
     try {
-      const response = await api.patch(`/shipments/${trackingNumber}`, updates);
+      const response = await api.patch(`shipments/${trackingNumber}`, updates);
       return response.data;
     } catch (error) {
       console.error(`Error updating shipment details ${trackingNumber}:`, error);
@@ -192,7 +192,7 @@ export const shipmentService = {
   // Update shipment location
   updateLocation: async (trackingNumber, locationData) => {
     try {
-      const response = await api.patch(`/shipments/${trackingNumber}/location`, locationData);
+      const response = await api.patch(`shipments/${trackingNumber}/location`, locationData);
       return response.data;
     } catch (error) {
       console.error(`Error updating location for shipment ${trackingNumber}:`, error);
@@ -203,7 +203,7 @@ export const shipmentService = {
   // Update shipment status
   updateStatus: async (trackingNumber, statusData) => {
     try {
-      const response = await api.patch(`/shipments/${trackingNumber}/status`, statusData);
+      const response = await api.patch(`shipments/${trackingNumber}/status`, statusData);
       return response.data;
     } catch (error) {
       console.error(`Error updating status for shipment ${trackingNumber}:`, error);
@@ -214,7 +214,7 @@ export const shipmentService = {
   // Driver: Scan to Pickup
   driverPickupScan: async (trackingNumber) => {
     try {
-      const response = await api.post(`/shipments/${trackingNumber}/pickup`);
+      const response = await api.post(`shipments/${trackingNumber}/pickup`);
       return response.data;
     } catch (error) {
       console.error(`Error processing driver pickup for ${trackingNumber}:`, error);
@@ -228,7 +228,7 @@ export const shipmentService = {
   // Warehouse: Scan Inbound (Handover)
   warehouseScan: async (trackingNumber) => {
     try {
-      const response = await api.post(`/shipments/${trackingNumber}/warehouse/scan`);
+      const response = await api.post(`shipments/${trackingNumber}/warehouse/scan`);
       return response.data;
     } catch (error) {
       console.error(`Error processing warehouse scan for ${trackingNumber}:`, error);
@@ -239,7 +239,7 @@ export const shipmentService = {
   // Submit to DGR (Generic Carrier Booking)
   submitToDgr: async (trackingNumber, carrierCode = 'DGR') => {
     try {
-      const response = await api.post(`/shipments/${trackingNumber}/book`, { carrierCode });
+      const response = await api.post(`shipments/${trackingNumber}/book`, { carrierCode });
       return response.data;
     } catch (error) {
       console.error(`Error submitting shipment ${trackingNumber} to ${carrierCode}:`, error);
@@ -250,7 +250,7 @@ export const shipmentService = {
   // Get shipment ETA
   getETA: async (trackingNumber) => {
     try {
-      const response = await api.get(`/shipments/${trackingNumber}/eta`);
+      const response = await api.get(`shipments/${trackingNumber}/eta`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching ETA for shipment ${trackingNumber}:`, error);
@@ -442,7 +442,7 @@ export const shipmentService = {
 export const financeService = {
   getBalance: async () => {
     try {
-      const response = await api.get('/finance/balance');
+      const response = await api.get('finance/balance');
       return response.data;
     } catch (error) {
       console.error('Error fetching balance:', error);
@@ -452,7 +452,7 @@ export const financeService = {
 
   getLedger: async (params = {}) => {
     try {
-      const response = await api.get('/finance/ledger', { params });
+      const response = await api.get('finance/ledger', { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching ledger:', error);
@@ -462,7 +462,7 @@ export const financeService = {
 
   getOrganizationOverview: async (orgId) => {
     try {
-      const response = await api.get(`/finance/organizations/${orgId}/overview`);
+      const response = await api.get(`finance/organizations/${orgId}/overview`);
       return response.data;
     } catch (error) {
       console.error('Error fetching organization overview:', error);
@@ -472,7 +472,7 @@ export const financeService = {
 
   listPayments: async (orgId) => {
     try {
-      const response = await api.get(`/finance/organizations/${orgId}/payments`);
+      const response = await api.get(`finance/organizations/${orgId}/payments`);
       return response.data;
     } catch (error) {
       console.error('Error fetching payments:', error);
@@ -482,7 +482,7 @@ export const financeService = {
 
   postPayment: async (orgId, payload) => {
     try {
-      const response = await api.post(`/finance/organizations/${orgId}/payments`, payload);
+      const response = await api.post(`finance/organizations/${orgId}/payments`, payload);
       return response.data;
     } catch (error) {
       console.error('Error posting payment:', error);
@@ -492,7 +492,7 @@ export const financeService = {
 
   allocatePaymentManual: async (orgId, payload) => {
     try {
-      const response = await api.post(`/finance/organizations/${orgId}/allocations`, payload);
+      const response = await api.post(`finance/organizations/${orgId}/allocations`, payload);
       return response.data;
     } catch (error) {
       console.error('Error allocating payment:', error);
@@ -502,7 +502,7 @@ export const financeService = {
 
   allocatePaymentsFifo: async (orgId) => {
     try {
-      const response = await api.post(`/finance/organizations/${orgId}/allocations/fifo`);
+      const response = await api.post(`finance/organizations/${orgId}/allocations/fifo`);
       return response.data;
     } catch (error) {
       console.error('Error allocating FIFO payments:', error);
@@ -512,7 +512,7 @@ export const financeService = {
 
   getShipmentAccounting: async (shipmentId) => {
     try {
-      const response = await api.get(`/finance/shipments/${shipmentId}/accounting`);
+      const response = await api.get(`finance/shipments/${shipmentId}/accounting`);
       return response.data;
     } catch (error) {
       console.error('Error fetching shipment accounting:', error);
@@ -522,7 +522,7 @@ export const financeService = {
 
   reverseAllocation: async (allocationId, payload) => {
     try {
-      const response = await api.post(`/finance/allocations/${allocationId}/reverse`, payload);
+      const response = await api.post(`finance/allocations/${allocationId}/reverse`, payload);
       return response.data;
     } catch (error) {
       console.error('Error reversing allocation:', error);
@@ -532,7 +532,7 @@ export const financeService = {
 
   adjustBalance: async (adjustmentData) => {
     try {
-      const response = await api.post('/finance/adjust', adjustmentData);
+      const response = await api.post('finance/adjust', adjustmentData);
       return response.data;
     } catch (error) {
       console.error('Error adjusting balance:', error);
@@ -544,7 +544,7 @@ export const financeService = {
 export const userService = {
   getUsers: async (roleFilter = '') => {
     try {
-      const response = await api.get(`/users${roleFilter ? `?role=${roleFilter}` : ''}`);
+      const response = await api.get(`users${roleFilter ? `?role=${roleFilter}` : ''}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -554,7 +554,7 @@ export const userService = {
 
   getClients: async () => {
     try {
-      const response = await api.get('/auth/clients');
+      const response = await api.get('auth/clients');
       return response.data;
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -564,7 +564,7 @@ export const userService = {
 
   createUser: async (userData) => {
     try {
-      const response = await api.post('/auth/signup', userData);
+      const response = await api.post('auth/signup', userData);
       return response.data;
     } catch (error) {
       console.error('Error creating user:', error);
@@ -574,7 +574,7 @@ export const userService = {
 
   updateUser: async (id, userData) => {
     try {
-      const response = await api.patch(`/users/${id}`, userData);
+      const response = await api.patch(`users/${id}`, userData);
       return response.data;
     } catch (error) {
       console.error('Error updating user:', error);
@@ -584,19 +584,19 @@ export const userService = {
 
   deleteUser: async (id) => {
     try {
-      const response = await api.delete(`/users/${id}`);
+      const response = await api.delete(`users/${id}`);
       return response.data;
     } catch (error) {
       console.error('Error deleting user:', error);
       throw error;
     }
-  }
+  },
 };
 
 export const organizationService = {
   getOrganizations: async () => {
     try {
-      const response = await api.get('/organizations');
+      const response = await api.get('organizations');
       return response.data;
     } catch (error) {
       console.error('Error fetching organizations:', error);
@@ -606,7 +606,7 @@ export const organizationService = {
 
   getOrganization: async (id) => {
     try {
-      const response = await api.get(`/organizations/${id}`);
+      const response = await api.get(`organizations/${id}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching organization ${id}:`, error);
@@ -616,7 +616,7 @@ export const organizationService = {
 
   createOrganization: async (data) => {
     try {
-      const response = await api.post('/organizations', data);
+      const response = await api.post('organizations', data);
       return response.data;
     } catch (error) {
       console.error('Error creating organization:', error);
@@ -626,7 +626,7 @@ export const organizationService = {
 
   updateOrganization: async (id, data) => {
     try {
-      const response = await api.patch(`/organizations/${id}`, data);
+      const response = await api.patch(`organizations/${id}`, data);
       return response.data;
     } catch (error) {
       console.error(`Error updating organization ${id}:`, error);
@@ -636,7 +636,7 @@ export const organizationService = {
 
   addMember: async (id, userId) => {
     try {
-      const response = await api.post(`/organizations/${id}/members`, { userId });
+      const response = await api.post(`organizations/${id}/members`, { userId });
       return response.data;
     } catch (error) {
       console.error(`Error adding member to organization ${id}:`, error);
@@ -646,7 +646,7 @@ export const organizationService = {
 
   removeMember: async (id, userId) => {
     try {
-      const response = await api.delete(`/organizations/${id}/members/${userId}`);
+      const response = await api.delete(`organizations/${id}/members/${userId}`);
       return response.data;
     } catch (error) {
       console.error(`Error removing member from organization ${id}:`, error);

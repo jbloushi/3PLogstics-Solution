@@ -32,9 +32,8 @@ class ShipmentBookingService {
         const price = shipment.pricingSnapshot?.totalPrice ?? shipment.price ?? 0;
         const payingUser = await User.findById(shipment.user).populate('organization');
         const organizationId = shipment.organization || payingUser?.organization?._id;
-        if (!organizationId) {
-            throw new Error('Shipment is missing an organization for ledger posting.');
-        }
+
+        logger.debug(`Booking Shipment ${trackingNumber}: Organization=${organizationId}, User=${shipment.user}`);
 
         const organization = await Organization.findById(organizationId);
         const orgBalance = await financeLedgerService.getOrganizationBalance(organizationId);

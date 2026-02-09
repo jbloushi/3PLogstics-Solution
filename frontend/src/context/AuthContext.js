@@ -19,7 +19,8 @@ export const AuthProvider = ({ children }) => {
             setUser(data.user);
             return data.user;
         } catch (err) {
-            setError(err.response?.data?.error || 'Login failed');
+            const message = err.response?.data?.message || err.response?.data?.error;
+            setError(typeof message === 'string' ? message : 'Login failed');
             throw err;
         } finally {
             setLoading(false);
@@ -37,7 +38,8 @@ export const AuthProvider = ({ children }) => {
             setUser(data.user);
             return data.user;
         } catch (err) {
-            setError(err.response?.data?.error || 'Signup failed');
+            const message = err.response?.data?.message || err.response?.data?.error;
+            setError(typeof message === 'string' ? message : 'Signup failed');
             throw err;
         } finally {
             setLoading(false);
@@ -57,7 +59,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const res = await api.get('/users/me', {
+            const res = await api.get('users/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             // Fix: Controller returns { data: userObject }, not { data: { user: userObject } }
