@@ -129,17 +129,27 @@ chown -R www:www /www/wwwroot/3pl.mawthook.io/site
 chmod -R 755 /www/wwwroot/3pl.mawthook.io/site
 ```
 
-### Step 5: Reload Nginx
+### Step 5: Reload Nginx & Check Configuration
+
+> [!CRITICAL]
+> **AA-PANEL NGINX CONFIGURATION**
+> Do NOT simply copy the `frontend/nginx.conf` file to your server, as it will overwrite SSL settings.
+>
+> **You MUST manually edit the config via aaPanel UI:**
+> 1. Go to **Websites** -> `3pl.mawthook.io` -> **Config**
+> 2. Find the `location /api` block
+> 3. Ensure this line exists to allow login:
+>    ```nginx
+>    proxy_set_header Authorization $http_authorization;
+>    ```
+> 4. Save and Reload.
 
 ```bash
 # Test nginx configuration
 nginx -t
 
-# If test passes, use systemctl (more reliable on aaPanel)
-systemctl reload nginx
-
-# If systemctl is not available, use:
-# nginx -s reload
+# Reload Nginx
+nginx -s reload
 ```
 
 ### Step 6: Verify Deployment
