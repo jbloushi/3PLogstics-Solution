@@ -36,12 +36,17 @@ module.exports = {
   jwtSecret: process.env.JWT_SECRET || 'dev-secret-key-change-in-production',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  frontendUrl: process.env.FRONTEND_URL || 'https://target-logistics.com',
 
   // API Keys (will be validated in adapters)
   dhlApiKey: process.env.DHL_API_KEY,
   dhlApiSecret: process.env.DHL_API_SECRET,
   dhlAccountNumber: process.env.DHL_ACCOUNT_NUMBER || '451012315',
+  dhlApiUrl: process.env.DHL_API_URL || 'https://express.api.dhl.com/mydhlapi/test',
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+  googleMapsAutocompleteUrl: process.env.GOOGLE_MAPS_AUTOCOMPLETE_URL || 'https://maps.googleapis.com/maps/api/place/autocomplete/json',
+  googleMapsDetailsUrl: process.env.GOOGLE_MAPS_DETAILS_URL || 'https://maps.googleapis.com/maps/api/place/details/json',
+  googleMapsValidationUrl: process.env.GOOGLE_MAPS_VALIDATION_URL || 'https://addressvalidation.googleapis.com/v1:validateAddress',
 
   // Logging Configuration
   logLevel: process.env.LOG_LEVEL || 'info',

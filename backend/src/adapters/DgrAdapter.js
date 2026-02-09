@@ -5,7 +5,7 @@ const termDefinitions = {
 const axios = require('axios');
 const CarrierAdapter = require('./CarrierAdapter');
 const { normalizeShipment } = require('../utils/shipmentNormalizer');
-const { dhlApiKey, dhlApiSecret, dhlAccountNumber } = require('../config/config');
+const { dhlApiKey, dhlApiSecret, dhlAccountNumber, dhlApiUrl } = require('../config/config');
 
 class DgrAdapter extends CarrierAdapter {
     constructor() {
@@ -17,7 +17,7 @@ class DgrAdapter extends CarrierAdapter {
         }
 
         super({
-            baseUrl: 'https://express.api.dhl.com/mydhlapi/test',
+            baseUrl: dhlApiUrl, // Uses config value
             apiKey: dhlApiKey,
             apiSecret: dhlApiSecret,
             accountNumber: dhlAccountNumber

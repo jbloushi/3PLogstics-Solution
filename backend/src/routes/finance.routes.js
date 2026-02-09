@@ -18,6 +18,6 @@ router.get('/shipments/:shipmentId/accounting', authController.restrictTo('staff
 router.post('/allocations/:allocationId/reverse', authController.restrictTo('staff', 'admin'), financeController.reverseAllocation);
 
 // Admin/Staff Routes
-router.post('/adjust', authController.restrictTo('admin', 'staff'), financeController.adjustBalance);
+
 
 module.exports = router;

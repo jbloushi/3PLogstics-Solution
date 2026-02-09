@@ -164,5 +164,17 @@ docker logs -f target-logistics-api
 
 ---
 
+## ⚠️ Common Mistakes
+
+### ❌ Running Backend on Host AND Docker
+If you see an error like `Port 8899 already in use` or your `nodemon` crashes with `Missing environment variables`, it's likely because you are trying to run `npm run dev` on the host while the Docker container is already running.
+
+**Solution:**
+1. Stop any manual Node processes (Ctrl+C).
+2. Use the Docker container: `docker logs -f target-logistics-api`.
+3. If you *must* run on host, stop Docker first: `docker-compose stop backend`.
+
+---
+
 **Last Updated:** 2026-02-09  
 **Target:** aaPanel VPS / Docker Deployment

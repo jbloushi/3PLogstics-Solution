@@ -1,4 +1,5 @@
-﻿const Shipment = require('../models/shipment.model');
+﻿const config = require('../config/config');
+const Shipment = require('../models/shipment.model');
 const User = require('../models/user.model');
 const PickupRequest = require('../models/pickupRequest.model');
 const pickupController = require('./pickup.controller');
@@ -839,7 +840,7 @@ exports.generateLabel = async (req, res) => {
 
           <div class="footer">
             Thank you for shipping with Target Logistics.<br>
-            Track at: https://target-logistics.com
+            Track at: ${config.frontendUrl}
           </div>
         </div>
 

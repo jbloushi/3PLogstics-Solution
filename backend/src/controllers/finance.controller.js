@@ -100,41 +100,7 @@ exports.getLedger = async (req, res) => {
 /**
  * Manual Balance Adjustment (Admin Only)
  */
-exports.adjustBalance = async (req, res) => {
-    try {
-        const { organizationId, amount, type, category, description } = req.body;
 
-        if (!organizationId || !amount || !type) {
-            return res.status(400).json({ success: false, error: 'Missing required fields' });
-        }
-
-        const organization = await Organization.findById(organizationId);
-        if (!organization) {
-            return res.status(404).json({ success: false, error: 'Organization not found' });
-        }
-
-        const adjustment = parseFloat(amount);
-        const entry = await financeLedgerService.createLedgerEntry(organization._id, {
-            amount: adjustment,
-            entryType: type,
-            category: category || 'ADJUSTMENT',
-            description: description || `Manual ${type.toLowerCase()} by admin`,
-            createdBy: req.user._id,
-            metadata: { adminId: req.user._id.toString() }
-        });
-
-        logger.info(`Balance adjusted for Org ${organization._id} by admin ${req.user._id}: ${type} ${amount}`);
-
-        res.status(200).json({
-            success: true,
-            message: 'Balance adjusted successfully',
-            data: { newBalance: entry.balanceAfter }
-        });
-    } catch (error) {
-        logger.error('Error adjusting balance:', error);
-        res.status(500).json({ success: false, error: 'Failed to adjust balance' });
-    }
-};
 
 exports.getOrganizationOverview = async (req, res) => {
     try {

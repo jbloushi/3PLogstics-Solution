@@ -14,7 +14,8 @@ const logger = require('../utils/logger');
  * enabling easy testing, mocking, and cost optimization.
  */
 
-const GOOGLE_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
+const config = require('../config/config');
+const GOOGLE_API_KEY = config.googleMapsApiKey;
 const ALLOWED_COUNTRIES = (process.env.GOOGLE_ALLOWED_COUNTRIES || 'KW,AE,SA,QA,BH,OM,IN,US,GB,DE').split(',');
 
 // Mock data for development/fallback
@@ -79,7 +80,7 @@ class AddressService {
             }
 
             const response = await axios.get(
-                'https://maps.googleapis.com/maps/api/place/autocomplete/json',
+                config.googleMapsAutocompleteUrl,
                 { params }
             );
 
@@ -153,7 +154,7 @@ class AddressService {
             }
 
             const response = await axios.get(
-                'https://maps.googleapis.com/maps/api/place/details/json',
+                config.googleMapsDetailsUrl,
                 { params }
             );
 
@@ -221,7 +222,7 @@ class AddressService {
             };
 
             const response = await axios.post(
-                `https://addressvalidation.googleapis.com/v1:validateAddress?key=${this.apiKey}`,
+                `${config.googleMapsValidationUrl}?key=${this.apiKey}`,
                 payload
             );
 

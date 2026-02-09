@@ -530,15 +530,7 @@ export const financeService = {
     }
   },
 
-  adjustBalance: async (adjustmentData) => {
-    try {
-      const response = await api.post('finance/adjust', adjustmentData);
-      return response.data;
-    } catch (error) {
-      console.error('Error adjusting balance:', error);
-      throw error;
-    }
-  }
+
 };
 
 export const userService = {
