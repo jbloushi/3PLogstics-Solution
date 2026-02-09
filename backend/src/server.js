@@ -16,6 +16,21 @@ const seedDemoData = require('./services/seedDemoData');
 
 // Initialize Express app
 const app = express();
+
+// FAIL-SAFE CRASH LOGGER
+process.on('uncaughtException', (err) => {
+  const fs = require('fs');
+  const path = require('path');
+  fs.appendFileSync(path.join(__dirname, '../fatal_error.log'), `[UNCAUGHT_EXCEPTION] ${new Date().toISOString()}\n${err.stack}\n\n`);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  const fs = require('fs');
+  const path = require('path');
+  fs.appendFileSync(path.join(__dirname, '../fatal_error.log'), `[UNHANDLED_REJECTION] ${new Date().toISOString()}\n${reason?.stack || reason}\n\n`);
+});
+
 app.set('trust proxy', 1); // Trust first proxy (Nginx)
 
 // Enable CORS early to ensure all responses (including errors/rate limits) have CORS headers
@@ -26,11 +41,23 @@ const corsOptions = {
 
     if (corsOrigin === '*') return callback(null, true);
 
-    const allowedOrigins = corsOrigin.split(',').map(o => o.trim());
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    const allowedOrigins = corsOrigin.split(',').map(o => o.trim().replace(/\/$/, ''));
+    const cleanOrigin = origin.replace(/\/$/, '');
+
+    // DEBUG: Log CORS details
+    // logger.debug(`CORS Check: Origin=${origin}, Clean=${cleanOrigin}, Env=${process.env.NODE_ENV}`);
+
+    // In development, allow any localhost origin
+    if (process.env.NODE_ENV === 'development' && cleanOrigin.startsWith('http://localhost')) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(cleanOrigin)) {
       callback(null, true);
     } else {
-      logger.warn(`CORS blocked origin: ${origin}`);
+      logger.warn(`CORS blocked origin: ${origin} (Clean: ${cleanOrigin})`);
+      logger.warn(`Allowed: ${JSON.stringify(allowedOrigins)}`);
+      logger.warn(`Env: ${process.env.NODE_ENV}`);
       callback(new Error('Not allowed by CORS'));
     }
   },

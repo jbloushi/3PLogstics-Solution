@@ -61,6 +61,7 @@ exports.login = async (req, res) => {
         }
 
         // 2) Check if user exists && password is correct
+        logger.debug(`Attempting login for: ${email}`);
         const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
         if (!user) {
@@ -68,18 +69,38 @@ exports.login = async (req, res) => {
             return res.status(401).json({ success: false, error: 'Incorrect email or password' });
         }
 
+        logger.debug('User found, checking password...');
         const isMatch = await user.correctPassword(password, user.password);
 
         if (!isMatch) {
-            logger.warn(`Login failed: Password mismatch for ${email}. Provided length: ${password.length}`);
+            logger.warn(`Login failed: Password mismatch for ${email}`);
             return res.status(401).json({ success: false, error: 'Incorrect email or password' });
         }
 
+        logger.debug('Password match, creating token...');
         // 3) If everything ok, send token to client
         createSendToken(user, 200, res);
     } catch (error) {
-        logger.error('Login error:', error);
-        res.status(500).json({ success: false, error: 'Server error during login' });
+        // FAIL-SAFE: Log to file if console is elusive
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const logMsg = `${new Date().toISOString()} - [LOGIN_ERROR] ${error.message}\n${error.stack}\n\n`;
+            fs.appendFileSync(path.join(__dirname, '../../debug_error.log'), logMsg);
+        } catch (fsErr) {
+            console.error('Failed to write to debug_error.log:', fsErr);
+        }
+
+        logger.error('Login error - Full metadata:', {
+            error: error.message,
+            stack: error.stack,
+            email: req.body?.email
+        });
+        res.status(500).json({
+            success: false,
+            error: 'Server error during login',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 

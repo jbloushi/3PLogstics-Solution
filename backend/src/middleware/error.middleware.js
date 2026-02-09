@@ -31,8 +31,13 @@ const handleValidationErrorDB = err => {
 const sendErrorDev = (err, res) => {
   res.status(err.statusCode).json({
     status: err.status,
-    error: err,
     message: err.message,
+    // Avoid circular references by only sending safe fields
+    error: {
+      message: err.message,
+      status: err.status,
+      statusCode: err.statusCode,
+    },
     stack: err.stack
   });
 };
@@ -61,6 +66,15 @@ const sendErrorProd = (err, res) => {
 const errorHandler = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
+
+  // DEBUG: Log all errors to file
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const logPath = path.join(__dirname, '../../middleware_error.log');
+    const msg = `[${new Date().toISOString()}] ${err.statusCode} - ${err.message}\nStack: ${err.stack}\nOrigin: ${req.headers.origin}\n\n`;
+    fs.appendFileSync(logPath, msg);
+  } catch (e) { console.error('Log write failed', e); }
 
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
