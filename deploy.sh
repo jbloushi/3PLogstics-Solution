@@ -38,21 +38,19 @@ fi
 
 npm install --production || { echo -e "${RED}Error: backend npm install failed${NC}"; exit 1; }
 
-echo -e "${BLUE}3. Restarting PM2 process: $PM2_PROCESS_NAME...${NC}"
-pm2 restart $PM2_PROCESS_NAME || { 
-    echo -e "${YELLOW}Warning: Failed to restart PM2 process $PM2_PROCESS_NAME. Attempting to start...${NC}"
-    pm2 start npm --name "$PM2_PROCESS_NAME" -- start
-}
+echo -e "${BLUE}3. Restarting Docker backend...${NC}"
+docker-compose up -d --build backend || { echo -e "${RED}Error: Docker rebuild failed${NC}"; exit 1; }
 
 # Wait for backend to start
 echo -e "${BLUE}4. Verifying Backend health...${NC}"
-sleep 5
+# Use Docker's built-in wait or simple sleep + curl
+sleep 10
 HEALTH_CHECK=$(curl -s $HEALTH_URL)
 if [[ $HEALTH_CHECK == *"\"status\":\"ok\""* ]]; then
     echo -e "${GREEN}✅ Backend is healthy!${NC}"
 else
     echo -e "${RED}❌ Backend health check failed! HTTP Response: $HEALTH_CHECK${NC}"
-    echo -e "${YELLOW}Check logs with: pm2 logs $PM2_PROCESS_NAME --lines 50${NC}"
+    echo -e "${YELLOW}Check Docker logs with: docker logs target-logistics-api${NC}"
     # exit 1 # Continue anyway for frontend, but notify
 fi
 
