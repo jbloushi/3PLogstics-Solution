@@ -178,11 +178,33 @@ class DgrAdapter extends CarrierAdapter {
 
             console.error('DGR Adapter Error:', JSON.stringify(errorData, null, 2));
 
-            // Re-throw with structured data if possible
-            const providerError = new Error(`DGR Error: ${errorData.detail || errorData.title || JSON.stringify(errorData)}`);
+            // Extract cleaner message if possible
+            let parsedData = errorData;
+            if (typeof errorData === 'string') {
+                try {
+                    parsedData = JSON.parse(errorData);
+                } catch (e) {
+                    // Not valid JSON, stick with original string
+                }
+            }
+
+            let message = parsedData.detail || parsedData.title;
+            if (!message && parsedData.reasons && Array.isArray(parsedData.reasons)) {
+                message = parsedData.reasons.map(r => r.msg || r.message).filter(Boolean).join(', ');
+            }
+            if (!message) message = typeof parsedData === 'string' ? parsedData : JSON.stringify(parsedData);
+
+            // Re-throw with structured data
+            const providerError = new Error(`DGR Error: ${message}`);
             providerError.statusCode = responseStatus;
-            providerError.details = errorData.additionalDetails || errorData.detail || errorData;
+            providerError.details = errorData.additionalDetails || errorData.reasons || errorData;
             providerError.isProviderError = true;
+
+            // Ensure properties are enumerable for some environments
+            Object.defineProperty(providerError, 'isProviderError', { enumerable: true });
+            Object.defineProperty(providerError, 'statusCode', { enumerable: true });
+            Object.defineProperty(providerError, 'details', { enumerable: true });
+
             throw providerError;
         }
     }

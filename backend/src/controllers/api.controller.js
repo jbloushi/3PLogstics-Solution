@@ -30,7 +30,10 @@ exports.createShipment = async (req, res) => {
         }
 
         // 4. Create Label
-        const result = await adapter.createShipment(normalized, serviceCode || 'P');
+        const result = await adapter.createShipment({
+            ...normalized,
+            user: req.user?._id // Pass user for logging
+        }, serviceCode || 'P');
 
         // 5. Audit/Persist
         // Map Normalized Data to Mongoose Schema
@@ -115,6 +118,16 @@ exports.createShipment = async (req, res) => {
 
     } catch (error) {
         logger.error('API Create Shipment Error:', error);
+
+        // If it's a known provider validation/error, return it with the right status
+        if (error.isProviderError || error.statusCode) {
+            return res.status(error.statusCode || 400).json({
+                success: false,
+                error: error.message,
+                details: error.details || null
+            });
+        }
+
         res.status(500).json({
             success: false,
             error: error.message || 'Internal Server Error',
