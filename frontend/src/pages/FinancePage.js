@@ -439,7 +439,7 @@ const FinancePage = () => {
     const selectedPayment = payments.find(p => p._id === selectedPaymentId);
     const selectedShipmentsTotal = shipments
         .filter(s => selectedShipmentIds.includes(s._id))
-        .reduce((sum, s) => sum + (s.pricingSnapshot?.totalPrice || s.price || 0), 0);
+        .reduce((sum, s) => sum + (s.paid ? 0 : (s.remainingBalance !== undefined ? s.remainingBalance : (s.pricingSnapshot?.totalPrice || s.price || 0) - (s.totalPaid || 0))), 0);
 
     const summary = overview || {
         balance: 0,
@@ -705,9 +705,9 @@ const FinancePage = () => {
                                             <div style={{
                                                 fontSize: '10px',
                                                 fontWeight: 700,
-                                                color: s.paid ? 'var(--accent-success)' : ((s.totalPaid || 0) > 0 ? '#ffb300' : 'var(--text-secondary)')
+                                                color: s.paid ? 'var(--accent-success)' : ((s.totalPaid || 0) > 0.001 ? '#ffb300' : 'var(--text-secondary)')
                                             }}>
-                                                {s.paid ? 'PAID' : ((s.totalPaid || 0) > 0 ? 'PARTIAL' : 'UNPAID')}
+                                                {s.paid ? 'PAID' : ((s.totalPaid || 0) > 0.001 ? 'PARTIAL' : 'UNPAID')}
                                             </div>
                                             {(s.totalPaid || 0) > 0 && !s.paid && (
                                                 <div style={{ fontSize: '9px', opacity: 0.7 }}>
@@ -725,10 +725,10 @@ const FinancePage = () => {
                             <AllocationFooter>
                                 <div style={{ fontSize: '14px' }}>
                                     {selectedPayment && (
-                                        <span>Allocating from: <strong>{selectedPayment.amount.toFixed(3)} KD</strong></span>
+                                        <span>Allocating From: <strong>Current Balance ({selectedPayment.amount.toFixed(3)} KD)</strong></span>
                                     )}
                                     {selectedShipmentsTotal > 0 && (
-                                        <span style={{ marginLeft: '16px' }}>Total to pay: <strong>{selectedShipmentsTotal.toFixed(3)} KD</strong></span>
+                                        <span style={{ marginLeft: '16px' }}>Total To Pay: <strong>Current Outstanding ({selectedShipmentsTotal.toFixed(3)} KD)</strong></span>
                                     )}
                                 </div>
                                 <Button

@@ -187,8 +187,7 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
                     const response = await financeService.getBalance();
                     setFinanceSummary(response.data);
                 } else {
-                    const orgId = shipment.organization || shipment.user?.organization;
-                    if (!orgId) return;
+                    const orgId = shipment.organization || shipment.user?.organization || 'none';
                     const response = await financeService.getOrganizationOverview(orgId);
                     setFinanceSummary(response.data);
                 }
@@ -248,9 +247,9 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
                         <Button
                             variant="primary"
                             onClick={handleConfirmBooking}
-                            disabled={loading || (!isClient && !hasFunds)}
+                            disabled={loading || (!isClient && !hasFunds && user?.role === 'client')} // Allow logic: only truly block clients
                         >
-                            {loading ? <Loader size="16px" /> : (isClient ? "Save Changes" : "Confirm & Book")}
+                            {loading ? <Loader size="16px" /> : (isClient ? "Save Changes" : (!hasFunds && !isClient ? "⚠ Confirm & Book" : "Confirm & Book"))}
                         </Button>
                     </div>
                 </div>
