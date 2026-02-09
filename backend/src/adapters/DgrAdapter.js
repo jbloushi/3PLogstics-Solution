@@ -111,10 +111,8 @@ class DgrAdapter extends CarrierAdapter {
             throw error;
         }
 
-        console.log('📦 DGR Adapter Payload:', JSON.stringify(payload, null, 2));
-        try {
-            require('fs').writeFileSync('debug_last_dgr_payload.json', JSON.stringify(payload, null, 2));
-        } catch (e) { console.error('Error writing debug payload', e); }
+        // console.log('📦 DGR Adapter Payload:', JSON.stringify(payload, null, 2));
+        // DELETED: Manual disk write causing EACCES in docker
 
         const CarrierLog = require('../models/CarrierLog');
         const startTime = Date.now();
@@ -139,7 +137,7 @@ class DgrAdapter extends CarrierAdapter {
                 statusCode: res.status,
                 success: true,
                 durationMs: Date.now() - startTime
-            });
+            }).catch(e => console.error('Failed to save CarrierLog (Success):', e));
 
             console.log('📦 DGR Response:', JSON.stringify(res.data, null, 2));
 
@@ -178,8 +176,14 @@ class DgrAdapter extends CarrierAdapter {
                 durationMs: Date.now() - startTime
             }).catch(e => console.error('Failed to save CarrierLog:', e));
 
-            console.error('DGR Adapter Error:', errorData);
-            throw new Error(`DGR Error: ${JSON.stringify(errorData.detail || errorData)}`);
+            console.error('DGR Adapter Error:', JSON.stringify(errorData, null, 2));
+
+            // Re-throw with structured data if possible
+            const providerError = new Error(`DGR Error: ${errorData.detail || errorData.title || JSON.stringify(errorData)}`);
+            providerError.statusCode = responseStatus;
+            providerError.details = errorData.additionalDetails || errorData.detail || errorData;
+            providerError.isProviderError = true;
+            throw providerError;
         }
     }
 
