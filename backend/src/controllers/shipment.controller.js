@@ -460,8 +460,9 @@ exports.getAllShipments = async (req, res) => {
         .sort(sortOptions)
         .skip(skip)
         .limit(limitValue)
+        .select('-__v -history -bookingAttempts -documents')
         .populate('user', 'name email role organization')
-        .select('-__v');
+        .lean();
     } catch (fetchError) {
       // If first fetch fails, try one more time
       if (fetchError.name === 'MongoNetworkError' ||
@@ -480,7 +481,8 @@ exports.getAllShipments = async (req, res) => {
             .sort(sortOptions)
             .skip(skip)
             .limit(limitValue)
-            .select('-__v');
+            .select('-__v -history -bookingAttempts -documents')
+            .lean();
 
           logger.info('Shipments fetched successfully after retry');
         } catch (retryError) {
@@ -497,8 +499,8 @@ exports.getAllShipments = async (req, res) => {
     // RESTRICTED: Hide sensitive cost data from non-admins
     if (req.user.role !== 'admin') {
       shipments.forEach(s => {
-        s.costPrice = undefined;
-        s.markup = undefined;
+        delete s.costPrice;
+        delete s.markup;
       });
     }
 
