@@ -417,7 +417,8 @@ exports.getAllShipments = async (req, res) => {
       limit = 50,
       page = 1,
       organization,
-      paid
+      paid,
+      summary
     } = req.query;
 
     const query = {};
@@ -480,18 +481,33 @@ exports.getAllShipments = async (req, res) => {
     const pageValue = Math.max(parsedPage, 1);
     const skip = (pageValue - 1) * limitValue;
 
-    const projection = '-__v -history -bookingAttempts -documents';
+    const summaryView = summary === 'true' || summary === '1' || summary === true;
+    const projection = summaryView
+      ? '_id trackingNumber status createdAt estimatedDelivery serviceCode origin.city destination.city customer.name customer.phone labelUrl invoiceUrl carrier dhlConfirmed paid totalPaid remainingBalance pricingSnapshot.totalPrice price'
+      : '-__v -history -bookingAttempts -documents';
+
+    const countPromise = Object.keys(query).length === 0
+      ? Shipment.estimatedDocumentCount()
+      : Shipment.countDocuments(query);
 
     // Fetch shipments with retry mechanism
     let shipments;
     try {
-      shipments = await Shipment.find(query)
+      const shipmentQuery = Shipment.find(query)
         .sort(sortOptions)
         .skip(skip)
         .limit(limitValue)
         .select(projection)
-        .populate('user', 'name email role organization')
         .lean();
+
+      if (!summaryView) {
+        shipmentQuery.populate('user', 'name email role organization');
+      }
+
+      [shipments] = await Promise.all([
+        shipmentQuery,
+        countPromise
+      ]);
     } catch (fetchError) {
       if (
         fetchError.name === 'MongoNetworkError' ||
@@ -504,13 +520,21 @@ exports.getAllShipments = async (req, res) => {
           const { connectDB } = require('../config/database');
           await connectDB();
 
-          shipments = await Shipment.find(query)
+          const retryShipmentQuery = Shipment.find(query)
             .sort(sortOptions)
             .skip(skip)
             .limit(limitValue)
             .select(projection)
-            .populate('user', 'name email role organization')
             .lean();
+
+          if (!summaryView) {
+            retryShipmentQuery.populate('user', 'name email role organization');
+          }
+
+          [shipments] = await Promise.all([
+            retryShipmentQuery,
+            countPromise
+          ]);
 
           logger.info('Shipments fetched successfully after retry');
         } catch (retryError) {
@@ -521,7 +545,10 @@ exports.getAllShipments = async (req, res) => {
       }
     }
 
-    const totalCount = await Shipment.countDocuments(query);
+    const [, totalCount] = await Promise.all([
+      Promise.resolve(shipments),
+      countPromise
+    ]);
 
     // RESTRICTED: Hide sensitive cost data from non-admins
     if (req.user.role !== 'admin') {
