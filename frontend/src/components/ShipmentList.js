@@ -165,6 +165,7 @@ const ShipmentList = () => {
       const response = await shipmentService.getAllShipments({
         page,
         limit: ITEMS_PER_PAGE,
+        summary: true,
         ...(statusIn ? { statusIn: statusIn.join(',') } : {}),
         ...(debouncedSearchQuery ? { q: debouncedSearchQuery } : {})
       });
