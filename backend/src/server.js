@@ -101,9 +101,14 @@ app.use('/uploads', express.static('uploads'));
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Logging middleware
+// Logging middleware (verbose logs in production can noticeably impact throughput)
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.url}`);
+  const message = `${req.method} ${req.url}`;
+  if (process.env.NODE_ENV === 'production') {
+    logger.debug(message);
+  } else {
+    logger.info(message);
+  }
   next();
 });
 
