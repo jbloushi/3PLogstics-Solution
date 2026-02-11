@@ -152,6 +152,7 @@ const ComingSoonContainer = styled.div`
     z-index: 10;
     border-radius: 16px;
     border: 1px solid rgba(255,255,255,0.05);
+    pointer-events: none;
 `;
 
 const ComingSoonIcon = styled.div`

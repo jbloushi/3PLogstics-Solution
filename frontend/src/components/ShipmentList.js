@@ -165,6 +165,7 @@ const ShipmentList = () => {
       const response = await shipmentService.getAllShipments({
         page,
         limit: ITEMS_PER_PAGE,
+        summary: true,
         ...(statusIn ? { statusIn: statusIn.join(',') } : {}),
         ...(debouncedSearchQuery ? { q: debouncedSearchQuery } : {})
       });
@@ -188,6 +189,7 @@ const ShipmentList = () => {
 
   const totalPages = Math.max(pagination.pages || 1, 1);
   const hasFilters = Boolean(searchQuery) || viewMode !== 'all';
+
   const counters = [
     { id: 'all', label: 'All', count: viewMode === 'all' ? pagination.total : '—', color: '#00d9b8' },
     { id: 'pending', label: 'Pending', count: viewMode === 'pending' ? pagination.total : '—', color: '#fbbf24' },
@@ -442,11 +444,13 @@ const ShipmentList = () => {
         {/* Pagination */}
         {totalPages > 1 && (
           <PaginationContainer>
+            <PageBtn disabled={page === 1} onClick={() => setPage(1)}>«</PageBtn>
             <PageBtn disabled={page === 1} onClick={() => setPage(p => p - 1)}>&lt;</PageBtn>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <PageBtn key={p} $active={p === page} onClick={() => setPage(p)}>{p}</PageBtn>
-            ))}
+            <span style={{ padding: '0 8px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              Page {page} of {totalPages}
+            </span>
             <PageBtn disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>&gt;</PageBtn>
+            <PageBtn disabled={page === totalPages} onClick={() => setPage(totalPages)}>»</PageBtn>
           </PaginationContainer>
         )}
       </div>
