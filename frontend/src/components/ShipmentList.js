@@ -190,6 +190,20 @@ const ShipmentList = () => {
   const totalPages = Math.max(pagination.pages || 1, 1);
   const hasFilters = Boolean(searchQuery) || viewMode !== 'all';
 
+  const getVisiblePages = () => {
+    const maxVisiblePages = 7;
+    if (totalPages <= maxVisiblePages) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const start = Math.max(1, page - 3);
+    const end = Math.min(totalPages, start + maxVisiblePages - 1);
+    const adjustedStart = Math.max(1, end - maxVisiblePages + 1);
+
+    return Array.from({ length: end - adjustedStart + 1 }, (_, i) => adjustedStart + i);
+  };
+
+  const visiblePages = getVisiblePages();
   const counters = [
     { id: 'all', label: 'All', count: viewMode === 'all' ? pagination.total : '—', color: '#00d9b8' },
     { id: 'pending', label: 'Pending', count: viewMode === 'pending' ? pagination.total : '—', color: '#fbbf24' },
@@ -446,9 +460,21 @@ const ShipmentList = () => {
           <PaginationContainer>
             <PageBtn disabled={page === 1} onClick={() => setPage(1)}>«</PageBtn>
             <PageBtn disabled={page === 1} onClick={() => setPage(p => p - 1)}>&lt;</PageBtn>
-            <span style={{ padding: '0 8px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-              Page {page} of {totalPages}
-            </span>
+            {visiblePages[0] > 1 && (
+              <>
+                <PageBtn onClick={() => setPage(1)}>1</PageBtn>
+                {visiblePages[0] > 2 && <span style={{ padding: '0 6px', color: 'var(--text-secondary)' }}>…</span>}
+              </>
+            )}
+            {visiblePages.map(p => (
+              <PageBtn key={p} $active={p === page} onClick={() => setPage(p)}>{p}</PageBtn>
+            ))}
+            {visiblePages[visiblePages.length - 1] < totalPages && (
+              <>
+                {visiblePages[visiblePages.length - 1] < totalPages - 1 && <span style={{ padding: '0 6px', color: 'var(--text-secondary)' }}>…</span>}
+                <PageBtn onClick={() => setPage(totalPages)}>{totalPages}</PageBtn>
+              </>
+            )}
             <PageBtn disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>&gt;</PageBtn>
             <PageBtn disabled={page === totalPages} onClick={() => setPage(totalPages)}>»</PageBtn>
           </PaginationContainer>
