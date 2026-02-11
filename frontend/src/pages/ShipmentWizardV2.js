@@ -6,8 +6,9 @@ import {
     Divider, CardContent, CircularProgress, Alert, Chip, IconButton,
     Tooltip, Stack, Paper, Fade, Zoom,
     Menu, MenuItem,
-    FormControl, InputLabel, Select,
+    FormControl, InputLabel, Select, Checkbox,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    List, ListItem, ListItemIcon, ListItemText,
     ThemeProvider, createTheme
 } from '@mui/material';
 
@@ -672,6 +673,8 @@ const ShipmentWizardV2 = () => {
                             const availableCodes = new Set(freshOptionalServices.map((service) => service.serviceCode));
                             return prev.filter((code) => availableCodes.has(code));
                         });
+                        setAvailableOptionalServices(quote.optionalServices || []);
+                        setSelectedOptionalServiceCodes([]);
                     }
                 } catch (err) {
                     console.error('Quote fetch error', err);
@@ -1327,6 +1330,42 @@ const ShipmentWizardV2 = () => {
                                     <Typography variant="body2">Optional Services</Typography>
                                     <Typography variant="body2" fontWeight="bold">{optionalServicesTotal.toFixed(3)} KD</Typography>
                                 </Box>
+
+                                {availableOptionalServices.length > 0 && (
+                                    <Box mb={1.5}>
+                                        <Typography variant="caption" sx={{ opacity: 0.85, display: 'block', mb: 0.5 }}>
+                                            Add Optional Services
+                                        </Typography>
+                                        <List dense disablePadding>
+                                            {availableOptionalServices.map((service) => {
+                                                const checked = selectedOptionalServiceCodes.includes(service.serviceCode);
+                                                return (
+                                                    <ListItem
+                                                        key={service.serviceCode}
+                                                        dense
+                                                        disableGutters
+                                                        sx={{ py: 0.3, cursor: 'pointer' }}
+                                                        onClick={() => toggleOptionalService(service.serviceCode)}
+                                                    >
+                                                        <ListItemIcon sx={{ minWidth: 32 }}>
+                                                            <Checkbox
+                                                                edge="start"
+                                                                checked={checked}
+                                                                sx={{ color: 'inherit', '&.Mui-checked': { color: '#fff' } }}
+                                                            />
+                                                        </ListItemIcon>
+                                                        <ListItemText
+                                                            primaryTypographyProps={{ variant: 'caption', color: 'inherit' }}
+                                                            secondaryTypographyProps={{ variant: 'caption', color: 'rgba(255,255,255,0.8)' }}
+                                                            primary={service.serviceName}
+                                                            secondary={`${Number(service.totalPrice || 0).toFixed(3)} KD`}
+                                                        />
+                                                    </ListItem>
+                                                );
+                                            })}
+                                        </List>
+                                    </Box>
+                                )}
 
                                 {/* Admin Markup Analysis */}
                                 {isAdmin && (
