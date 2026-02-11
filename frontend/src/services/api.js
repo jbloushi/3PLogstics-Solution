@@ -3,13 +3,6 @@ import axios from 'axios';
 // Use environment variable if available, otherwise use a relative URL that works in both development and production
 const API_URL = process.env.REACT_APP_API_URL || '/api';
 
-// Debug: Log the API URL being used
-console.log('🔧 API Configuration:', {
-  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
-  API_URL: API_URL,
-  NODE_ENV: process.env.NODE_ENV
-});
-
 const api = axios.create({
   baseURL: API_URL,
   headers: {

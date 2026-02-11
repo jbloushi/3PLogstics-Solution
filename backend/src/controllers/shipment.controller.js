@@ -396,7 +396,6 @@ exports.getAllShipments = async (req, res) => {
     if (mongoose.connection.readyState !== 1) {
       logger.warn('MongoDB not connected when fetching shipments, attempting to reconnect...');
       try {
-        // Try to reconnect
         const { connectDB } = require('../config/database');
         await connectDB();
         logger.info('MongoDB reconnected successfully for fetching shipments');
@@ -409,115 +408,165 @@ exports.getAllShipments = async (req, res) => {
       }
     }
 
-    const { status, sortBy, sortOrder, limit = 50, page = 1, organization, paid } = req.query;
+    const {
+      status,
+      statusIn,
+      q,
+      sortBy,
+      sortOrder,
+      limit = 50,
+      page = 1,
+      organization,
+      paid,
+      view,
+      includeUser,
+      includeTotal
+    } = req.query;
+
     const query = {};
 
-    // Apply filters
     if (status) {
       query.status = status;
     }
 
-    if (organization) {
-      if (organization === 'none') {
-        query.organization = null;
-      } else {
-        query.organization = organization;
+    if (statusIn) {
+      const statuses = String(statusIn)
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (statuses.length > 0) {
+        query.status = { $in: statuses };
       }
+    }
+
+    if (organization) {
+      query.organization = organization === 'none' ? null : organization;
     }
 
     if (paid !== undefined) {
       const isPaid = paid === 'true' || paid === true;
-      if (isPaid) {
-        query.paid = true;
-      } else {
-        // Use $ne: true to catch false, undefined, and null
-        query.paid = { $ne: true };
-      }
+      query.paid = isPaid ? true : { $ne: true };
     }
 
-    // Role-based filtering: Clients only see their own shipments, staff see all
+    if (q) {
+      const escapedQuery = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escapedQuery, 'i');
+      query.$or = [
+        { trackingNumber: searchRegex },
+        { 'customer.name': searchRegex },
+        { 'destination.city': searchRegex }
+      ];
+    }
+
     if (req.user.role === 'client') {
       query.user = req.user._id;
     }
 
-    // Apply sorting
     const sortOptions = {};
     if (sortBy) {
       sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
     } else {
-      // Default sort by createdAt in descending order (newest first)
       sortOptions.createdAt = -1;
     }
 
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const limitValue = parseInt(limit);
+    const parsedLimit = Number.parseInt(limit, 10) || 50;
+    const parsedPage = Number.parseInt(page, 10) || 1;
+    const limitValue = Math.min(Math.max(parsedLimit, 1), 100);
+    const pageValue = Math.max(parsedPage, 1);
+    const skip = (pageValue - 1) * limitValue;
 
-    // Fetch shipments with retry mechanism
-    let shipments;
-    try {
-      shipments = await Shipment.find(query)
+    const isListView = view === 'list';
+    const shouldIncludeUser = includeUser === undefined ? !isListView : includeUser === 'true' || includeUser === true;
+    const shouldIncludeTotal = includeTotal === undefined ? true : includeTotal === 'true' || includeTotal === true;
+
+    const projection = isListView
+      ? 'trackingNumber origin.city destination.city customer.name customer.phone status estimatedDelivery serviceCode carrier labelUrl invoiceUrl costPrice markup createdAt paid'
+      : '-__v -history -bookingAttempts -documents';
+
+    const buildFindQuery = () => {
+      let findQuery = Shipment.find(query)
         .sort(sortOptions)
         .skip(skip)
         .limit(limitValue)
-        .populate('user', 'name email role organization')
-        .select('-__v');
-    } catch (fetchError) {
-      // If first fetch fails, try one more time
-      if (fetchError.name === 'MongoNetworkError' ||
-        fetchError.name === 'MongoTimeoutError' ||
-        (fetchError.message && fetchError.message.includes('connection'))) {
+        .select(projection)
+        .lean();
 
+      if (shouldIncludeUser) {
+        findQuery = findQuery.populate('user', 'name email role organization');
+      }
+
+      return findQuery;
+    };
+
+    let shipments;
+    try {
+      const [rows, totalCount] = await Promise.all([
+        buildFindQuery(),
+        shouldIncludeTotal ? Shipment.countDocuments(query) : Promise.resolve(null)
+      ]);
+      shipments = rows;
+
+      if (req.user.role !== 'admin') {
+        shipments.forEach((shipment) => {
+          delete shipment.costPrice;
+          delete shipment.markup;
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: shipments,
+        pagination: {
+          total: totalCount,
+          page: pageValue,
+          limit: limitValue,
+          pages: totalCount === null ? null : Math.ceil(totalCount / limitValue)
+        }
+      });
+    } catch (fetchError) {
+      if (
+        fetchError.name === 'MongoNetworkError' ||
+        fetchError.name === 'MongoTimeoutError' ||
+        (fetchError.message && fetchError.message.includes('connection'))
+      ) {
         logger.warn('MongoDB fetch error, attempting to reconnect and retry:', fetchError);
 
-        try {
-          // Try to reconnect
-          const { connectDB } = require('../config/database');
-          await connectDB();
+        const { connectDB } = require('../config/database');
+        await connectDB();
 
-          // Try fetching again
-          shipments = await Shipment.find(query)
-            .sort(sortOptions)
-            .skip(skip)
-            .limit(limitValue)
-            .select('-__v');
+        const [rows, totalCount] = await Promise.all([
+          buildFindQuery(),
+          shouldIncludeTotal ? Shipment.countDocuments(query) : Promise.resolve(null)
+        ]);
+        shipments = rows;
 
-          logger.info('Shipments fetched successfully after retry');
-        } catch (retryError) {
-          throw retryError; // Will be caught by outer catch block
+        if (req.user.role !== 'admin') {
+          shipments.forEach((shipment) => {
+            delete shipment.costPrice;
+            delete shipment.markup;
+          });
         }
-      } else {
-        throw fetchError; // Will be caught by outer catch block
+
+        logger.info('Shipments fetched successfully after retry');
+
+        return res.status(200).json({
+          success: true,
+          data: shipments,
+          pagination: {
+            total: totalCount,
+            page: pageValue,
+            limit: limitValue,
+            pages: totalCount === null ? null : Math.ceil(totalCount / limitValue)
+          }
+        });
       }
+
+      throw fetchError;
     }
-
-    // Get total count for pagination info
-    const totalCount = await Shipment.countDocuments(query);
-
-    // RESTRICTED: Hide sensitive cost data from non-admins
-    if (req.user.role !== 'admin') {
-      shipments.forEach(s => {
-        s.costPrice = undefined;
-        s.markup = undefined;
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: shipments,
-      pagination: {
-        total: totalCount,
-        page: parseInt(page),
-        limit: limitValue,
-        pages: Math.ceil(totalCount / limitValue)
-      }
-    });
   } catch (error) {
     logger.error('Error fetching shipments:', error);
 
-    // Provide more specific error messages based on the error type
     let errorMessage = 'Failed to fetch shipments';
-
     if (error.name === 'MongoNetworkError') {
       errorMessage = 'Network error connecting to database. Please try again later.';
     } else if (error.name === 'MongoServerError') {

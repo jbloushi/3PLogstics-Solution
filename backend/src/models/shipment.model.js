@@ -276,6 +276,10 @@ shipmentSchema.index({ user: 1 });
 shipmentSchema.index({ status: 1 });
 shipmentSchema.index({ createdAt: -1 });
 shipmentSchema.index({ 'customer.email': 1 });
+shipmentSchema.index({ user: 1, createdAt: -1 });
+shipmentSchema.index({ organization: 1, createdAt: -1 });
+shipmentSchema.index({ paid: 1, createdAt: -1 });
+shipmentSchema.index({ status: 1, createdAt: -1 });
 
 // Helper function to calculate distance between two points using Haversine formula
 function calculateDistance(point1, point2) {
