@@ -161,10 +161,19 @@ exports.getQuotes = async (req, res) => {
     const markupQuotes = rawQuotes.map(quote => {
       const basePrice = Number(quote.totalPrice);
       const calculation = PricingService.calculateFinalPrice(basePrice, markup);
+      const optionalServices = (quote.optionalServices || []).map((service) => ({
+        serviceCode: service.serviceCode,
+        serviceName: service.serviceName,
+        totalPrice: Number(Number(service.totalPrice || 0).toFixed(3)),
+        currency: service.currency || quote.currency || 'KWD'
+      }));
+      const estimatedShipmentCost = Number(calculation.finalPrice.toFixed(3));
 
       return {
         ...quote,
-        totalPrice: Number(calculation.finalPrice.toFixed(3)),
+        totalPrice: estimatedShipmentCost,
+        estimatedShipmentCost,
+        optionalServices,
         currency: quote.currency || 'KWD',
         // RESTRICTED: Only Admins can see the raw carrier price
         carrierCost: req.user.role === 'admin' ? basePrice : undefined,

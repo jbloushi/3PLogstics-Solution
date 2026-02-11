@@ -210,7 +210,15 @@ const shipmentSchema = new mongoose.Schema({
   pricingSnapshot: {
     carrierRate: Number, // Raw rate from carrier (Hidden from client)
     markup: Number,      // Calculated markup amount
-    totalPrice: Number,  // Final price to user (carrier + markup)
+    estimatedShipmentCost: Number, // Carrier rate + markup (without optional services)
+    optionalServicesTotal: Number,
+    optionalServices: [{
+      serviceCode: String,
+      serviceName: String,
+      totalPrice: Number,
+      currency: String
+    }],
+    totalPrice: Number,  // Final price to user (carrier + markup + optional services)
     currency: String,
     rateHash: String,    // Simple hash to detect changes
     expiresAt: Date,
