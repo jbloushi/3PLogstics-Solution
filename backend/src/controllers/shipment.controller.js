@@ -417,10 +417,7 @@ exports.getAllShipments = async (req, res) => {
       limit = 50,
       page = 1,
       organization,
-      paid,
-      view,
-      includeUser,
-      includeTotal
+      paid
     } = req.query;
 
     const query = {};
@@ -436,6 +433,14 @@ exports.getAllShipments = async (req, res) => {
         .filter(Boolean);
       if (statuses.length > 0) {
         query.status = { $in: statuses };
+      }
+    }
+
+    if (organization) {
+      if (organization === 'none') {
+        query.organization = null;
+      } else {
+        query.organization = organization;
       }
     }
 
@@ -458,6 +463,7 @@ exports.getAllShipments = async (req, res) => {
       ];
     }
 
+    // Role-based filtering: Clients only see their own shipments
     if (req.user.role === 'client') {
       query.user = req.user._id;
     }
@@ -469,11 +475,14 @@ exports.getAllShipments = async (req, res) => {
       sortOptions.createdAt = -1;
     }
 
+    // Pagination (hard capped for API safety)
     const parsedLimit = Number.parseInt(limit, 10) || 50;
     const parsedPage = Number.parseInt(page, 10) || 1;
     const limitValue = Math.min(Math.max(parsedLimit, 1), 100);
     const pageValue = Math.max(parsedPage, 1);
     const skip = (pageValue - 1) * limitValue;
+
+    const projection = '-__v -history -bookingAttempts -documents';
 
     const isListView = view === 'list';
     const shouldIncludeUser = includeUser === undefined ? !isListView : includeUser === 'true' || includeUser === true;
@@ -489,40 +498,8 @@ exports.getAllShipments = async (req, res) => {
         .skip(skip)
         .limit(limitValue)
         .select(projection)
+        .populate('user', 'name email role organization')
         .lean();
-
-      if (shouldIncludeUser) {
-        findQuery = findQuery.populate('user', 'name email role organization');
-      }
-
-      return findQuery;
-    };
-
-    let shipments;
-    try {
-      const [rows, totalCount] = await Promise.all([
-        buildFindQuery(),
-        shouldIncludeTotal ? Shipment.countDocuments(query) : Promise.resolve(null)
-      ]);
-      shipments = rows;
-
-      if (req.user.role !== 'admin') {
-        shipments.forEach((shipment) => {
-          delete shipment.costPrice;
-          delete shipment.markup;
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        data: shipments,
-        pagination: {
-          total: totalCount,
-          page: pageValue,
-          limit: limitValue,
-          pages: totalCount === null ? null : Math.ceil(totalCount / limitValue)
-        }
-      });
     } catch (fetchError) {
       if (
         fetchError.name === 'MongoNetworkError' ||
@@ -531,34 +508,45 @@ exports.getAllShipments = async (req, res) => {
       ) {
         logger.warn('MongoDB fetch error, attempting to reconnect and retry:', fetchError);
 
-        const { connectDB } = require('../config/database');
-        await connectDB();
+        try {
+          const { connectDB } = require('../config/database');
+          await connectDB();
 
-        const [rows, totalCount] = await Promise.all([
-          buildFindQuery(),
-          shouldIncludeTotal ? Shipment.countDocuments(query) : Promise.resolve(null)
-        ]);
-        shipments = rows;
+          shipments = await Shipment.find(query)
+            .sort(sortOptions)
+            .skip(skip)
+            .limit(limitValue)
+            .select(projection)
+            .populate('user', 'name email role organization')
+            .lean();
 
-        if (req.user.role !== 'admin') {
-          shipments.forEach((shipment) => {
-            delete shipment.costPrice;
-            delete shipment.markup;
-          });
+          logger.info('Shipments fetched successfully after retry');
+        } catch (retryError) {
+          throw retryError;
         }
+      } else {
+        throw fetchError;
+      }
+    }
 
-        logger.info('Shipments fetched successfully after retry');
+    const totalCount = await Shipment.countDocuments(query);
 
-        return res.status(200).json({
-          success: true,
-          data: shipments,
-          pagination: {
-            total: totalCount,
-            page: pageValue,
-            limit: limitValue,
-            pages: totalCount === null ? null : Math.ceil(totalCount / limitValue)
-          }
-        });
+    // RESTRICTED: Hide sensitive cost data from non-admins
+    if (req.user.role !== 'admin') {
+      shipments.forEach((shipment) => {
+        delete shipment.costPrice;
+        delete shipment.markup;
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: shipments,
+      pagination: {
+        total: totalCount,
+        page: pageValue,
+        limit: limitValue,
+        pages: Math.ceil(totalCount / limitValue)
       }
 
       throw fetchError;
