@@ -79,12 +79,49 @@ class DgrAdapter extends CarrierAdapter {
     async getRates(shipmentData) {
         // Normalize input first
         const shipment = normalizeShipment(shipmentData);
+        const currency = shipment.currency || 'KWD';
+        const optionalServices = [
+            {
+                serviceCode: 'II',
+                serviceName: 'Shipment Insurance',
+                totalPrice: 3.000,
+                currency
+            },
+            {
+                serviceCode: 'WY',
+                serviceName: 'Non-Standard Pickup',
+                totalPrice: 1.500,
+                currency
+            },
+            {
+                serviceCode: 'NN',
+                serviceName: 'Saturday Delivery',
+                totalPrice: 4.000,
+                currency
+            }
+        ];
 
         // --- TEMP FALLBACK FOR RATES (Preserving existing behavior) ---
         // TODO: Implement actual DGR Rate Request in Phase 3
         return [
-            { serviceName: 'DGR Express Worldwide', serviceCode: 'P', carrierCode: 'DGR', totalPrice: 15.000, currency: 'KWD', deliveryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() },
-            { serviceName: 'DGR Express 12:00', serviceCode: 'Y', carrierCode: 'DGR', totalPrice: 22.500, currency: 'KWD', deliveryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString() },
+            {
+                serviceName: 'DGR Express Worldwide',
+                serviceCode: 'P',
+                carrierCode: 'DGR',
+                totalPrice: 15.000,
+                currency,
+                deliveryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                optionalServices
+            },
+            {
+                serviceName: 'DGR Express 12:00',
+                serviceCode: 'Y',
+                carrierCode: 'DGR',
+                totalPrice: 22.500,
+                currency,
+                deliveryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+                optionalServices
+            },
         ];
     }
 
