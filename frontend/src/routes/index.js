@@ -1,31 +1,32 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import CreateShipmentPage from '../pages/CreateShipmentPage';
-import DgrShipmentWizard from '../pages/DgrShipmentWizard';
-import ShipmentWizardV2 from '../pages/ShipmentWizardV2';
-import AboutPage from '../pages/AboutPage';
-import ContactPage from '../pages/ContactPage';
-import NotFoundPage from '../pages/NotFoundPage';
-import LoginPage from '../pages/LoginPage';
-import SignupPage from '../pages/SignupPage';
-import SettingsPage from '../pages/SettingsPage';
-// import ProfilePage from '../pages/ProfilePage'; // Deprecated
-import AddressBookPage from '../pages/AddressBookPage';
-import AdminUsersPage from '../pages/AdminUsersPage';
-import AdminOrganizationsPage from '../pages/AdminOrganizationsPage';
-import PublicLocationPage from '../pages/PublicLocationPage';
-import PublicTrackingLandingPage from '../pages/PublicTrackingLandingPage';
 import { useAuth } from '../context/AuthContext';
 
-import DashboardPage from '../pages/DashboardPage';
-import ShipmentsPage from '../pages/ShipmentsPage';
-import DriverPickupPage from '../pages/DriverPickupPage';
-import WarehouseScanPage from '../pages/WarehouseScanPage';
-import InConstructionPage from '../pages/InConstructionPage';
-import FinancePage from '../pages/FinancePage';
-import ShipmentDetailsPage from '../pages/ShipmentDetailsPage';
-import TrackingLandingPage from '../pages/TrackingLandingPage';
+const CreateShipmentPage = lazy(() => import('../pages/CreateShipmentPage'));
+const DgrShipmentWizard = lazy(() => import('../pages/DgrShipmentWizard'));
+const ShipmentWizardV2 = lazy(() => import('../pages/ShipmentWizardV2'));
+const AboutPage = lazy(() => import('../pages/AboutPage'));
+const ContactPage = lazy(() => import('../pages/ContactPage'));
+const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
+const LoginPage = lazy(() => import('../pages/LoginPage'));
+const SignupPage = lazy(() => import('../pages/SignupPage'));
+const SettingsPage = lazy(() => import('../pages/SettingsPage'));
+// import ProfilePage from '../pages/ProfilePage'; // Deprecated
+const AddressBookPage = lazy(() => import('../pages/AddressBookPage'));
+const AdminUsersPage = lazy(() => import('../pages/AdminUsersPage'));
+const AdminOrganizationsPage = lazy(() => import('../pages/AdminOrganizationsPage'));
+const PublicLocationPage = lazy(() => import('../pages/PublicLocationPage'));
+const PublicTrackingLandingPage = lazy(() => import('../pages/PublicTrackingLandingPage'));
+
+const DashboardPage = lazy(() => import('../pages/DashboardPage'));
+const ShipmentsPage = lazy(() => import('../pages/ShipmentsPage'));
+const DriverPickupPage = lazy(() => import('../pages/DriverPickupPage'));
+const WarehouseScanPage = lazy(() => import('../pages/WarehouseScanPage'));
+const InConstructionPage = lazy(() => import('../pages/InConstructionPage'));
+const FinancePage = lazy(() => import('../pages/FinancePage'));
+const ShipmentDetailsPage = lazy(() => import('../pages/ShipmentDetailsPage'));
+const TrackingLandingPage = lazy(() => import('../pages/TrackingLandingPage'));
 
 
 
@@ -53,8 +54,8 @@ const RedirectToShipment = () => {
 
 const AppRoutes = () => {
   return (
-
-    <Routes>
+    <Suspense fallback={<div style={{ padding: '24px' }}>Loading...</div>}>
+      <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/" element={<LoginPage />} />
@@ -180,7 +181,8 @@ const AppRoutes = () => {
         <Route path="terms" element={<div>Terms of Service - Coming Soon</div>} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 };
 
