@@ -458,6 +458,7 @@ const ShipmentList = () => {
         {/* Pagination */}
         {totalPages > 1 && (
           <PaginationContainer>
+            <PageBtn disabled={page === 1} onClick={() => setPage(1)}>«</PageBtn>
             <PageBtn disabled={page === 1} onClick={() => setPage(p => p - 1)}>&lt;</PageBtn>
             {visiblePages[0] > 1 && (
               <>
@@ -475,6 +476,7 @@ const ShipmentList = () => {
               </>
             )}
             <PageBtn disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>&gt;</PageBtn>
+            <PageBtn disabled={page === totalPages} onClick={() => setPage(totalPages)}>»</PageBtn>
           </PaginationContainer>
         )}
       </div>
