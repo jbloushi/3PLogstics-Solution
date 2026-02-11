@@ -100,12 +100,39 @@ class ShipmentDraftService {
             throw new Error(`Service ${serviceCode} not available from ${carrierCode}`);
         }
 
+        const selectedOptionalServices = Array.isArray(data.optionalServices) ? data.optionalServices : [];
+        const selectedOptionalCodes = new Set(
+            selectedOptionalServices
+                .map(service => service?.serviceCode)
+                .filter(Boolean)
+        );
+
+        const optionalServices = (quote.optionalServices || [])
+            .filter(service => selectedOptionalCodes.has(service.serviceCode))
+            .map(service => ({
+                serviceCode: service.serviceCode,
+                serviceName: service.serviceName,
+                totalPrice: Number(Number(service.totalPrice || 0).toFixed(3)),
+                currency: service.currency || quote.currency || 'KWD'
+            }));
+
+        const optionalServicesTotal = Number(
+            optionalServices.reduce((sum, service) => sum + Number(service.totalPrice || 0), 0).toFixed(3)
+        );
+
         // 3. Create Snapshot
-        return PricingService.createSnapshot(
+        const snapshot = PricingService.createSnapshot(
             quote.totalPrice,
             user.markup,
             quote.currency
         );
+
+        snapshot.optionalServices = optionalServices;
+        snapshot.optionalServicesTotal = optionalServicesTotal;
+        snapshot.estimatedShipmentCost = snapshot.totalPrice;
+        snapshot.totalPrice = Number((snapshot.totalPrice + optionalServicesTotal).toFixed(3));
+
+        return snapshot;
     }
 
     /**

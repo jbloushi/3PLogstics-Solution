@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    Paper, Box, Typography, FormControlLabel, Switch, Collapse, Grid, TextField, FormControl, InputLabel, Select, MenuItem
+    Paper, Box, Typography, FormControlLabel, Switch, Collapse, Grid, TextField, FormControl, InputLabel, Select, MenuItem, Alert
 } from '@mui/material';
 import WarningIcon from '@mui/icons-material/Warning';
 
@@ -13,9 +13,45 @@ const DG_TYPES = [
     { label: 'Dry Ice (UN1845)', code: '1845', serviceCode: 'HC', contentId: '901', hazard: '9', psn: 'Dry Ice' },
 ];
 
+const DG_MARKS_DEFAULT = 'DANGEROUS GOODS AS PER ASSOCIATED DGD';
+const DG_LIMITS = {
+    code: 4,
+    serviceCode: 2,
+    contentId: 3,
+    hazardClass: 3,
+    properShippingName: 70,
+    customDescription: 200
+};
+
 const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
     const handleChange = (field, value) => {
-        setDangerousGoods(prev => ({ ...prev, [field]: value }));
+        setDangerousGoods(prev => {
+            if (field === 'contains') {
+                return {
+                    ...prev,
+                    contains: value,
+                    customDescription: value ? (prev.customDescription || DG_MARKS_DEFAULT) : prev.customDescription
+                };
+            }
+
+            const sanitizedValue = typeof value === 'string' ? value : value;
+            if (field === 'serviceCode') {
+                return { ...prev, [field]: String(sanitizedValue).toUpperCase().slice(0, DG_LIMITS.serviceCode) };
+            }
+            if (field === 'contentId' || field === 'code') {
+                return { ...prev, [field]: String(sanitizedValue).replace(/[^0-9]/g, '').slice(0, DG_LIMITS[field]) };
+            }
+            if (field === 'hazardClass') {
+                return { ...prev, [field]: String(sanitizedValue).slice(0, DG_LIMITS.hazardClass) };
+            }
+            if (field === 'properShippingName') {
+                return { ...prev, [field]: String(sanitizedValue).slice(0, DG_LIMITS.properShippingName + 20) };
+            }
+            if (field === 'customDescription') {
+                return { ...prev, [field]: String(sanitizedValue).slice(0, DG_LIMITS.customDescription + 40) };
+            }
+            return { ...prev, [field]: sanitizedValue };
+        });
     };
 
     const handleTypeChange = (e) => {
@@ -28,10 +64,15 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                 contentId: type.contentId,
                 hazardClass: type.hazard,
                 properShippingName: type.psn,
-                packingGroup: type.pg || 'II'
+                packingGroup: type.pg || 'II',
+                customDescription: prev.customDescription || DG_MARKS_DEFAULT
             }));
         }
     };
+
+    const warnings = [];
+    if ((dangerousGoods.properShippingName || '').length > DG_LIMITS.properShippingName) warnings.push(`Proper Shipping Name exceeds ${DG_LIMITS.properShippingName} characters.`);
+    if ((dangerousGoods.customDescription || '').length > DG_LIMITS.customDescription) warnings.push(`DG Marks & Instructions exceeds ${DG_LIMITS.customDescription} characters.`);
 
     return (
         <Paper sx={{
@@ -87,6 +128,7 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                                 color="error"
                                 placeholder="1266"
                                 size="small"
+                                helperText={`${(dangerousGoods.code || '').length}/${DG_LIMITS.code}`}
                                 InputProps={{ startAdornment: <Typography color="text.secondary" variant="caption" mr={1}>UN/ID</Typography> }}
                             />
                         </Grid>
@@ -100,7 +142,7 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                                 color="error"
                                 placeholder="HE"
                                 size="small"
-                                helperText="e.g. HE, HV, HK"
+                                helperText="2 chars, e.g. HE, HV, HK"
                             />
                         </Grid>
 
@@ -113,7 +155,7 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                                 color="error"
                                 placeholder="910"
                                 size="small"
-                                helperText="e.g. 910, 967"
+                                helperText={`${(dangerousGoods.contentId || '').length}/${DG_LIMITS.contentId}`}
                             />
                         </Grid>
 
@@ -169,6 +211,8 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                                 color="error"
                                 placeholder="e.g. PERFUMERY PRODUCTS"
                                 size="small"
+                                error={(dangerousGoods.properShippingName || '').length > DG_LIMITS.properShippingName}
+                                helperText={`${(dangerousGoods.properShippingName || '').length}/${DG_LIMITS.properShippingName}`}
                             />
                         </Grid>
 
@@ -183,9 +227,18 @@ const DangerousGoodsPanel = ({ dangerousGoods, setDangerousGoods }) => {
                                 color="error"
                                 placeholder="Additional details for the declaration..."
                                 size="small"
+                                error={(dangerousGoods.customDescription || '').length > DG_LIMITS.customDescription}
+                                helperText={`${(dangerousGoods.customDescription || '').length}/${DG_LIMITS.customDescription}`}
                             />
                         </Grid>
                     </Grid>
+                    {warnings.length > 0 && (
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                            {warnings.map((warning) => (
+                                <Typography key={warning} variant="body2">• {warning}</Typography>
+                            ))}
+                        </Alert>
+                    )}
                 </Box>
             </Collapse>
         </Paper>
