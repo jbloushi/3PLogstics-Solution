@@ -9,7 +9,7 @@ class CarrierFactory {
      */
     static getAvailableCarriers() {
         return [
-            { code: 'DGR', name: 'DGR Express', active: true },
+            { code: 'DGR', name: 'DHL DGR', active: true },
             { code: 'FEDEX', name: 'FedEx', active: false },
             { code: 'UPS', name: 'UPS', active: false }
         ];
