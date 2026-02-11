@@ -422,7 +422,6 @@ exports.getAllShipments = async (req, res) => {
 
     const query = {};
 
-    // Apply filters
     if (status) {
       query.status = status;
     }
@@ -445,6 +444,10 @@ exports.getAllShipments = async (req, res) => {
       }
     }
 
+    if (organization) {
+      query.organization = organization === 'none' ? null : organization;
+    }
+
     if (paid !== undefined) {
       const isPaid = paid === 'true' || paid === true;
       query.paid = isPaid ? true : { $ne: true };
@@ -465,7 +468,6 @@ exports.getAllShipments = async (req, res) => {
       query.user = req.user._id;
     }
 
-    // Apply sorting
     const sortOptions = {};
     if (sortBy) {
       sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
@@ -482,10 +484,16 @@ exports.getAllShipments = async (req, res) => {
 
     const projection = '-__v -history -bookingAttempts -documents';
 
-    // Fetch shipments with retry mechanism
-    let shipments;
-    try {
-      shipments = await Shipment.find(query)
+    const isListView = view === 'list';
+    const shouldIncludeUser = includeUser === undefined ? !isListView : includeUser === 'true' || includeUser === true;
+    const shouldIncludeTotal = includeTotal === undefined ? true : includeTotal === 'true' || includeTotal === true;
+
+    const projection = isListView
+      ? 'trackingNumber origin.city destination.city customer.name customer.phone status estimatedDelivery serviceCode carrier labelUrl invoiceUrl costPrice markup createdAt paid'
+      : '-__v -history -bookingAttempts -documents';
+
+    const buildFindQuery = () => {
+      let findQuery = Shipment.find(query)
         .sort(sortOptions)
         .skip(skip)
         .limit(limitValue)
@@ -540,7 +548,9 @@ exports.getAllShipments = async (req, res) => {
         limit: limitValue,
         pages: Math.ceil(totalCount / limitValue)
       }
-    });
+
+      throw fetchError;
+    }
   } catch (error) {
     logger.error('Error fetching shipments:', error);
 
