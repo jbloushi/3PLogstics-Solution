@@ -6,8 +6,9 @@ import {
     Divider, CardContent, CircularProgress, Alert, Chip, IconButton,
     Tooltip, Stack, Paper, Fade, Zoom,
     Menu, MenuItem,
-    FormControl, InputLabel, Select,
+    FormControl, InputLabel, Select, Checkbox,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+    List, ListItem, ListItemIcon, ListItemText,
     ThemeProvider, createTheme
 } from '@mui/material';
 
@@ -440,6 +441,8 @@ const ShipmentWizardV2 = () => {
     const [expandedParcel, setExpandedParcel] = useState(0);
 
     const [selectedService, setSelectedService] = useState({ serviceName: 'DHL DGR Express Worldwide', serviceCode: 'P', totalPrice: '0.000', currency: 'KWD', deliveryDate: new Date() });
+    const [availableOptionalServices, setAvailableOptionalServices] = useState([]);
+    const [selectedOptionalServiceCodes, setSelectedOptionalServiceCodes] = useState([]);
 
 
     // Global Settings
@@ -479,6 +482,8 @@ const ShipmentWizardV2 = () => {
         setSelectedCarrier(carrierCode);
         // Reset service selection if carrier changes to prevent invalid service codes
         setSelectedService(prev => ({ ...prev, serviceCode: 'P' }));
+        setAvailableOptionalServices([]);
+        setSelectedOptionalServiceCodes([]);
     };
 
     // Fetch Carriers & Clients
@@ -537,7 +542,7 @@ const ShipmentWizardV2 = () => {
                 dangerousGoods, packagingType, exportReason,
                 invoiceRemarks, incoterm, gstPaid, payerOfVat,
                 shipperAccount, labelFormat, signatureName, signatureTitle,
-                palletCount, packageMarks, selectedClient: isStaff ? selectedClient : undefined,
+                palletCount, packageMarks, selectedOptionalServiceCodes, selectedClient: isStaff ? selectedClient : undefined,
                 updatedAt: new Date().toISOString()
             };
             localStorage.setItem(`shipment_draft_${user._id}`, JSON.stringify(draftData));
@@ -551,7 +556,7 @@ const ShipmentWizardV2 = () => {
         dangerousGoods, packagingType, exportReason,
         invoiceRemarks, incoterm, gstPaid, payerOfVat,
         shipperAccount, labelFormat, signatureName, signatureTitle,
-        palletCount, packageMarks, selectedClient, isStaff
+        palletCount, packageMarks, selectedOptionalServiceCodes, selectedClient, isStaff
     ]);
 
     // Check for draft on mount
@@ -616,6 +621,7 @@ const ShipmentWizardV2 = () => {
         if (data.signatureTitle) setSignatureTitle(data.signatureTitle);
         if (data.palletCount) setPalletCount(data.palletCount);
         if (data.packageMarks) setPackageMarks(data.packageMarks);
+        if (data.selectedOptionalServiceCodes) setSelectedOptionalServiceCodes(data.selectedOptionalServiceCodes);
         if (data.selectedClient && isStaff) setSelectedClient(data.selectedClient);
 
         enqueueSnackbar('Draft restored', { variant: 'success' });
@@ -640,13 +646,15 @@ const ShipmentWizardV2 = () => {
                         setSelectedService({
                             serviceName: quote.serviceName,
                             serviceCode: quote.serviceCode,
-                            totalPrice: quote.totalPrice, // User's price (marked up)
+                            totalPrice: quote.totalPrice, // Estimated shipment cost (carrier + markup)
                             basePrice: quote.basePrice,   // Admin view
                             markupLabel: quote.markupLabel,
                             rawPrice: quote.rawPrice,
                             currency: quote.currency,
                             deliveryDate: quote.deliveryDate
                         });
+                        setAvailableOptionalServices(quote.optionalServices || []);
+                        setSelectedOptionalServiceCodes([]);
                     }
                 } catch (err) {
                     console.error('Quote fetch error', err);
@@ -657,7 +665,7 @@ const ShipmentWizardV2 = () => {
             };
             fetchQuote();
         }
-    }, [activeStep, sender, receiver, parcels, items, selectedClient, user]);
+    }, [activeStep, sender, receiver, parcels, items, selectedCarrier, selectedClient, user, enqueueSnackbar]);
 
 
     // Handle Client Selection (Autofill)
@@ -721,6 +729,26 @@ const ShipmentWizardV2 = () => {
     }, [parcels, items]);
 
     const billableWeight = Math.max(totals.actualWeight, totals.volumetricWeight);
+
+    const selectedOptionalServices = useMemo(() => {
+        const selectedCodes = new Set(selectedOptionalServiceCodes);
+        return availableOptionalServices.filter((service) => selectedCodes.has(service.serviceCode));
+    }, [availableOptionalServices, selectedOptionalServiceCodes]);
+
+    const optionalServicesTotal = useMemo(() => {
+        return selectedOptionalServices.reduce((sum, service) => sum + Number(service.totalPrice || 0), 0);
+    }, [selectedOptionalServices]);
+
+    const estimatedShipmentCost = Number(selectedService.totalPrice || 0);
+    const estimatedShipmentTotal = Number((estimatedShipmentCost + optionalServicesTotal).toFixed(3));
+
+    const toggleOptionalService = (serviceCode) => {
+        setSelectedOptionalServiceCodes((prev) => (
+            prev.includes(serviceCode)
+                ? prev.filter((code) => code !== serviceCode)
+                : [...prev, serviceCode]
+        ));
+    };
 
     const loadScenario = (scenario, name) => {
         if (scenario) {
@@ -947,8 +975,11 @@ const ShipmentWizardV2 = () => {
                 carrierCode: selectedCarrier,
                 status: 'ready_for_pickup',
                 skipCarrierCreation: true,
-                price: selectedService.totalPrice,
+                price: estimatedShipmentTotal,
                 costPrice: selectedService.rawPrice, // Pass raw cost if available (Admin/Staff)
+                optionalServices: selectedOptionalServices,
+                optionalServicesTotal,
+                estimatedShipmentCost,
                 currency: currency, // Dynamic currency
                 incoterm: incoterm, // Dynamic incoterm
                 dangerousGoods: dangerousGoods, // Dynamic DG
@@ -1241,14 +1272,61 @@ const ShipmentWizardV2 = () => {
                         {/* Cost Summary Card */}
                         <Card sx={{ bgcolor: 'primary.main', color: 'primary.contrastText', borderRadius: 2 }}>
                             <CardContent>
-                                <Typography variant="overline" sx={{ opacity: 0.8 }}>ESTIMATED TOTAL</Typography>
+                                <Typography variant="overline" sx={{ opacity: 0.8 }}>ESTIMATED SHIPMENT TOTAL</Typography>
                                 <Box display="flex" alignItems="baseline" gap={1}>
-                                    <Typography variant="h3" fontWeight="bold">{(Number(selectedService.totalPrice)).toFixed(3)}</Typography>
+                                    <Typography variant="h3" fontWeight="bold">{estimatedShipmentTotal.toFixed(3)}</Typography>
                                     <Typography variant="subtitle1">KD</Typography>
                                 </Box>
                                 <Typography variant="subtitle2" sx={{ opacity: 0.9, mt: 1 }}>
                                     {selectedService.serviceName}
                                 </Typography>
+
+                                <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 2 }} />
+
+                                <Box display="flex" justifyContent="space-between" mb={0.5}>
+                                    <Typography variant="body2">Estimated Shipment Cost</Typography>
+                                    <Typography variant="body2" fontWeight="bold">{estimatedShipmentCost.toFixed(3)} KD</Typography>
+                                </Box>
+                                <Box display="flex" justifyContent="space-between" mb={1.5}>
+                                    <Typography variant="body2">Optional Services</Typography>
+                                    <Typography variant="body2" fontWeight="bold">{optionalServicesTotal.toFixed(3)} KD</Typography>
+                                </Box>
+
+                                {availableOptionalServices.length > 0 && (
+                                    <Box mb={1.5}>
+                                        <Typography variant="caption" sx={{ opacity: 0.85, display: 'block', mb: 0.5 }}>
+                                            Add Optional Services
+                                        </Typography>
+                                        <List dense disablePadding>
+                                            {availableOptionalServices.map((service) => {
+                                                const checked = selectedOptionalServiceCodes.includes(service.serviceCode);
+                                                return (
+                                                    <ListItem
+                                                        key={service.serviceCode}
+                                                        dense
+                                                        disableGutters
+                                                        sx={{ py: 0.3, cursor: 'pointer' }}
+                                                        onClick={() => toggleOptionalService(service.serviceCode)}
+                                                    >
+                                                        <ListItemIcon sx={{ minWidth: 32 }}>
+                                                            <Checkbox
+                                                                edge="start"
+                                                                checked={checked}
+                                                                sx={{ color: 'inherit', '&.Mui-checked': { color: '#fff' } }}
+                                                            />
+                                                        </ListItemIcon>
+                                                        <ListItemText
+                                                            primaryTypographyProps={{ variant: 'caption', color: 'inherit' }}
+                                                            secondaryTypographyProps={{ variant: 'caption', color: 'rgba(255,255,255,0.8)' }}
+                                                            primary={service.serviceName}
+                                                            secondary={`${Number(service.totalPrice || 0).toFixed(3)} KD`}
+                                                        />
+                                                    </ListItem>
+                                                );
+                                            })}
+                                        </List>
+                                    </Box>
+                                )}
 
                                 {/* Admin Markup Analysis */}
                                 {isAdmin && (
@@ -1328,17 +1406,17 @@ const ShipmentWizardV2 = () => {
                         {user && (
                             <Card variant="outlined" sx={{
                                 borderRadius: 2,
-                                bgcolor: availableCredit < Number(selectedService.totalPrice) ? 'error.lighter' : 'success.lighter',
-                                borderColor: availableCredit < Number(selectedService.totalPrice) ? 'error.main' : 'success.main',
+                                bgcolor: availableCredit < estimatedShipmentTotal ? 'error.lighter' : 'success.lighter',
+                                borderColor: availableCredit < estimatedShipmentTotal ? 'error.main' : 'success.main',
                                 p: 1
                             }}>
                                 <Box display="flex" alignItems="center" gap={1}>
-                                    <AccountBalanceWalletIcon color={availableCredit < Number(selectedService.totalPrice) ? 'error' : 'success'} />
+                                    <AccountBalanceWalletIcon color={availableCredit < estimatedShipmentTotal ? 'error' : 'success'} />
                                     <Box>
                                         <Typography variant="caption" display="block" fontWeight="bold">
                                             Available Credit: {availableCredit.toFixed(3)} KD
                                         </Typography>
-                                        {availableCredit < Number(selectedService.totalPrice) && (
+                                        {availableCredit < estimatedShipmentTotal && (
                                             <Typography variant="caption" color="error.main" fontWeight="bold">
                                                 Insufficient balance. Please top up.
                                             </Typography>
@@ -1470,7 +1548,7 @@ const ShipmentWizardV2 = () => {
                         <Button
                             variant="contained" size="large" onClick={activeStep === 3 ? handleSubmit : handleNext}
                             endIcon={loading ? <CircularProgress size={20} color="inherit" /> : <ArrowForwardIcon />}
-                            disabled={loading || (activeStep === 3 && user && !isAdmin && !isStaff && availableCredit < Number(selectedService.totalPrice))}
+                            disabled={loading || (activeStep === 3 && user && !isAdmin && !isStaff && availableCredit < estimatedShipmentTotal)}
 
                             sx={{
                                 borderRadius: 50,
