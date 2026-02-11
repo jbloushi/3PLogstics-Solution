@@ -90,7 +90,7 @@ const IS_DEV = process.env.NODE_ENV === 'development' || process.env.REACT_APP_V
 // --- Integrated Autofill Scenarios ---
 // --- Integrated Autofill Scenarios ---
 const AUTOFILL_SCENARIOS = {
-    'DGR': {
+    'DHL DGR': {
         'Standard': {
             'Full Business Shipment (DAP)': {
                 sender: {
@@ -439,7 +439,7 @@ const ShipmentWizardV2 = () => {
 
     const [expandedParcel, setExpandedParcel] = useState(0);
 
-    const [selectedService, setSelectedService] = useState({ serviceName: 'DGR Express Worldwide', serviceCode: 'P', totalPrice: '0.000', currency: 'KWD', deliveryDate: new Date() });
+    const [selectedService, setSelectedService] = useState({ serviceName: 'DHL DGR Express Worldwide', serviceCode: 'P', totalPrice: '0.000', currency: 'KWD', deliveryDate: new Date() });
 
 
     // Global Settings
@@ -944,7 +944,7 @@ const ShipmentWizardV2 = () => {
                     currency: i.currency || currency // Fallback to global currency if missing
                 })),
                 serviceCode: selectedService.serviceCode,
-                carrierCode: 'DGR',
+                carrierCode: selectedCarrier,
                 status: 'ready_for_pickup',
                 skipCarrierCreation: true,
                 price: selectedService.totalPrice,
@@ -1418,7 +1418,7 @@ const ShipmentWizardV2 = () => {
                                         selectedClient={selectedClient} onClientChange={handleClientChange}
                                         availableCarriers={availableCarriers}
                                         selectedCarrier={selectedCarrier}
-                                        onCarrierChange={setSelectedCarrier}
+                                        onCarrierChange={handleCarrierChange}
                                     />
                                 </Box>
                             )}
