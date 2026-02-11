@@ -1,8 +1,5 @@
-import React, { useEffect } from 'react';
-import usePlacesAutocomplete, {
-    getGeocode,
-    getLatLng,
-} from 'use-places-autocomplete';
+import React, { useEffect, useMemo, useState } from 'react';
+import { getGeocode, getLatLng } from 'use-places-autocomplete';
 import { useJsApiLoader } from '@react-google-maps/api';
 import {
     TextField,
@@ -18,26 +15,63 @@ import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SearchIcon from '@mui/icons-material/Search';
 
 const libraries = ['places'];
+const INPUT_DEBOUNCE_MS = 300;
+
+const mapPlaceComponentsToAddress = (addressComponents = []) => {
+    let city = '';
+    let countryCode = '';
+    let postalCode = '';
+    let state = '';
+    let streetName = '';
+    let streetNumber = '';
+    let area = '';
+
+    addressComponents.forEach((component) => {
+        const types = component.types || [];
+        const longName = component.long_name || component.longText || '';
+        const shortName = component.short_name || component.shortText || '';
+
+        if (types.includes('locality')) city = longName;
+        if (types.includes('country')) countryCode = shortName;
+        if (types.includes('postal_code')) postalCode = longName;
+        if (types.includes('administrative_area_level_1')) state = longName;
+        if (types.includes('route')) streetName = longName;
+        if (types.includes('street_number')) streetNumber = longName;
+        if (types.includes('sublocality') || types.includes('sublocality_level_1') || types.includes('neighborhood')) {
+            area = longName;
+        }
+    });
+
+    return {
+        city,
+        countryCode,
+        postalCode,
+        state,
+        streetLines: [`${streetNumber} ${streetName}`.trim()],
+        area
+    };
+};
 
 const GoogleAddressInput = ({
     value = {},
     onChange,
-    label = "Search Address (Google)",
+    label = 'Search Address (Google)',
     disabled,
     required,
     error,
     helperText
 }) => {
-    // Validate API key is configured
     const apiKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+    const [inputValue, setInputValue] = useState(value?.formattedAddress || '');
+    const [debouncedInput, setDebouncedInput] = useState(value?.formattedAddress || '');
+    const [options, setOptions] = useState([]);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (!apiKey) {
             console.error(
-                '🔴 GOOGLE MAPS API KEY MISSING!\n' +
-                'Address autofill will not work.\n' +
-                'Set REACT_APP_GOOGLE_MAPS_API_KEY in your .env file.\n' +
-                'See: https://console.cloud.google.com/google/maps-apis'
+                'GOOGLE MAPS API KEY MISSING. Address autofill will not work. ' +
+                'Set REACT_APP_GOOGLE_MAPS_API_KEY in your .env file.'
             );
         }
     }, [apiKey]);
@@ -49,134 +83,175 @@ const GoogleAddressInput = ({
     });
 
     useEffect(() => {
-        if (loadError) {
-            console.error("Google Maps API Load Error:", loadError);
+        const timer = setTimeout(() => {
+            setDebouncedInput(inputValue.trim());
+        }, INPUT_DEBOUNCE_MS);
+
+        return () => clearTimeout(timer);
+    }, [inputValue]);
+
+    useEffect(() => {
+        if (value?.formattedAddress && value.formattedAddress !== inputValue) {
+            setInputValue(value.formattedAddress);
         }
-    }, [loadError]);
-
-    const {
-        ready,
-        value: inputValue,
-        suggestions: { status, data },
-        setValue,
-        clearSuggestions,
-        init
-    } = usePlacesAutocomplete({
-        requestOptions: {
-            /* Define search scope here */
-        },
-        debounce: 300,
-        defaultValue: value?.formattedAddress || '',
-        initOnMount: false
-    });
-
-    // Manually initialize when Google Script is loaded
-    useEffect(() => {
-        if (isLoaded) {
-            init();
-        }
-    }, [isLoaded, init]);
-
-    // Debug API State
-    useEffect(() => {
-        console.log('🗺️ GoogleAddressInput Debug:', {
-            apiKeyPresent: !!apiKey,
-            isLoaded,
-            ready,
-            status,
-            inputValue,
-            libsLoaded: libraries
-        });
-    }, [apiKey, isLoaded, ready, status, inputValue]);
-
-    // Sync internal input value only if external value REALLY changes (fixes typing lockout)
-    const prevExternalAddress = React.useRef(value?.formattedAddress);
+    }, [inputValue, value?.formattedAddress]);
 
     useEffect(() => {
-        if (value?.formattedAddress !== prevExternalAddress.current) {
-            // Parent prop changed -> Update input
-            if (value?.formattedAddress) {
-                setValue(value.formattedAddress, false);
+        let cancelled = false;
+
+        const fetchSuggestions = async () => {
+            if (!isLoaded || !debouncedInput || debouncedInput.length < 2) {
+                setOptions([]);
+                return;
             }
-            prevExternalAddress.current = value?.formattedAddress;
-        }
-    }, [value, setValue]);
 
-    const handleSelect = async (address, placeId) => {
-        setValue(address, false);
-        clearSuggestions();
+            try {
+                setLoadingSuggestions(true);
+
+                if (!window.google?.maps) {
+                    setOptions([]);
+                    return;
+                }
+
+                const placesLib = await window.google.maps.importLibrary('places');
+                const AutocompleteSuggestion = placesLib?.AutocompleteSuggestion;
+
+                if (AutocompleteSuggestion?.fetchAutocompleteSuggestions) {
+                    const response = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+                        input: debouncedInput
+                    });
+
+                    const nextOptions = (response?.suggestions || [])
+                        .map((entry, index) => {
+                            const prediction = entry?.placePrediction;
+                            const text = prediction?.text?.text || '';
+                            const secondary = prediction?.structuredFormat?.secondaryText?.text || '';
+                            const placeId = prediction?.placeId || `${text}-${index}`;
+
+                            if (!text) return null;
+
+                            return {
+                                placeId,
+                                description: text,
+                                mainText: text,
+                                secondaryText: secondary,
+                                prediction
+                            };
+                        })
+                        .filter(Boolean);
+
+                    if (!cancelled) {
+                        setOptions(nextOptions);
+                    }
+                    return;
+                }
+
+                const service = new window.google.maps.places.AutocompleteService();
+                service.getPlacePredictions({ input: debouncedInput }, (predictions = []) => {
+                    if (cancelled) return;
+
+                    setOptions(
+                        predictions.map((prediction) => ({
+                            placeId: prediction.place_id,
+                            description: prediction.description,
+                            mainText: prediction.structured_formatting?.main_text || prediction.description,
+                            secondaryText: prediction.structured_formatting?.secondary_text || ''
+                        }))
+                    );
+                });
+            } catch (suggestionError) {
+                if (!cancelled) {
+                    console.error('Address suggestions failed:', suggestionError);
+                    setOptions([]);
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoadingSuggestions(false);
+                }
+            }
+        };
+
+        fetchSuggestions();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [debouncedInput, isLoaded]);
+
+    const handleSelect = async (selectedOption) => {
+        if (!selectedOption) return;
+
+        setInputValue(selectedOption.description);
 
         try {
-            const results = await getGeocode({ address });
-            const { lat, lng } = await getLatLng(results[0]);
+            let addressData;
 
-            // Extract address components
-            const components = results[0].address_components;
-            let city = '', countryCode = '', postalCode = '', state = '';
-            let streetName = '', streetNumber = '';
-            let area = '';
+            if (selectedOption.prediction?.toPlace) {
+                const place = selectedOption.prediction.toPlace();
+                await place.fetchFields({
+                    fields: ['formattedAddress', 'location', 'addressComponents']
+                });
 
-            components.forEach(component => {
-                const types = component.types;
-                if (types.includes('locality')) city = component.long_name;
-                if (types.includes('country')) countryCode = component.short_name;
-                if (types.includes('postal_code')) postalCode = component.long_name;
-                if (types.includes('administrative_area_level_1')) state = component.long_name;
-                if (types.includes('route')) streetName = component.long_name;
-                if (types.includes('street_number')) streetNumber = component.long_name;
-                if (types.includes('sublocality') || types.includes('sublocality_level_1') || types.includes('neighborhood')) {
-                    area = component.long_name;
-                }
-            });
+                const lat = place.location?.lat?.();
+                const lng = place.location?.lng?.();
+                const mapped = mapPlaceComponentsToAddress(place.addressComponents || []);
 
-            // Update parent - PRESERVE existing contact info (contactPerson, phone, email)
-            const addressData = {
-                formattedAddress: address,
-                streetLines: [`${streetNumber} ${streetName}`.trim()],
-                city,
-                state,
-                postalCode,
-                countryCode,
-                area, // Auto-fill area if mapped
-                longitude: lng,
-                latitude: lat,
-                validationStatus: 'CONFIRMED'
-            };
+                addressData = {
+                    formattedAddress: place.formattedAddress || selectedOption.description,
+                    ...mapped,
+                    longitude: lng,
+                    latitude: lat,
+                    validationStatus: 'CONFIRMED'
+                };
+            } else {
+                const results = await getGeocode({ address: selectedOption.description });
+                const { lat, lng } = await getLatLng(results[0]);
+                const mapped = mapPlaceComponentsToAddress(results[0]?.address_components || []);
 
-            // Merge with existing value to preserve contact fields
+                addressData = {
+                    formattedAddress: selectedOption.description,
+                    ...mapped,
+                    longitude: lng,
+                    latitude: lat,
+                    validationStatus: 'CONFIRMED'
+                };
+            }
+
             onChange({
-                ...value, // Preserve contactPerson, phone, email, company, etc.
+                ...value,
                 ...addressData
             });
-        } catch (error) {
-            console.error('Error selecting address:', error);
+        } catch (selectionError) {
+            console.error('Error selecting address:', selectionError);
         }
     };
+
+    const helperMessage = useMemo(() => {
+        if (helperText) return helperText;
+        if (loadError) return `Google Maps Error: ${loadError.message}`;
+        return undefined;
+    }, [helperText, loadError]);
 
     return (
         <Box>
             <MuiAutocomplete
                 componentsProps={{
                     popper: {
-                        style: { zIndex: 10000 } // Fix: Ensure dropdown is above Dialog/Modal (usually 1300)
+                        style: { zIndex: 10000 }
                     }
                 }}
                 freeSolo
-                disabled={!ready || disabled}
-                options={data.map(suggestion => suggestion.place_id)}
-                getOptionLabel={(option) => {
-                    const suggestion = data.find(d => d.place_id === option);
-                    return suggestion ? suggestion.description : inputValue;
-                }}
+                disabled={disabled || !isLoaded || !apiKey}
+                options={options}
+                getOptionLabel={(option) => option?.description || ''}
                 filterOptions={(x) => x}
                 inputValue={inputValue}
-                onInputChange={(e, newVal) => {
-                    setValue(newVal);
+                onInputChange={(event, newValue) => {
+                    setInputValue(newValue || '');
                 }}
-                onChange={(e, val) => {
-                    const suggestion = data.find(d => d.place_id === val);
-                    if (suggestion) {
-                        handleSelect(suggestion.description, suggestion.place_id);
+                onChange={(event, selectedOption) => {
+                    if (selectedOption) {
+                        handleSelect(selectedOption);
                     }
                 }}
                 renderInput={(params) => (
@@ -184,16 +259,16 @@ const GoogleAddressInput = ({
                         <TextField
                             {...params}
                             label={label}
-                            disabled={!ready || disabled || !apiKey}
+                            disabled={disabled || !isLoaded || !apiKey}
                             required={required}
-                            error={!!error || !apiKey}
-                            helperText={helperText}
+                            error={!!error || !apiKey || !!loadError}
+                            helperText={helperMessage}
                             InputProps={{
                                 ...params.InputProps,
                                 startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
                                 endAdornment: (
                                     <>
-                                        {!ready && <CircularProgress size={20} />}
+                                        {(loadingSuggestions || !isLoaded) && <CircularProgress size={20} />}
                                         {params.InputProps.endAdornment}
                                     </>
                                 )
@@ -202,43 +277,37 @@ const GoogleAddressInput = ({
                         {(!apiKey || loadError) && (
                             <Box mt={1}>
                                 <Alert severity="error">
-                                    {loadError ? `Google Maps Error: ${loadError.message}` : "Google Maps API Key is missing. Autofill disabled."}
+                                    {loadError ? `Google Maps Error: ${loadError.message}` : 'Google Maps API Key is missing. Autofill disabled.'}
                                 </Alert>
                             </Box>
                         )}
                     </>
                 )}
-                renderOption={(props, optionId) => {
-                    const suggestion = data.find(d => d.place_id === optionId);
-                    if (!suggestion) return null;
-
-                    return (
-                        <li {...props} key={optionId} style={{ padding: '10px 16px' }}>
-                            <Box display="flex" alignItems="center" sx={{ width: '100%' }}>
-                                <Box sx={{
-                                    mr: 2,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    bgcolor: 'rgba(0, 217, 184, 0.1)',
-                                    borderRadius: '50%',
-                                    p: 1
-                                }}>
-                                    <LocationOnIcon sx={{ color: '#00d9b8', fontSize: 20 }} />
-                                </Box>
-                                <Box sx={{ flexGrow: 1 }}>
-                                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#e0e0e0' }}>
-                                        {suggestion.structured_formatting.main_text}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: '#aaa', display: 'block' }}>
-                                        {suggestion.structured_formatting.secondary_text}
-                                    </Typography>
-                                </Box>
+                renderOption={(props, option) => (
+                    <li {...props} key={option.placeId} style={{ padding: '10px 16px' }}>
+                        <Box display="flex" alignItems="center" sx={{ width: '100%' }}>
+                            <Box sx={{
+                                mr: 2,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: 'rgba(0, 217, 184, 0.1)',
+                                borderRadius: '50%',
+                                p: 1
+                            }}>
+                                <LocationOnIcon sx={{ color: '#00d9b8', fontSize: 20 }} />
                             </Box>
-                        </li>
-                    );
-                }}
-
+                            <Box sx={{ flexGrow: 1 }}>
+                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#e0e0e0' }}>
+                                    {option.mainText || option.description}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#aaa', display: 'block' }}>
+                                    {option.secondaryText}
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </li>
+                )}
                 PaperComponent={(paperProps) => (
                     <Paper {...paperProps} sx={{
                         bgcolor: '#1a1f2e !important',
@@ -256,10 +325,6 @@ const GoogleAddressInput = ({
                     }} />
                 )}
             />
-            {/* Debug Info */}
-            <Typography variant="caption" display="block" sx={{ mt: 1, fontSize: '11px', color: status === 'OK' ? '#00d9b8' : (status === '' ? 'text.secondary' : '#ff4444'), fontWeight: 'bold' }}>
-                Status: {status || 'Waiting...'} | Found: {data.length} | Maps Loaded: {isLoaded ? 'Yes' : 'No'} | Ready: {ready ? 'Yes' : 'No'}
-            </Typography>
         </Box>
     );
 };

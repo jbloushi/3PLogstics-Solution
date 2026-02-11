@@ -985,7 +985,6 @@ const ShipmentWizardV2 = () => {
                 receiver: { ...receiver, vatNumber: receiver.vatNumber, eoriNumber: receiver.eoriNumber, taxId: receiver.taxId }
             };
 
-            console.log('Finalizing shipment (Internal)...', payload);
             const response = await shipmentService.createShipment(payload);
 
             if (response.success || response.data) {

@@ -54,7 +54,7 @@ const RedirectToShipment = () => {
 
 const AppRoutes = () => {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<div style={{ padding: '24px' }}>Loading...</div>}>
       <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/signup" element={<SignupPage />} />

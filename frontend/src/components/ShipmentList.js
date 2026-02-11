@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
 import { shipmentService } from '../services/api';
@@ -119,6 +119,15 @@ const PageBtn = styled.button`
 const ACTIVE_STATUSES = ['created', 'in_transit', 'out_for_delivery'];
 const PENDING_STATUSES = ['draft', 'pending', 'updated', 'ready_for_pickup', 'picked_up'];
 
+const STATUS_GROUP_MAP = {
+  all: undefined,
+  pending: PENDING_STATUSES,
+  active: ACTIVE_STATUSES,
+  delivered: ['delivered']
+};
+
+const DEBOUNCE_MS = 350;
+
 const ShipmentList = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
@@ -126,8 +135,10 @@ const ShipmentList = () => {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('all');
   const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, pages: 1 });
   const ITEMS_PER_PAGE = 10;
 
   // Menu State (Replaces Custom ActionMenu)
@@ -138,53 +149,50 @@ const ShipmentList = () => {
   const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
   const [selectedShipmentForApproval, setSelectedShipmentForApproval] = useState(null);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Fetch Data
-  const fetchShipments = async () => {
+  const fetchShipments = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await shipmentService.getAllShipments();
-      setShipments(Array.isArray(response) ? response : (response?.data || []));
+      const statusIn = STATUS_GROUP_MAP[viewMode];
+      const response = await shipmentService.getAllShipments({
+        page,
+        limit: ITEMS_PER_PAGE,
+        ...(statusIn ? { statusIn: statusIn.join(',') } : {}),
+        ...(debouncedSearchQuery ? { q: debouncedSearchQuery } : {})
+      });
+
+      setShipments(response?.data || []);
+      setPagination(response?.pagination || { total: 0, page: 1, limit: ITEMS_PER_PAGE, pages: 1 });
     } catch (err) {
       console.error('Fetch error:', err);
+      setShipments([]);
+      setPagination({ total: 0, page: 1, limit: ITEMS_PER_PAGE, pages: 1 });
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedSearchQuery, page, viewMode]);
 
   useEffect(() => {
-    if (isAuthenticated) fetchShipments();
-  }, [isAuthenticated]);
+    if (isAuthenticated) {
+      fetchShipments();
+    }
+  }, [fetchShipments, isAuthenticated]);
 
-  // Filter Logic
-  const filteredShipments = useMemo(() => {
-    return shipments.filter(shipment => {
-      // View Mode
-      if (viewMode === 'active' && !ACTIVE_STATUSES.includes(shipment.status)) return false;
-      if (viewMode === 'pending' && !PENDING_STATUSES.includes(shipment.status)) return false;
-      if (viewMode === 'delivered' && shipment.status !== 'delivered') return false;
-
-      // Search
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        return (
-          shipment.trackingNumber?.toLowerCase().includes(q) ||
-          shipment.customer?.name?.toLowerCase().includes(q) ||
-          shipment.destination?.city?.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [shipments, viewMode, searchQuery]);
-
-  // Pagination Logic
-  const totalPages = Math.ceil(filteredShipments.length / ITEMS_PER_PAGE);
-  const currentShipments = filteredShipments.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const totalPages = Math.max(pagination.pages || 1, 1);
   const hasFilters = Boolean(searchQuery) || viewMode !== 'all';
   const counters = [
-    { id: 'all', label: 'All', count: shipments.length, color: '#00d9b8' },
-    { id: 'pending', label: 'Pending', count: shipments.filter(s => PENDING_STATUSES.includes(s.status)).length, color: '#fbbf24' },
-    { id: 'active', label: 'In Transit (Active)', count: shipments.filter(s => ACTIVE_STATUSES.includes(s.status)).length, color: '#34d399' },
-    { id: 'delivered', label: 'Delivered', count: shipments.filter(s => s.status === 'delivered').length, color: '#38bdf8' },
+    { id: 'all', label: 'All', count: viewMode === 'all' ? pagination.total : '—', color: '#00d9b8' },
+    { id: 'pending', label: 'Pending', count: viewMode === 'pending' ? pagination.total : '—', color: '#fbbf24' },
+    { id: 'active', label: 'In Transit (Active)', count: viewMode === 'active' ? pagination.total : '—', color: '#34d399' },
+    { id: 'delivered', label: 'Delivered', count: viewMode === 'delivered' ? pagination.total : '—', color: '#38bdf8' },
   ];
 
   // Handlers
@@ -276,7 +284,7 @@ const ShipmentList = () => {
           </div>
           <ResultsMeta>
             <span>
-              Showing {filteredShipments.length} of {shipments.length} shipments
+              Showing {shipments.length} of {pagination.total} shipments
             </span>
             {hasFilters && (
               <Button
@@ -309,7 +317,7 @@ const ShipmentList = () => {
             <Tbody>
               {loading ? (
                 <Tr><Td colSpan="6" style={{ textAlign: 'center' }}>Loading...</Td></Tr>
-              ) : currentShipments.map(shipment => (
+              ) : shipments.map(shipment => (
                 <Tr
                   key={shipment._id}
                   onClick={() => navigate(`/shipment/${shipment.trackingNumber}`)}
@@ -343,7 +351,7 @@ const ShipmentList = () => {
                   </Td>
                 </Tr>
               ))}
-              {!loading && currentShipments.length === 0 && (
+              {!loading && shipments.length === 0 && (
                 <Tr>
                   <Td colSpan="6" style={{ padding: 0 }}>
                     <EmptyState>

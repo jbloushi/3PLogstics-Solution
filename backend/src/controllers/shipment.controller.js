@@ -396,7 +396,6 @@ exports.getAllShipments = async (req, res) => {
     if (mongoose.connection.readyState !== 1) {
       logger.warn('MongoDB not connected when fetching shipments, attempting to reconnect...');
       try {
-        // Try to reconnect
         const { connectDB } = require('../config/database');
         await connectDB();
         logger.info('MongoDB reconnected successfully for fetching shipments');
@@ -409,12 +408,33 @@ exports.getAllShipments = async (req, res) => {
       }
     }
 
-    const { status, sortBy, sortOrder, limit = 50, page = 1, organization, paid } = req.query;
+    const {
+      status,
+      statusIn,
+      q,
+      sortBy,
+      sortOrder,
+      limit = 50,
+      page = 1,
+      organization,
+      paid
+    } = req.query;
+
     const query = {};
 
     // Apply filters
     if (status) {
       query.status = status;
+    }
+
+    if (statusIn) {
+      const statuses = String(statusIn)
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (statuses.length > 0) {
+        query.status = { $in: statuses };
+      }
     }
 
     if (organization) {
@@ -427,15 +447,20 @@ exports.getAllShipments = async (req, res) => {
 
     if (paid !== undefined) {
       const isPaid = paid === 'true' || paid === true;
-      if (isPaid) {
-        query.paid = true;
-      } else {
-        // Use $ne: true to catch false, undefined, and null
-        query.paid = { $ne: true };
-      }
+      query.paid = isPaid ? true : { $ne: true };
     }
 
-    // Role-based filtering: Clients only see their own shipments, staff see all
+    if (q) {
+      const escapedQuery = String(q).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const searchRegex = new RegExp(escapedQuery, 'i');
+      query.$or = [
+        { trackingNumber: searchRegex },
+        { 'customer.name': searchRegex },
+        { 'destination.city': searchRegex }
+      ];
+    }
+
+    // Role-based filtering: Clients only see their own shipments
     if (req.user.role === 'client') {
       query.user = req.user._id;
     }
@@ -445,13 +470,17 @@ exports.getAllShipments = async (req, res) => {
     if (sortBy) {
       sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
     } else {
-      // Default sort by createdAt in descending order (newest first)
       sortOptions.createdAt = -1;
     }
 
-    // Pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const limitValue = parseInt(limit);
+    // Pagination (hard capped for API safety)
+    const parsedLimit = Number.parseInt(limit, 10) || 50;
+    const parsedPage = Number.parseInt(page, 10) || 1;
+    const limitValue = Math.min(Math.max(parsedLimit, 1), 100);
+    const pageValue = Math.max(parsedPage, 1);
+    const skip = (pageValue - 1) * limitValue;
+
+    const projection = '-__v -history -bookingAttempts -documents';
 
     // Fetch shipments with retry mechanism
     let shipments;
@@ -460,47 +489,45 @@ exports.getAllShipments = async (req, res) => {
         .sort(sortOptions)
         .skip(skip)
         .limit(limitValue)
-        .select('-__v -history -bookingAttempts -documents')
+        .select(projection)
         .populate('user', 'name email role organization')
         .lean();
     } catch (fetchError) {
-      // If first fetch fails, try one more time
-      if (fetchError.name === 'MongoNetworkError' ||
+      if (
+        fetchError.name === 'MongoNetworkError' ||
         fetchError.name === 'MongoTimeoutError' ||
-        (fetchError.message && fetchError.message.includes('connection'))) {
-
+        (fetchError.message && fetchError.message.includes('connection'))
+      ) {
         logger.warn('MongoDB fetch error, attempting to reconnect and retry:', fetchError);
 
         try {
-          // Try to reconnect
           const { connectDB } = require('../config/database');
           await connectDB();
 
-          // Try fetching again
           shipments = await Shipment.find(query)
             .sort(sortOptions)
             .skip(skip)
             .limit(limitValue)
-            .select('-__v -history -bookingAttempts -documents')
+            .select(projection)
+            .populate('user', 'name email role organization')
             .lean();
 
           logger.info('Shipments fetched successfully after retry');
         } catch (retryError) {
-          throw retryError; // Will be caught by outer catch block
+          throw retryError;
         }
       } else {
-        throw fetchError; // Will be caught by outer catch block
+        throw fetchError;
       }
     }
 
-    // Get total count for pagination info
     const totalCount = await Shipment.countDocuments(query);
 
     // RESTRICTED: Hide sensitive cost data from non-admins
     if (req.user.role !== 'admin') {
-      shipments.forEach(s => {
-        delete s.costPrice;
-        delete s.markup;
+      shipments.forEach((shipment) => {
+        delete shipment.costPrice;
+        delete shipment.markup;
       });
     }
 
@@ -509,7 +536,7 @@ exports.getAllShipments = async (req, res) => {
       data: shipments,
       pagination: {
         total: totalCount,
-        page: parseInt(page),
+        page: pageValue,
         limit: limitValue,
         pages: Math.ceil(totalCount / limitValue)
       }
@@ -517,9 +544,7 @@ exports.getAllShipments = async (req, res) => {
   } catch (error) {
     logger.error('Error fetching shipments:', error);
 
-    // Provide more specific error messages based on the error type
     let errorMessage = 'Failed to fetch shipments';
-
     if (error.name === 'MongoNetworkError') {
       errorMessage = 'Network error connecting to database. Please try again later.';
     } else if (error.name === 'MongoServerError') {
