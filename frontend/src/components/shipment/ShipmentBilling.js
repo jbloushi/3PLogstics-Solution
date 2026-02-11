@@ -2,8 +2,16 @@ import React from 'react';
 import {
     Box, Typography, Grid, Paper, FormControl,
     InputLabel, Select, MenuItem, TextField, FormControlLabel,
-    Switch, Divider, Alert
+    Switch, Alert, Checkbox, List, ListItem, ListItemText, ListItemIcon, Divider
 } from '@mui/material';
+
+const LIMITS = {
+    invoiceRemarks: 120,
+    signatureName: 35,
+    signatureTitle: 35,
+    packageMarks: 70,
+    shipperAccount: 12
+};
 
 const ShipmentBilling = ({
     exportReason, setExportReason,
@@ -11,14 +19,27 @@ const ShipmentBilling = ({
     incoterm, setIncoterm,
     gstPaid, setGstPaid,
     payerOfVat, setPayerOfVat,
-    shipperAccount, setShipperAccount, // New Field
-    labelFormat, setLabelFormat, // New Field
-    signatureName, setSignatureName, // New Field
-    signatureTitle, setSignatureTitle, // New Field
+    shipperAccount, setShipperAccount,
+    labelFormat, setLabelFormat,
+    signatureName, setSignatureName,
+    signatureTitle, setSignatureTitle,
     palletCount, setPalletCount,
     packageMarks, setPackageMarks,
+    availableOptionalServices = [],
+    selectedOptionalServiceCodes = [],
+    onToggleOptionalService,
+    estimatedShipmentCost = 0,
+    optionalServicesTotal = 0,
+    estimatedShipmentTotal = 0,
     errors
 }) => {
+    const warnings = [];
+    if (invoiceRemarks.length > LIMITS.invoiceRemarks) warnings.push(`Invoice Remarks exceeds ${LIMITS.invoiceRemarks} characters.`);
+    if (packageMarks.length > LIMITS.packageMarks) warnings.push(`Package Marks exceeds ${LIMITS.packageMarks} characters.`);
+    if (signatureName.length > LIMITS.signatureName) warnings.push(`Signature Name exceeds ${LIMITS.signatureName} characters.`);
+    if (signatureTitle.length > LIMITS.signatureTitle) warnings.push(`Signature Title exceeds ${LIMITS.signatureTitle} characters.`);
+    if (shipperAccount.length > LIMITS.shipperAccount) warnings.push(`Shipper Account exceeds ${LIMITS.shipperAccount} characters.`);
+
     return (
         <Box>
             {/* 1. Commercial Invoice Data */}
@@ -47,8 +68,10 @@ const ShipmentBilling = ({
                             fullWidth size="small"
                             label="Invoice Remarks"
                             value={invoiceRemarks}
-                            onChange={(e) => setInvoiceRemarks(e.target.value)}
+                            onChange={(e) => setInvoiceRemarks(e.target.value.slice(0, LIMITS.invoiceRemarks + 20))}
                             placeholder="Visible on Commercial Invoice"
+                            error={invoiceRemarks.length > LIMITS.invoiceRemarks}
+                            helperText={`${invoiceRemarks.length}/${LIMITS.invoiceRemarks}`}
                         />
                     </Grid>
                     <Grid item xs={12} md={6}>
@@ -56,8 +79,10 @@ const ShipmentBilling = ({
                             fullWidth size="small"
                             label="Signature Name"
                             value={signatureName}
-                            onChange={(e) => setSignatureName(e.target.value)}
+                            onChange={(e) => setSignatureName(e.target.value.slice(0, LIMITS.signatureName + 20))}
                             placeholder="Name for Invoice Signature"
+                            error={signatureName.length > LIMITS.signatureName}
+                            helperText={`${signatureName.length}/${LIMITS.signatureName}`}
                         />
                     </Grid>
                     <Grid item xs={12} md={6}>
@@ -65,8 +90,10 @@ const ShipmentBilling = ({
                             fullWidth size="small"
                             label="Signature Title"
                             value={signatureTitle}
-                            onChange={(e) => setSignatureTitle(e.target.value)}
+                            onChange={(e) => setSignatureTitle(e.target.value.slice(0, LIMITS.signatureTitle + 20))}
                             placeholder="e.g. Logistics Manager"
+                            error={signatureTitle.length > LIMITS.signatureTitle}
+                            helperText={`${signatureTitle.length}/${LIMITS.signatureTitle}`}
                         />
                     </Grid>
                 </Grid>
@@ -109,9 +136,10 @@ const ShipmentBilling = ({
                             fullWidth size="small"
                             label="Shipper Account Number (Optional)"
                             value={shipperAccount}
-                            onChange={(e) => setShipperAccount(e.target.value)}
+                            onChange={(e) => setShipperAccount(e.target.value.slice(0, LIMITS.shipperAccount + 8))}
                             placeholder="Overwrite default account if needed"
-                            helperText="Leave blank to use system default"
+                            helperText={`Leave blank to use system default (${shipperAccount.length}/${LIMITS.shipperAccount})`}
+                            error={shipperAccount.length > LIMITS.shipperAccount}
                         />
                     </Grid>
                     <Grid item xs={12} md={6} display="flex" alignItems="center">
@@ -123,9 +151,52 @@ const ShipmentBilling = ({
                 </Grid>
             </Paper>
 
-            {/* 3. Output Configuration */}
+            {/* 3. Optional Services (before review) */}
             <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
-                <Typography variant="h6" fontWeight="bold" gutterBottom>3. Output & Operations</Typography>
+                <Typography variant="h6" fontWeight="bold" gutterBottom>3. Optional Services & Cost Estimate</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    Select optional services now so your estimated total is finalized before review.
+                </Typography>
+
+                {availableOptionalServices.length > 0 ? (
+                    <List dense disablePadding>
+                        {availableOptionalServices.map((service) => {
+                            const checked = selectedOptionalServiceCodes.includes(service.serviceCode);
+                            return (
+                                <ListItem
+                                    key={service.serviceCode}
+                                    sx={{ border: '1px solid', borderColor: checked ? 'primary.main' : 'divider', borderRadius: 1, mb: 1 }}
+                                    onClick={() => onToggleOptionalService?.(service.serviceCode)}
+                                >
+                                    <ListItemIcon sx={{ minWidth: 34 }}>
+                                        <Checkbox checked={checked} />
+                                    </ListItemIcon>
+                                    <ListItemText
+                                        primary={service.serviceName}
+                                        secondary={`Code: ${service.serviceCode} · ${Number(service.totalPrice || 0).toFixed(3)} KD`}
+                                    />
+                                </ListItem>
+                            );
+                        })}
+                    </List>
+                ) : (
+                    <Alert severity="info">No optional services available for the selected carrier service.</Alert>
+                )}
+
+                <Divider sx={{ my: 2 }} />
+                <Grid container spacing={1}>
+                    <Grid item xs={12} md={4}><Typography variant="body2">Estimated Shipment Cost:</Typography></Grid>
+                    <Grid item xs={12} md={8}><Typography variant="body2" fontWeight="bold">{Number(estimatedShipmentCost).toFixed(3)} KD</Typography></Grid>
+                    <Grid item xs={12} md={4}><Typography variant="body2">Optional Services:</Typography></Grid>
+                    <Grid item xs={12} md={8}><Typography variant="body2" fontWeight="bold">{Number(optionalServicesTotal).toFixed(3)} KD</Typography></Grid>
+                    <Grid item xs={12} md={4}><Typography variant="body2">Estimated Shipment Total:</Typography></Grid>
+                    <Grid item xs={12} md={8}><Typography variant="body2" color="primary" fontWeight="bold">{Number(estimatedShipmentTotal).toFixed(3)} KD</Typography></Grid>
+                </Grid>
+            </Paper>
+
+            {/* 4. Output Configuration */}
+            <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
+                <Typography variant="h6" fontWeight="bold" gutterBottom>4. Output & Operations</Typography>
                 <Grid container spacing={3}>
                     <Grid item xs={12} md={4}>
                         <FormControl fullWidth size="small">
@@ -149,15 +220,26 @@ const ShipmentBilling = ({
                     <Grid item xs={12} md={4}>
                         <TextField
                             fullWidth size="small" label="Package Marks"
-                            value={packageMarks} onChange={(e) => setPackageMarks(e.target.value)}
+                            value={packageMarks} onChange={(e) => setPackageMarks(e.target.value.slice(0, LIMITS.packageMarks + 40))}
                             placeholder="e.g. Fragile / Up"
+                            error={packageMarks.length > LIMITS.packageMarks}
+                            helperText={`${packageMarks.length}/${LIMITS.packageMarks}`}
                         />
                     </Grid>
                 </Grid>
             </Paper>
 
+            {warnings.length > 0 && (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                    <Typography variant="subtitle2" fontWeight="bold">Carrier formatting warnings</Typography>
+                    {warnings.map((warning) => (
+                        <Typography key={warning} variant="body2">• {warning}</Typography>
+                    ))}
+                </Alert>
+            )}
+
             <Alert severity="info">
-                Please verify all billing details. Incorrect Incoterms may result in refused shipments or unexpected charges for the receiver.
+                Please verify all billing details. Incorrect Incoterms or invalid field lengths can result in carrier rejection.
             </Alert>
         </Box>
     );

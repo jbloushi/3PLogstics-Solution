@@ -87,6 +87,14 @@ const darkFormTheme = createTheme({
 const VOLUME_FACTOR = 5000;
 const STEPS = ['Setup', 'Content', 'Billing', 'Review', 'Success'];
 const IS_DEV = process.env.NODE_ENV === 'development' || process.env.REACT_APP_VITE_DEV_TOOLS === 'true';
+const HS_CODE_REGEX = /^\d{4}(\.\d{2}(\.\d{2})?)?$/;
+const ISO_COUNTRY_REGEX = /^[A-Z]{2}$/;
+const FIELD_LIMITS = {
+    invoiceRemarks: 120,
+    packageMarks: 70,
+    properShippingName: 70,
+    dgMarksInstructions: 200
+};
 
 // --- Integrated Autofill Scenarios ---
 // --- Integrated Autofill Scenarios ---
@@ -425,6 +433,12 @@ const ShipmentWizardV2 = () => {
     const [packageMarks, setPackageMarks] = useState('');
 
     useEffect(() => {
+        if (dangerousGoods.contains && !dangerousGoods.customDescription) {
+            setDangerousGoods(prev => ({ ...prev, customDescription: 'DANGEROUS GOODS AS PER ASSOCIATED DGD' }));
+        }
+    }, [dangerousGoods.contains, dangerousGoods.customDescription]);
+
+    useEffect(() => {
         const loadFinance = async () => {
             if (!user?.organization) return;
             try {
@@ -629,8 +643,8 @@ const ShipmentWizardV2 = () => {
 
     // --- Dynamic Quote Fetching ---
     React.useEffect(() => {
-        if (activeStep === 3) {
-            // Fetch quote when entering Review step
+        if (activeStep >= 2) {
+            // Fetch quote from Billing step onward so optional services can be selected before Review
             const fetchQuote = async () => {
                 setLoading(true);
                 try {
@@ -652,6 +666,12 @@ const ShipmentWizardV2 = () => {
                             rawPrice: quote.rawPrice,
                             currency: quote.currency,
                             deliveryDate: quote.deliveryDate
+                        });
+                        const freshOptionalServices = quote.optionalServices || [];
+                        setAvailableOptionalServices(freshOptionalServices);
+                        setSelectedOptionalServiceCodes((prev) => {
+                            const availableCodes = new Set(freshOptionalServices.map((service) => service.serviceCode));
+                            return prev.filter((code) => availableCodes.has(code));
                         });
                         setAvailableOptionalServices(quote.optionalServices || []);
                         setSelectedOptionalServiceCodes([]);
@@ -918,7 +938,18 @@ const ShipmentWizardV2 = () => {
                     if (!item.weight || item.weight <= 0) newErrors[`item${i}wgt`] = 'Weight required';
                     if (!item.hsCode) newErrors[`item${i}hs`] = 'HS Code required';
                     if (!item.countryOfOrigin) newErrors[`item${i}origin`] = 'Origin required';
+                    if (item.hsCode && !HS_CODE_REGEX.test(item.hsCode)) newErrors[`item${i}hs`] = 'HS code format invalid';
+                    if (item.countryOfOrigin && !ISO_COUNTRY_REGEX.test(String(item.countryOfOrigin).toUpperCase())) newErrors[`item${i}origin`] = 'Origin must be ISO-2 code (e.g. KW)';
                 });
+
+                if (dangerousGoods.contains) {
+                    if ((dangerousGoods.properShippingName || '').length > FIELD_LIMITS.properShippingName) {
+                        newErrors.dgProperName = `DG proper shipping name max ${FIELD_LIMITS.properShippingName} chars`;
+                    }
+                    if ((dangerousGoods.customDescription || '').length > FIELD_LIMITS.dgMarksInstructions) {
+                        newErrors.dgMarks = `DG marks/instructions max ${FIELD_LIMITS.dgMarksInstructions} chars`;
+                    }
+                }
 
                 // Validate Currency Consistency
                 const currencies = new Set(items.map(i => i.currency || 'USD'));
@@ -934,6 +965,8 @@ const ShipmentWizardV2 = () => {
             // Billing & Docs Validation
             if (!incoterm) newErrors.incoterm = 'Incoterm required';
             if (!exportReason) newErrors.exportReason = 'Reason for Export required';
+            if ((invoiceRemarks || '').length > FIELD_LIMITS.invoiceRemarks) newErrors.invoiceRemarks = `Invoice remarks max ${FIELD_LIMITS.invoiceRemarks} chars`;
+            if ((packageMarks || '').length > FIELD_LIMITS.packageMarks) newErrors.packageMarks = `Package marks max ${FIELD_LIMITS.packageMarks} chars`;
             // if (!invoiceRemarks && shipmentType !== 'documents') newErrors.invoiceRemarks = 'Remarks recommended'; 
         }
 
@@ -1135,6 +1168,12 @@ const ShipmentWizardV2 = () => {
             signatureTitle={signatureTitle} setSignatureTitle={setSignatureTitle}
             palletCount={palletCount} setPalletCount={setPalletCount}
             packageMarks={packageMarks} setPackageMarks={setPackageMarks}
+            availableOptionalServices={availableOptionalServices}
+            selectedOptionalServiceCodes={selectedOptionalServiceCodes}
+            onToggleOptionalService={toggleOptionalService}
+            estimatedShipmentCost={estimatedShipmentCost}
+            optionalServicesTotal={optionalServicesTotal}
+            estimatedShipmentTotal={estimatedShipmentTotal}
             errors={errors}
         />
     );
@@ -1519,15 +1558,23 @@ const ShipmentWizardV2 = () => {
                             {activeStep === 2 && (
                                 <Box>
                                     <ShipmentBilling
-                                        sender={sender} receiver={receiver}
-                                        totals={totals}
-                                        incoterm={incoterm} setIncoterm={setIncoterm}
                                         exportReason={exportReason} setExportReason={setExportReason}
                                         invoiceRemarks={invoiceRemarks} setInvoiceRemarks={setInvoiceRemarks}
+                                        incoterm={incoterm} setIncoterm={setIncoterm}
                                         gstPaid={gstPaid} setGstPaid={setGstPaid}
                                         payerOfVat={payerOfVat} setPayerOfVat={setPayerOfVat}
                                         shipperAccount={shipperAccount} setShipperAccount={setShipperAccount}
+                                        labelFormat={labelFormat} setLabelFormat={setLabelFormat}
+                                        signatureName={signatureName} setSignatureName={setSignatureName}
+                                        signatureTitle={signatureTitle} setSignatureTitle={setSignatureTitle}
+                                        palletCount={palletCount} setPalletCount={setPalletCount}
                                         packageMarks={packageMarks} setPackageMarks={setPackageMarks}
+                                        availableOptionalServices={availableOptionalServices}
+                                        selectedOptionalServiceCodes={selectedOptionalServiceCodes}
+                                        onToggleOptionalService={toggleOptionalService}
+                                        estimatedShipmentCost={estimatedShipmentCost}
+                                        optionalServicesTotal={optionalServicesTotal}
+                                        estimatedShipmentTotal={estimatedShipmentTotal}
                                         errors={errors}
                                     />
                                 </Box>
