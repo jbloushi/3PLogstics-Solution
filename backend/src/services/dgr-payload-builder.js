@@ -318,10 +318,12 @@ const buildDangerousGoodsValueAddedServices = (dg) => {
         : dg.code;
 
     // Strict DG Item construction - ONLY allowed fields
+    const DG_CUSTOM_DESCRIPTION_MAX_LENGTH = 200;
+
     const dgItem = {
         contentId: dg.contentId,
         unCode: unCode, // e.g. UN1266
-        customDescription: (dg.customDescription || dg.properShippingName || 'Dangerous Goods').substring(0, 70)
+        customDescription: (dg.customDescription || dg.properShippingName || 'Dangerous Goods').substring(0, DG_CUSTOM_DESCRIPTION_MAX_LENGTH)
     };
 
     const vas = {
