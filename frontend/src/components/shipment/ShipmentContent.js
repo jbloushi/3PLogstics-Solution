@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
 import {
     Box, Typography, Button, Grid, Paper, FormControl,
-    InputLabel, Select, MenuItem, Divider, IconButton,
-    Tooltip, Alert, TextField
+    InputLabel, Select, MenuItem, IconButton,
+    Alert, TextField
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ParcelCard from './ParcelCard';
 import DangerousGoodsPanel from './DangerousGoodsPanel';
+
+const HS_CODE_REGEX = /^\d{4}(\.\d{2}(\.\d{2})?)?$/;
+const ISO_COUNTRY_REGEX = /^[A-Z]{2}$/;
+const DEFAULT_PACKAGING_OPTIONS = [
+    { value: 'user', label: 'My Own Packaging' },
+    { value: 'CP', label: 'Custom Packaging' },
+    { value: 'EE', label: 'DGR Express Envelope' },
+    { value: 'OD', label: 'Other DGR Packaging' }
+];
 
 const ShipmentContent = ({
     parcels, setParcels,
@@ -15,7 +24,9 @@ const ShipmentContent = ({
     dangerousGoods, setDangerousGoods,
     packagingType, setPackagingType,
     shipmentType,
-    errors
+    errors,
+    showDangerousGoods = true,
+    packagingOptions
 }) => {
     const [expandedParcel, setExpandedParcel] = useState(0);
 
@@ -33,7 +44,15 @@ const ShipmentContent = ({
 
     const updateItem = (index, field, val) => {
         const newItems = [...items];
-        newItems[index][field] = val;
+        if (field === 'hsCode') {
+            newItems[index][field] = String(val).replace(/[^0-9.]/g, '').slice(0, 10);
+        } else if (field === 'countryOfOrigin') {
+            newItems[index][field] = String(val).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2);
+        } else if (field === 'description') {
+            newItems[index][field] = String(val).slice(0, 70);
+        } else {
+            newItems[index][field] = val;
+        }
         setItems(newItems);
     };
 
@@ -43,13 +62,23 @@ const ShipmentContent = ({
         }
     };
 
+    const itemWarnings = items.flatMap((item, index) => {
+        const warns = [];
+        if (item.hsCode && !HS_CODE_REGEX.test(item.hsCode)) warns.push(`Item ${index + 1}: HS Code format looks invalid.`);
+        if (item.countryOfOrigin && !ISO_COUNTRY_REGEX.test(item.countryOfOrigin)) warns.push(`Item ${index + 1}: Origin must be 2-letter ISO code.`);
+        if ((item.description || '').length > 70) warns.push(`Item ${index + 1}: Description exceeds 70 characters.`);
+        return warns;
+    });
+
     return (
         <Box>
             {/* Dangerous Goods Section (Conditional Panel) */}
-            <DangerousGoodsPanel
-                dangerousGoods={dangerousGoods}
-                setDangerousGoods={setDangerousGoods}
-            />
+            {showDangerousGoods && (
+                <DangerousGoodsPanel
+                    dangerousGoods={dangerousGoods}
+                    setDangerousGoods={setDangerousGoods}
+                />
+            )}
 
             <Paper sx={{ p: 3, mb: 3, mt: 2 }} variant="outlined">
                 <Typography variant="h6" fontWeight="bold" gutterBottom>1. Physical Packages</Typography>
@@ -61,11 +90,10 @@ const ShipmentContent = ({
                             value={packagingType || 'user'}
                             label="Packaging Type"
                             onChange={(e) => setPackagingType(e.target.value)}
-                        >
-                            <MenuItem value="user">My Own Packaging</MenuItem>
-                            <MenuItem value="CP">Custom Packaging</MenuItem>
-                            <MenuItem value="EE">DGR Express Envelope</MenuItem>
-                            <MenuItem value="OD">Other DGR Packaging</MenuItem>
+>
+                            {(packagingOptions || DEFAULT_PACKAGING_OPTIONS).map((option) => (
+                                <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                            ))}
                         </Select>
                     </FormControl>
                 </Box>
@@ -100,8 +128,16 @@ const ShipmentContent = ({
                 <Paper sx={{ p: 3, mb: 3 }} variant="outlined">
                     <Typography variant="h6" fontWeight="bold" gutterBottom>2. Customs Declaration (Items)</Typography>
                     <Alert severity="info" sx={{ mb: 2 }}>
-                        List the internal contents of your packages for Customs. The total value must match your commercial invoice.
+                        List package contents for customs. HS Code format: 1234 or 1234.56 or 1234.56.78. Origin must be ISO-2 (e.g. KW, US).
                     </Alert>
+
+                    {itemWarnings.length > 0 && (
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            {itemWarnings.map((warning) => (
+                                <Typography key={warning} variant="body2">• {warning}</Typography>
+                            ))}
+                        </Alert>
+                    )}
 
                     {items.map((item, index) => (
                         <Paper key={index} sx={{ p: 2, mb: 2, border: '1px solid #e0e0e0', bgcolor: 'background.paper', color: 'text.primary' }}>
@@ -114,7 +150,8 @@ const ShipmentContent = ({
                                     <TextField
                                         fullWidth label="Description" value={item.description}
                                         onChange={(e) => updateItem(index, 'description', e.target.value)}
-                                        error={!!errors[`item${index}desc`]}
+                                        error={!!errors[`item${index}desc`] || (item.description || '').length > 70}
+                                        helperText={`${(item.description || '').length}/70`}
                                     />
                                 </Grid>
                                 <Grid item xs={6} md={2}>
@@ -155,15 +192,18 @@ const ShipmentContent = ({
                                     <TextField
                                         fullWidth label="HS Code" value={item.hsCode}
                                         onChange={(e) => updateItem(index, 'hsCode', e.target.value)}
-                                        error={!!errors[`item${index}hs`]}
+                                        error={!!errors[`item${index}hs`] || (!!item.hsCode && !HS_CODE_REGEX.test(item.hsCode))}
                                         placeholder="e.g. 3303.00.00"
+                                        helperText="4, 6, or 8 digits (with dots optional)"
                                     />
                                 </Grid>
                                 <Grid item xs={6} md={3}>
                                     <TextField
                                         fullWidth label="Origin" value={item.countryOfOrigin}
                                         onChange={(e) => updateItem(index, 'countryOfOrigin', e.target.value)}
+                                        error={!!errors[`item${index}origin`] || (!!item.countryOfOrigin && !ISO_COUNTRY_REGEX.test(item.countryOfOrigin))}
                                         placeholder="KW"
+                                        helperText="2-letter ISO country code"
                                     />
                                 </Grid>
                             </Grid>
