@@ -136,6 +136,7 @@ function validateShipmentForDgr(order) {
  * @returns {string}
  */
 function composeItemDescription(item, dangerousGoods) {
+    const ITEM_DESCRIPTION_MAX_LENGTH = 250;
     let desc = item.description || 'Item';
 
     if (dangerousGoods && dangerousGoods.contains) {
@@ -145,14 +146,15 @@ function composeItemDescription(item, dangerousGoods) {
         } else if (unCode === '3481') {
             desc += ', Device with lithium-ion battery contained in equipment (UN3481)';
         } else if (unCode === '8000') {
-            desc += ', Consumer commodity (ID8000)';
+            // Intentionally do not force a hardcoded carrier phrase for ID8000.
+            // The item description should stay user-provided.
         } else if (unCode === '1845') {
             desc += `, Packed with Dry Ice UN1845, ${dangerousGoods.dryIceWeight || 0}kg`;
         }
     }
 
     // Sanitize
-    return desc.replace(/[\r\n]+/g, ' ').substring(0, 75); // DGR often has line limits
+    return desc.replace(/[\r\n]+/g, ' ').substring(0, ITEM_DESCRIPTION_MAX_LENGTH);
 }
 
 /**
@@ -473,7 +475,7 @@ function buildDgrShipmentPayload(order, config = {}) {
                 customerReferences: [
                     { value: order.reference || order.sender?.reference || p.reference || `PKG-${i + 1}`, typeCode: 'CU' }
                 ],
-                description: `${p.description || 'Box'}${order.packageMarks ? ' - ' + order.packageMarks : ''}`.substring(0, 70)
+                description: `${p.description || 'Box'}${order.packageMarks ? ' - ' + order.packageMarks : ''}`.substring(0, 250)
                 // NO dangerousGoods here.
             })),
             isCustomsDeclarable: true, // Always true for our goods flow
