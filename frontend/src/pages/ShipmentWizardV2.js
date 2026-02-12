@@ -687,42 +687,51 @@ const ShipmentWizardV2 = () => {
 
     // --- Dynamic Quote Fetching ---
     React.useEffect(() => {
-        if (activeStep >= 2) {
-            // Fetch quote from Billing step onward so optional services can be selected before Review
-            const fetchQuote = async () => {
-                setLoading(true);
-                try {
-                    const payload = {
-                        sender, receiver, parcels, items,
-                        carrierCode: selectedCarrier,
-                        userId: selectedClient || user?._id // Use selected client ID for markup!
-                    };
-                    const response = await shipmentService.getQuotes(payload);
-                    if (response.success && response.data && response.data.length > 0) {
-                        // For now, auto-select the standard service (closest to logic) or P
-                        const quote = response.data.find(q => q.serviceCode === 'P') || response.data[0];
-                        setSelectedService({
-                            serviceName: quote.serviceName,
-                            serviceCode: quote.serviceCode,
-                            totalPrice: quote.totalPrice, // Estimated shipment cost (carrier + markup)
-                            basePrice: quote.basePrice,   // Admin view
-                            markupLabel: quote.markupLabel,
-                            rawPrice: quote.rawPrice,
-                            currency: quote.currency,
-                            deliveryDate: quote.deliveryDate
-                        });
-                        setAvailableOptionalServices(quote.optionalServices || []);
-                        setSelectedOptionalServiceCodes([]);
-                    }
-                } catch (err) {
-                    console.error('Quote fetch error', err);
-                    enqueueSnackbar('Failed to calculate latest rates', { variant: 'warning' });
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchQuote();
+        if (activeStep < 2) return undefined;
+
+        const hasBasicAddress = (address) => Boolean(
+            address?.city && address?.countryCode && address?.postalCode
+        );
+        const hasParcelData = Array.isArray(parcels) && parcels.length > 0;
+
+        if (!hasBasicAddress(sender) || !hasBasicAddress(receiver) || !hasParcelData) {
+            return undefined;
         }
+
+        // Debounce quote requests so typing does not trigger API calls on every keystroke.
+        const timer = setTimeout(async () => {
+            setLoading(true);
+            try {
+                const payload = {
+                    sender, receiver, parcels, items,
+                    carrierCode: selectedCarrier,
+                    userId: selectedClient || user?._id // Use selected client ID for markup!
+                };
+                const response = await shipmentService.getQuotes(payload);
+                if (response.success && response.data && response.data.length > 0) {
+                    const quote = response.data.find(q => q.serviceCode === 'P') || response.data[0];
+                    setSelectedService({
+                        serviceName: quote.serviceName,
+                        serviceCode: quote.serviceCode,
+                        totalPrice: quote.totalPrice,
+                        basePrice: quote.basePrice,
+                        markupLabel: quote.markupLabel,
+                        rawPrice: quote.rawPrice,
+                        currency: quote.currency,
+                        deliveryDate: quote.deliveryDate
+                    });
+                    setAvailableOptionalServices(quote.optionalServices || []);
+                    setSelectedOptionalServiceCodes([]);
+                }
+            } catch (err) {
+                console.error('Quote fetch error', err);
+                enqueueSnackbar('Failed to calculate latest rates', { variant: 'warning' });
+            } finally {
+                setLoading(false);
+            }
+        }, 600);
+
+        return () => clearTimeout(timer);
     }, [activeStep, sender, receiver, parcels, items, selectedCarrier, selectedClient, user, enqueueSnackbar]);
 
 
