@@ -183,50 +183,16 @@ class DgrAdapter extends CarrierAdapter {
     }
 
     extractOptionalServices(product, fallbackCurrency) {
-        const candidateLists = [
-            product?.valueAddedServices,
-            product?.productAndServices?.valueAddedServices,
-            product?.outputValueAddedServices,
-            product?.additionalServices
-        ].filter(Array.isArray);
+        const valueAddedServices = Array.isArray(product.valueAddedServices) ? product.valueAddedServices : [];
 
-        const flattened = candidateLists.flat();
-
-        const normalized = flattened
-            .map((service) => {
-                const code = service?.serviceCode || service?.localServiceCode || service?.typeCode || service?.code;
-                if (!code) return null;
-
-                const rawPrice =
-                    service?.price?.amount ??
-                    service?.price?.value ??
-                    service?.price ??
-                    service?.totalPrice?.[0]?.price ??
-                    service?.totalPrice ??
-                    0;
-
-                const currency =
-                    service?.price?.currency ||
-                    service?.price?.currencyType ||
-                    service?.totalPrice?.[0]?.currencyType ||
-                    fallbackCurrency;
-
-                return {
-                    serviceCode: String(code).toUpperCase(),
-                    serviceName: service?.localServiceName || service?.serviceName || service?.name || String(code).toUpperCase(),
-                    totalPrice: Number(Number(rawPrice || 0).toFixed(3)),
-                    currency
-                };
-            })
-            .filter(Boolean);
-
-        // Deduplicate by service code while keeping the first occurrence.
-        const seen = new Set();
-        return normalized.filter((service) => {
-            if (seen.has(service.serviceCode)) return false;
-            seen.add(service.serviceCode);
-            return true;
-        });
+        return valueAddedServices
+            .filter((service) => service.serviceCode)
+            .map((service) => ({
+                serviceCode: service.serviceCode,
+                serviceName: service.localServiceName || service.serviceName || service.serviceCode,
+                totalPrice: Number(Number(service?.price?.amount || service?.price || 0).toFixed(3)),
+                currency: service?.price?.currency || fallbackCurrency
+            }));
     }
 
     /**
