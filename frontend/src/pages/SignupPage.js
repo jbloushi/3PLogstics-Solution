@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
-import { Button, Input, Select, Alert } from '../ui';
+import { Button, Input, Alert } from '../ui';
 
 // --- Styled Components ---
 
@@ -74,8 +74,7 @@ const SignupPage = () => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        password: '',
-        role: 'client'
+        password: ''
     });
     const { signup, loading, error, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -105,7 +104,7 @@ const SignupPage = () => {
         <FullPageGradient>
             <SignupCard>
                 <Title>Join 3PLogistics</Title>
-                <Subtitle>Create your account to start managing shipments</Subtitle>
+                <Subtitle>Create your organization agent account to start managing shipments</Subtitle>
 
                 {error && (
                     <div style={{ width: '100%', marginBottom: '24px' }}>
@@ -131,17 +130,6 @@ const SignupPage = () => {
                         placeholder="name@company.com"
                         required
                     />
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                        <Select
-                            label="Account Type"
-                            value={formData.role}
-                            onChange={(e) => handleChange('role', e.target.value)}
-                        >
-                            <option value="client">Client (Sender/Receiver)</option>
-                            <option value="staff">Staff (Logistics Team)</option>
-                        </Select>
-                    </div>
 
                     <Input
                         label="Password"

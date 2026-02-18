@@ -52,7 +52,7 @@ exports.createRequest = async (req, res) => {
 exports.getAllRequests = async (req, res) => {
     try {
         let query = {};
-        if (req.user.role === 'client') {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role)) {
             query.client = req.user._id;
         }
 
@@ -80,7 +80,7 @@ exports.getRequest = async (req, res) => {
         }
 
         // Access Control
-        if (req.user.role === 'client' && request.client._id.toString() !== req.user._id.toString()) {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role) && request.client._id.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
@@ -100,7 +100,7 @@ exports.updateRequest = async (req, res) => {
         }
 
         // Access Control
-        if (req.user.role === 'client' && request.client.toString() !== req.user._id.toString()) {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role) && request.client.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
@@ -242,7 +242,7 @@ exports.deleteRequest = async (req, res) => {
         }
 
         // Access Control
-        if (req.user.role === 'client' && request.client.toString() !== req.user._id.toString()) {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role) && request.client.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
