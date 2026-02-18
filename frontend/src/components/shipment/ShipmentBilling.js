@@ -180,7 +180,9 @@ const ShipmentBilling = ({
                         })}
                     </List>
                 ) : (
-                    <Alert severity="info">No optional services available for the selected carrier service.</Alert>
+                    <Alert severity="info">
+                        No optional services were returned at quote stage for this route/service. Final optional services are fetched again at approval/booking from carrier.
+                    </Alert>
                 )}
 
                 <Divider sx={{ my: 2 }} />

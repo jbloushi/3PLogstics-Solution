@@ -117,6 +117,8 @@ const SignupPage = () => {
                 <Form onSubmit={handleSubmit}>
                     <Input
                         label="Full Name"
+                        name="name"
+                        autoComplete="name"
                         value={formData.name}
                         onChange={(e) => handleChange('name', e.target.value)}
                         placeholder="John Doe"
@@ -124,6 +126,8 @@ const SignupPage = () => {
                     />
                     <Input
                         label="Email Address"
+                        name="email"
+                        autoComplete="email"
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleChange('email', e.target.value)}
@@ -133,6 +137,8 @@ const SignupPage = () => {
 
                     <Input
                         label="Password"
+                        name="new-password"
+                        autoComplete="new-password"
                         type="password"
                         value={formData.password}
                         onChange={(e) => handleChange('password', e.target.value)}

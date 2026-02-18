@@ -177,6 +177,9 @@ const LoginPage = () => {
                 <Form onSubmit={handleSubmit}>
                     <Input
                         label="Email Address"
+                        type="email"
+                        name="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="name@company.com"
@@ -185,6 +188,8 @@ const LoginPage = () => {
                     />
                     <Input
                         label="Password"
+                        name="password"
+                        autoComplete="current-password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
