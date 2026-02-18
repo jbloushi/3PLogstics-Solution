@@ -400,17 +400,24 @@ exports.bookWithCarrier = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Shipment not found' });
     }
 
+    // Role/ownership guard
+    const isPrivileged = ['admin', 'staff', 'manager'].includes(req.user.role);
+    const isOwner = shipment.user?.toString() === req.user._id.toString();
+    if (!isPrivileged && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Permission denied' });
+    }
+
     // Call Booking Service
     const result = await ShipmentBookingService.bookShipment(trackingNumber, carrierCode);
 
     res.status(200).json({
       success: true,
       data: result,
-      message: `Shipment successfully booked with ${result.carrierCode}`
+      message: `Shipment successfully booked with ${carrierCode || shipment.carrierCode || shipment.carrier || 'DGR'}`
     });
   } catch (error) {
     logger.error('Error booking shipment:', error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       error: error.message
     });

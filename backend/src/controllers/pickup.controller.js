@@ -1,5 +1,6 @@
 const PickupRequest = require('../models/pickupRequest.model');
 const Shipment = require('../models/shipment.model');
+const User = require('../models/user.model');
 
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
@@ -126,6 +127,8 @@ const processApproval = async (requestId, approverId) => {
     if (!request) throw new Error('Request not found');
     if (request.status === 'APPROVED') return { request, shipment: await Shipment.findById(request.shipment) };
 
+    const clientUser = await User.findById(request.client).populate('organization');
+
     // 1. Prepare Shipment Data
     const shipmentItems = request.parcels.map(p => ({
         description: p.description,
@@ -153,6 +156,8 @@ const processApproval = async (requestId, approverId) => {
         estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
         items: shipmentItems,
         user: request.client,
+        organization: clientUser?.organization?._id || null,
+        serviceCode: request.serviceCode || 'P',
         pickupRequest: request._id,
         history: [{
             location: request.sender,
