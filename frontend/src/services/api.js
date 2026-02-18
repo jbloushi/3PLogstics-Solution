@@ -1,7 +1,20 @@
 import axios from 'axios';
 
 // Use environment variable if available, otherwise use a relative URL that works in both development and production
-const API_URL = process.env.REACT_APP_API_URL || '/api';
+const normalizeApiUrl = (raw) => {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+
+  if (!trimmed || trimmed === '/' || trimmed === './') return '/api';
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/\/+$/, '');
+  }
+
+  const normalized = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return normalized.replace(/\/+$/, '');
+};
+
+const API_URL = normalizeApiUrl(process.env.REACT_APP_API_URL);
 
 const api = axios.create({
   baseURL: API_URL,
@@ -25,7 +38,15 @@ api.interceptors.request.use(
 // Add response interceptor for better error handling
 api.interceptors.response.use(
   response => {
-    // For successful responses, return the response directly
+    // Guardrail: API endpoints should not return HTML documents.
+    const contentType = String(response?.headers?.['content-type'] || '').toLowerCase();
+    if (contentType.includes('text/html')) {
+      const requestUrl = `${response?.config?.baseURL || ''}${response?.config?.url || ''}`;
+      const routingError = new Error(`API returned HTML instead of JSON for ${requestUrl}. Check REACT_APP_API_URL and reverse-proxy /api routing.`);
+      routingError.code = 'API_HTML_RESPONSE';
+      throw routingError;
+    }
+
     return response;
   },
   error => {

@@ -29,15 +29,23 @@ const createSendToken = (user, statusCode, res) => {
 
 exports.signup = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, email, password, role: requestedRole } = req.body;
+
+        // SECURITY: Public signup is restricted to customer accounts only.
+        if (requestedRole && requestedRole !== 'client') {
+            return res.status(403).json({ success: false, error: 'Only organization agent accounts can be self-registered' });
+        }
+
+        const role = 'client';
+
         const newUser = await User.create({
             name,
             email: email.toLowerCase(),
             password,
-            role: role || 'client',
+            role,
             markup: {
                 type: 'PERCENTAGE',
-                percentageValue: role === 'client' ? 15 : 0,
+                percentageValue: 15,
                 flatValue: 0
             }
         });
@@ -144,7 +152,15 @@ exports.protect = async (req, res, next) => {
 
 exports.generateApiKey = async (req, res) => {
     try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, error: 'Only admins can generate API keys' });
+        }
+
         const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
         const key = user.generateApiKey();
         await user.save();
 

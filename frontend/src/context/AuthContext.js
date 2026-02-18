@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }) => {
             logout,
             refreshUser: loadUser,
             isAuthenticated: !!user,
-            isStaff: user?.role === 'staff' || user?.role === 'admin'
+            isStaff: ['staff', 'admin', 'manager', 'accounting'].includes(user?.role)
         }}>
             {children}
         </AuthContext.Provider>
