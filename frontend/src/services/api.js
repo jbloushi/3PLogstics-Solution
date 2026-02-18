@@ -250,10 +250,20 @@ export const shipmentService = {
     }
   },
 
-  // Submit to DGR (Generic Carrier Booking)
-  submitToDgr: async (trackingNumber, carrierCode = 'DGR') => {
+  getBookingOptions: async (trackingNumber, carrierCode = 'DGR') => {
     try {
-      const response = await api.post(`shipments/${trackingNumber}/book`, { carrierCode });
+      const response = await api.get(`shipments/${trackingNumber}/booking-options`, { params: { carrierCode } });
+      return response.data;
+    } catch (error) {
+      console.error(`Error fetching booking options for shipment ${trackingNumber}:`, error);
+      throw error;
+    }
+  },
+
+  // Submit to DGR (Generic Carrier Booking)
+  submitToDgr: async (trackingNumber, carrierCode = 'DGR', optionalServiceCodes = []) => {
+    try {
+      const response = await api.post(`shipments/${trackingNumber}/book`, { carrierCode, optionalServiceCodes });
       return response.data;
     } catch (error) {
       console.error(`Error submitting shipment ${trackingNumber} to ${carrierCode}:`, error);

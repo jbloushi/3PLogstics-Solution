@@ -388,11 +388,79 @@ exports.getShipmentHistory = async (req, res) => {
   }
 };
 
-// Submit to Carrier (Staff Only)
-exports.bookWithCarrier = async (req, res) => {
+// Fetch booking-time carrier options (service + optional services)
+exports.getBookingOptions = async (req, res) => {
   try {
     const { trackingNumber } = req.params;
-    const { carrierCode } = req.body;
+    const carrierCode = String(req.query.carrierCode || req.body?.carrierCode || 'DGR').toUpperCase();
+
+    const shipment = await Shipment.findOne({ trackingNumber });
+    if (!shipment) {
+      return res.status(404).json({ success: false, error: 'Shipment not found' });
+    }
+
+    const isPrivileged = ['admin', 'staff', 'manager'].includes(req.user.role);
+    const isOwner = shipment.user?.toString() === req.user._id.toString();
+    if (!isPrivileged && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Permission denied' });
+    }
+
+    const carrier = CarrierFactory.getAdapter(carrierCode);
+    const rawQuotes = await carrier.getRates({
+      sender: shipment.origin,
+      receiver: shipment.destination,
+      origin: shipment.origin,
+      destination: shipment.destination,
+      parcels: shipment.parcels || [],
+      items: shipment.items || [],
+      serviceCode: shipment.serviceCode,
+      currency: shipment.currency || 'KWD',
+      dangerousGoods: shipment.dangerousGoods,
+      carrierCode
+    });
+
+    if (!Array.isArray(rawQuotes) || rawQuotes.length === 0) {
+      return res.status(200).json({ success: true, data: { carrierCode, services: [], selectedServiceCode: shipment.serviceCode || null, optionalServices: [] } });
+    }
+
+    const selectedQuote = rawQuotes.find((quote) => quote.serviceCode === shipment.serviceCode) || rawQuotes[0];
+
+    const optionalServices = (selectedQuote.optionalServices || []).map((service) => ({
+      serviceCode: service.serviceCode,
+      serviceName: service.serviceName,
+      totalPrice: Number(Number(service.totalPrice || 0).toFixed(3)),
+      currency: service.currency || selectedQuote.currency || 'KWD'
+    }));
+
+    const services = rawQuotes.map((quote) => ({
+      serviceCode: quote.serviceCode,
+      serviceName: quote.serviceName,
+      totalPrice: Number(Number(quote.totalPrice || 0).toFixed(3)),
+      currency: quote.currency || 'KWD',
+      deliveryDate: quote.deliveryDate || null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        carrierCode,
+        selectedServiceCode: selectedQuote.serviceCode,
+        optionalServices,
+        services
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching booking options:', error);
+    return res.status(error.statusCode || 500).json({ success: false, error: error.message });
+  }
+};
+
+// Submit to Carrier (Staff Only)
+exports.bookWithCarrier = async (req, res) => {
+
+  try {
+    const { trackingNumber } = req.params;
+    const { carrierCode, optionalServiceCodes = [] } = req.body;
 
     // Find shipment
     const shipment = await Shipment.findOne({ trackingNumber });
@@ -408,7 +476,7 @@ exports.bookWithCarrier = async (req, res) => {
     }
 
     // Call Booking Service
-    const result = await ShipmentBookingService.bookShipment(trackingNumber, carrierCode);
+    const result = await ShipmentBookingService.bookShipment(trackingNumber, carrierCode, optionalServiceCodes);
 
     res.status(200).json({
       success: true,
@@ -1696,7 +1764,7 @@ exports.updateShipment = async (req, res) => {
 
     // Apply allowed updates
     // Prevent updating critical fields like trackingNumber, user, history directly via this endpoint
-    const allowedFields = ['destination', 'origin', 'items', 'currentLocation', 'price', 'markup', 'pickupRequest', 'customer', 'status', 'allowPublicLocationUpdate', 'allowPublicInfoUpdate'];
+    const allowedFields = ['destination', 'origin', 'items', 'parcels', 'incoterm', 'currency', 'dangerousGoods', 'serviceCode', 'currentLocation', 'price', 'markup', 'pickupRequest', 'customer', 'status', 'allowPublicLocationUpdate', 'allowPublicInfoUpdate'];
 
     Object.keys(updates).forEach(key => {
       if (allowedFields.includes(key)) {

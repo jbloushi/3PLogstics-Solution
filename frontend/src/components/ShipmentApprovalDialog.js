@@ -96,6 +96,38 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
         }
     }, [shipment, open, isClient]);
 
+
+    useEffect(() => {
+        const loadBookingOptions = async () => {
+            if (!open || !shipment || isClient) return;
+            setBookingOptionsLoading(true);
+            try {
+                const response = await shipmentService.getBookingOptions(shipment.trackingNumber, bookingCarrier);
+                const optionalServices = response?.data?.optionalServices || [];
+                setBookingOptions(optionalServices);
+                setSelectedOptionalServiceCodes((prev) => {
+                    const allowed = new Set(optionalServices.map((service) => service.serviceCode));
+                    return prev.filter((code) => allowed.has(code));
+                });
+            } catch (err) {
+                console.error('Failed to fetch booking options', err);
+                setBookingOptions([]);
+            } finally {
+                setBookingOptionsLoading(false);
+            }
+        };
+
+        loadBookingOptions();
+    }, [open, shipment, bookingCarrier, isClient]);
+
+    const toggleOptionalService = (serviceCode) => {
+        setSelectedOptionalServiceCodes((prev) => (
+            prev.includes(serviceCode)
+                ? prev.filter((code) => code !== serviceCode)
+                : [...prev, serviceCode]
+        ));
+    };
+
     const handleAddressChange = (type, newData) => {
         setFormData(prev => ({ ...prev, [type]: newData }));
     };
@@ -191,7 +223,7 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
             });
 
             if (!isClient) {
-                await shipmentService.submitToDgr(shipment.trackingNumber, bookingCarrier);
+                await shipmentService.submitToDgr(shipment.trackingNumber, bookingCarrier, selectedOptionalServiceCodes);
             }
 
             onShipmentUpdated();
@@ -282,12 +314,14 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
                         )}
 
                         {!isClient && (
-                            <div style={{ width: '150px' }}>
-                                <Select value={bookingCarrier} onChange={e => setBookingCarrier(e.target.value)}>
-                                    {availableCarriers.map(c => <option key={c.code} value={c.code} disabled={!c.active}>{c.name}</option>)}
-                                    {availableCarriers.length === 0 && <option value="DGR">Default Carrier</option>}
-                                </Select>
-                            </div>
+                            <>
+                                <div style={{ width: '150px' }}>
+                                    <Select value={bookingCarrier} onChange={e => setBookingCarrier(e.target.value)}>
+                                        {availableCarriers.map(c => <option key={c.code} value={c.code} disabled={!c.active}>{c.name}</option>)}
+                                        {availableCarriers.length === 0 && <option value="DGR">Default Carrier</option>}
+                                    </Select>
+                                </div>
+                            </>
                         )}
 
                         <Button variant="secondary" onClick={onClose}>Cancel</Button>
