@@ -69,7 +69,7 @@ const AppRoutes = () => {
 
       <Route element={<Layout />}>
         <Route path="dashboard" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <DashboardPage />
           </ProtectedRoute>
         } />
@@ -81,13 +81,13 @@ const AppRoutes = () => {
         } />
 
         <Route path="admin/organizations" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'manager']}>
             <AdminOrganizationsPage />
           </ProtectedRoute>
         } />
 
         <Route path="shipments" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <ShipmentsPage />
           </ProtectedRoute>
         } />
@@ -97,46 +97,46 @@ const AppRoutes = () => {
 
         {/* Protected Client/Staff Routes */}
         <Route path="create" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <ShipmentWizardV2 />
           </ProtectedRoute>
         } />
 
         {/* Correct mapping for 'New Shipment' button in ShipmentsPage */}
         <Route path="create-shipment" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <ShipmentWizardV2 />
           </ProtectedRoute>
         } />
 
         <Route path="create-legacy" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <DgrShipmentWizard />
           </ProtectedRoute>
         } />
 
         {/* Old create page */}
         <Route path="create-old" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <CreateShipmentPage />
           </ProtectedRoute>
         } />
 
         <Route path="tracking/:trackingNumber" element={<RedirectToShipment />} />
         <Route path="tracking" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <TrackingLandingPage />
           </ProtectedRoute>
         } />
         <Route path="shipment/:trackingNumber" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <ShipmentDetailsPage />
           </ProtectedRoute>
         } />
 
         {/* Warehouse Tools */}
         <Route path="warehouse/scan" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'manager']}>
             <WarehouseScanPage />
           </ProtectedRoute>
         } />
@@ -154,7 +154,7 @@ const AppRoutes = () => {
         <Route path="fleets" element={<InConstructionPage title="Fleet Management" description="Vehicle tracking and maintenance logs." />} />
         <Route path="drivers" element={<InConstructionPage title="Driver Management" description="Manage driver profiles and assignments." />} />
         <Route path="finance" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <FinancePage />
           </ProtectedRoute>
         } />
@@ -165,12 +165,12 @@ const AppRoutes = () => {
         <Route path="notifications" element={<InConstructionPage title="Notifications" description="System alerts and updates." />} />
 
         <Route path="settings" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'driver']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'driver', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <SettingsPage />
           </ProtectedRoute>
         } />
         <Route path="address-book" element={
-          <ProtectedRoute allowedRoles={['admin', 'staff', 'client']}>
+          <ProtectedRoute allowedRoles={['admin', 'staff', 'client', 'manager', 'accounting', 'org_manager', 'org_agent']}>
             <AddressBookPage />
           </ProtectedRoute>
         } />

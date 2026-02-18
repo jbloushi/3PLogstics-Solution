@@ -117,6 +117,8 @@ function validateShipmentForDgr(order) {
         if (!dangerousGoods.code) errors.push('DG: UN Code is required.');
         if (!dangerousGoods.serviceCode) errors.push('DG: Service Code (HE/HV/HK/HC) is required.');
         if (!dangerousGoods.contentId) errors.push('DG: Content ID is required.');
+        if (!dangerousGoods.properShippingName) errors.push('DG: Proper Shipping Name is required.');
+        if (!dangerousGoods.customDescription) errors.push('DG: Custom Description is required.');
 
         // Dry Ice Specific
         if (dangerousGoods.code === '1845') {
@@ -137,23 +139,7 @@ function validateShipmentForDgr(order) {
  */
 function composeItemDescription(item, dangerousGoods) {
     const ITEM_DESCRIPTION_MAX_LENGTH = 250;
-    let desc = item.description || 'Item';
-
-    if (dangerousGoods && dangerousGoods.contains) {
-        const unCode = (dangerousGoods.code || '').replace('UN', '').replace('ID', '');
-        if (unCode === '1266') {
-            desc += ', Perfumery products containing alcohol, UN1266, Class 3';
-        } else if (unCode === '3481') {
-            desc += ', Device with lithium-ion battery contained in equipment (UN3481)';
-        } else if (unCode === '8000') {
-            // Intentionally do not force a hardcoded carrier phrase for ID8000.
-            // The item description should stay user-provided.
-        } else if (unCode === '1845') {
-            desc += `, Packed with Dry Ice UN1845, ${dangerousGoods.dryIceWeight || 0}kg`;
-        }
-    }
-
-    // Sanitize
+    const desc = item.description || '';
     return desc.replace(/[\r\n]+/g, ' ').substring(0, ITEM_DESCRIPTION_MAX_LENGTH);
 }
 
@@ -311,8 +297,8 @@ const buildDangerousGoodsValueAddedServices = (dg) => {
     if (!dg || !dg.contains) return [];
 
     // Safety check for required fields (already checked in validate, but double safety)
-    if (!dg.serviceCode || !dg.contentId || !dg.code) {
-        return [];
+    if (!dg.serviceCode || !dg.contentId || !dg.code || !dg.customDescription) {
+        throw new Error('DG payload requires serviceCode, contentId, code, and customDescription.');
     }
 
     const unCode = (dg.code && !dg.code.startsWith('UN') && !dg.code.startsWith('ID'))
@@ -325,7 +311,7 @@ const buildDangerousGoodsValueAddedServices = (dg) => {
     const dgItem = {
         contentId: dg.contentId,
         unCode: unCode, // e.g. UN1266
-        customDescription: (dg.customDescription || dg.properShippingName || 'Dangerous Goods').substring(0, DG_CUSTOM_DESCRIPTION_MAX_LENGTH)
+        customDescription: String(dg.customDescription).substring(0, DG_CUSTOM_DESCRIPTION_MAX_LENGTH)
     };
 
     const vas = {
@@ -335,7 +321,11 @@ const buildDangerousGoodsValueAddedServices = (dg) => {
 
     // SPECIAL HANDLING for Dry Ice (HC)
     if (dg.serviceCode === 'HC') {
-        dgItem.dryIceWeight = Number(dg.dryIceWeight || 0.1);
+        const dryIceWeight = Number(dg.dryIceWeight);
+        if (!Number.isFinite(dryIceWeight) || dryIceWeight <= 0) {
+            throw new Error('DG payload requires a positive dryIceWeight for serviceCode HC.');
+        }
+        dgItem.dryIceWeight = dryIceWeight;
     }
 
     return [vas];

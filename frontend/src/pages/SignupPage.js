@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
-import { Button, Input, Select, Alert } from '../ui';
+import { Button, Input, Alert } from '../ui';
 
 // --- Styled Components ---
 
@@ -74,8 +74,7 @@ const SignupPage = () => {
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        password: '',
-        role: 'client'
+        password: ''
     });
     const { signup, loading, error, isAuthenticated, user } = useAuth();
     const navigate = useNavigate();
@@ -105,7 +104,7 @@ const SignupPage = () => {
         <FullPageGradient>
             <SignupCard>
                 <Title>Join 3PLogistics</Title>
-                <Subtitle>Create your account to start managing shipments</Subtitle>
+                <Subtitle>Create your organization agent account to start managing shipments</Subtitle>
 
                 {error && (
                     <div style={{ width: '100%', marginBottom: '24px' }}>
@@ -118,6 +117,8 @@ const SignupPage = () => {
                 <Form onSubmit={handleSubmit}>
                     <Input
                         label="Full Name"
+                        name="name"
+                        autoComplete="name"
                         value={formData.name}
                         onChange={(e) => handleChange('name', e.target.value)}
                         placeholder="John Doe"
@@ -125,6 +126,8 @@ const SignupPage = () => {
                     />
                     <Input
                         label="Email Address"
+                        name="email"
+                        autoComplete="email"
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleChange('email', e.target.value)}
@@ -132,19 +135,10 @@ const SignupPage = () => {
                         required
                     />
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
-                        <Select
-                            label="Account Type"
-                            value={formData.role}
-                            onChange={(e) => handleChange('role', e.target.value)}
-                        >
-                            <option value="client">Client (Sender/Receiver)</option>
-                            <option value="staff">Staff (Logistics Team)</option>
-                        </Select>
-                    </div>
-
                     <Input
                         label="Password"
+                        name="new-password"
+                        autoComplete="new-password"
                         type="password"
                         value={formData.password}
                         onChange={(e) => handleChange('password', e.target.value)}

@@ -3,6 +3,7 @@ import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import styled from 'styled-components';
 import { useAuth } from '../context/AuthContext';
 import { Button, Input, Alert } from '../ui';
+import { getRoleLabel } from '../utils/roleLabels';
 
 // --- Styled Components ---
 
@@ -176,6 +177,9 @@ const LoginPage = () => {
                 <Form onSubmit={handleSubmit}>
                     <Input
                         label="Email Address"
+                        type="email"
+                        name="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="name@company.com"
@@ -184,6 +188,8 @@ const LoginPage = () => {
                     />
                     <Input
                         label="Password"
+                        name="password"
+                        autoComplete="current-password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -232,7 +238,7 @@ const LoginPage = () => {
                                             onClick={() => handleLogin(`${role}@demo.com`, 'password123')}
                                             style={{ textTransform: 'capitalize', fontSize: '12px', padding: '6px' }}
                                         >
-                                            {role}
+                                            {getRoleLabel(role)}
                                         </Button>
                                     ))}
                                 </QuickLoginGrid>
