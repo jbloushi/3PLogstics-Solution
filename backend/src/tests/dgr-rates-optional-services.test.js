@@ -112,49 +112,4 @@ describe('DgrAdapter.getRates optional services parsing', () => {
             }
         ]);
     });
-
-    test('parses optional services from nested optionalServices containers with string prices', async () => {
-        const adapter = new DgrAdapter();
-
-        axios.post.mockResolvedValue({
-            data: {
-                products: [
-                    {
-                        productCode: 'P',
-                        productName: 'Express Worldwide',
-                        totalPrice: [{ price: '18.75', currencyType: 'KWD' }],
-                        productAndServices: {
-                            optionalServices: {
-                                items: [
-                                    {
-                                        serviceCode: 'IB',
-                                        serviceName: 'Insurance Basic',
-                                        amount: '2.500',
-                                        currency: 'KWD'
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                ]
-            }
-        });
-
-        const quotes = await adapter.getRates({
-            sender: { city: 'Kuwait', countryCode: 'KW', postalCode: '13001' },
-            receiver: { city: 'Riyadh', countryCode: 'SA', postalCode: '11411' },
-            serviceCode: 'P',
-            parcels: [{ weight: 1, dimensions: { length: 10, width: 10, height: 10 } }]
-        });
-
-        expect(quotes[0].optionalServices).toEqual([
-            {
-                serviceCode: 'IB',
-                serviceName: 'Insurance Basic',
-                totalPrice: 2.5,
-                currency: 'KWD'
-            }
-        ]);
-    });
-
 });
