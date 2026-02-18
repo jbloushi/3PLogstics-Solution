@@ -3,6 +3,9 @@ import api from '../services/api';
 
 const AuthContext = createContext();
 
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+const LAST_ACTIVITY_KEY = 'lastActivityAt';
+
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -16,6 +19,7 @@ export const AuthProvider = ({ children }) => {
 
             const { token, data } = res.data;
             localStorage.setItem('token', token);
+            localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
             setUser(data.user);
             return data.user;
         } catch (err) {
@@ -35,6 +39,7 @@ export const AuthProvider = ({ children }) => {
 
             const { token, data } = res.data;
             localStorage.setItem('token', token);
+            localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
             setUser(data.user);
             return data.user;
         } catch (err) {
@@ -46,14 +51,16 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logout = () => {
+    const logout = useCallback(() => {
         localStorage.removeItem('token');
+        localStorage.removeItem(LAST_ACTIVITY_KEY);
         setUser(null);
-    };
+    }, []);
 
     const loadUser = useCallback(async () => {
         const token = localStorage.getItem('token');
         if (!token) {
+            localStorage.removeItem(LAST_ACTIVITY_KEY);
             setLoading(false);
             return;
         }
@@ -68,6 +75,7 @@ export const AuthProvider = ({ children }) => {
             console.error('Load user failed:', err);
             if (err.response && err.response.status === 401) {
                 localStorage.removeItem('token');
+                localStorage.removeItem(LAST_ACTIVITY_KEY);
                 setUser(null);
             }
         } finally {
@@ -79,6 +87,38 @@ export const AuthProvider = ({ children }) => {
         loadUser();
     }, [loadUser]);
 
+
+    useEffect(() => {
+        if (!user) return;
+
+        const touchActivity = () => {
+            localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+        };
+
+        const enforceIdleTimeout = () => {
+            const lastActivityAt = Number(localStorage.getItem(LAST_ACTIVITY_KEY) || 0);
+            if (!lastActivityAt) {
+                touchActivity();
+                return;
+            }
+
+            if (Date.now() - lastActivityAt >= IDLE_TIMEOUT_MS) {
+                logout();
+            }
+        };
+
+        touchActivity();
+        const activityEvents = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'];
+        activityEvents.forEach((eventName) => window.addEventListener(eventName, touchActivity, { passive: true }));
+
+        const intervalId = window.setInterval(enforceIdleTimeout, 30 * 1000);
+
+        return () => {
+            activityEvents.forEach((eventName) => window.removeEventListener(eventName, touchActivity));
+            window.clearInterval(intervalId);
+        };
+    }, [user, logout]);
+
     return (
         <AuthContext.Provider value={{
             user,
@@ -89,7 +129,7 @@ export const AuthProvider = ({ children }) => {
             logout,
             refreshUser: loadUser,
             isAuthenticated: !!user,
-            isStaff: user?.role === 'staff' || user?.role === 'admin'
+            isStaff: ['staff', 'admin', 'manager', 'accounting'].includes(user?.role)
         }}>
             {children}
         </AuthContext.Provider>

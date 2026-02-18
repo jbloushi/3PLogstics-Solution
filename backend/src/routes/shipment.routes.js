@@ -196,6 +196,17 @@ router.post(
   shipmentController.processWarehouseScan
 );
 
+
+// Get booking-time carrier options (service + optional services)
+router.get(
+  '/:trackingNumber/booking-options',
+  [
+    param('trackingNumber').isString().notEmpty().withMessage('Valid tracking number is required'),
+    validate
+  ],
+  shipmentController.getBookingOptions
+);
+
 // Submit to Carrier (Staff Only)
 router.post(
   '/:trackingNumber/book',

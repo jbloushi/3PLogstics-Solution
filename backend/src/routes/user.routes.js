@@ -7,7 +7,7 @@ const authController = require('../controllers/auth.controller');
 router.use(authController.protect);
 
 // Get users (Staff/Admin only for listing clients)
-router.get('/', authController.restrictTo('staff', 'admin'), userController.getUsers);
+router.get('/', authController.restrictTo('staff', 'admin', 'manager'), userController.getUsers);
 
 // Get current user profile
 router.get('/me', userController.getMe);

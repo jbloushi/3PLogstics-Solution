@@ -14,6 +14,57 @@ const ShipmentDraftService = require('../services/ShipmentDraftService');
 const ShipmentBookingService = require('../services/ShipmentBookingService');
 const { generateTrackingNumber } = require('../utils/shipmentUtils');
 
+
+
+const DEFAULT_MARKUP = { type: 'PERCENTAGE', percentageValue: 15, flatValue: 0 };
+
+const hasMarkupShape = (markup) => Boolean(markup && typeof markup === 'object' && markup.type);
+
+const resolveEffectiveCarrierPolicy = ({ targetUser, carrierCode, availableCarrierCodes }) => {
+  const normalizedCarrier = (carrierCode || '').toUpperCase();
+  const org = targetUser?.organization;
+
+  const orgAllowed = Array.isArray(org?.allowedCarriers) && org.allowedCarriers.length > 0
+    ? org.allowedCarriers.map((c) => String(c).toUpperCase())
+    : availableCarrierCodes;
+
+  const userAllowed = Array.isArray(targetUser?.agentPolicy?.allowedCarriers) && targetUser.agentPolicy.allowedCarriers.length > 0
+    ? targetUser.agentPolicy.allowedCarriers.map((c) => String(c).toUpperCase())
+    : orgAllowed;
+
+  const effectiveAllowed = orgAllowed.filter((code) => userAllowed.includes(code));
+
+  if (normalizedCarrier && !effectiveAllowed.includes(normalizedCarrier)) {
+    const deniedError = new Error(`Carrier ${normalizedCarrier} is not allowed for this account`);
+    deniedError.statusCode = 403;
+    throw deniedError;
+  }
+
+  let markup = hasMarkupShape(targetUser?.markup) ? targetUser.markup : DEFAULT_MARKUP;
+  let policySource = hasMarkupShape(targetUser?.markup) ? 'user_default' : 'platform_default';
+
+  const orgCarrierMarkup = org?.markup?.byCarrier?.[normalizedCarrier];
+  if (hasMarkupShape(orgCarrierMarkup)) {
+    markup = orgCarrierMarkup;
+    policySource = 'org_carrier';
+  } else if (hasMarkupShape(org?.markup)) {
+    markup = org.markup;
+    policySource = 'org_default';
+  }
+
+  const agentMarkup = targetUser?.agentPolicy?.markupOverride;
+  if (hasMarkupShape(agentMarkup)) {
+    markup = agentMarkup;
+    policySource = 'agent_default';
+  }
+
+  return {
+    effectiveAllowed,
+    markup,
+    policySource
+  };
+};
+
 const buildHistoryKey = (event) => {
   const time = event?.timestamp ? new Date(event.timestamp).toISOString() : '';
   const status = event?.status || '';
@@ -112,53 +163,36 @@ exports.createShipment = async (req, res) => {
   }
 };
 
-// Get available carriers
-exports.getAvailableCarriers = (req, res) => {
-  try {
-    const carriers = CarrierFactory.getAvailableCarriers();
-    res.status(200).json({
-      success: true,
-      data: carriers
-    });
-  } catch (error) {
-    logger.error('Error fetching carriers:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch carriers'
-    });
-  }
-};
-
-
-
 // Get rate quotes from DGR
 exports.getQuotes = async (req, res) => {
   try {
-    const carrierCode = req.body.carrierCode || 'DGR';
-    const carrier = CarrierFactory.getAdapter(carrierCode);
-    const rawQuotes = await carrier.getRates(req.body);
+    const carrierCode = String(req.body.carrierCode || 'DGR').toUpperCase();
+    const carriers = CarrierFactory.getAvailableCarriers();
+    const carrierCodes = carriers.map((carrier) => carrier.code.toUpperCase());
 
-    // 3PL Profit Engine Logic (Target User Markup)
-    let markup = req.user?.markup;
+    let targetUser = await User.findById(req.user._id).populate('organization');
+    if (!targetUser) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
 
-    // If Admin/Staff is quoting on behalf of a user, fetch that user's markup
-    if (['staff', 'admin'].includes(req.user.role) && req.body.userId) {
-      try {
-        const targetUser = await User.findById(req.body.userId).populate('organization');
-        if (targetUser) {
-          markup = targetUser.markup;
-        }
-      } catch (err) {
-        logger.warn(`Failed to fetch target user ${req.body.userId} for markup`, err);
+    // Platform operators can quote on behalf of a customer account.
+    if (['staff', 'admin', 'manager', 'accounting'].includes(req.user.role) && req.body.userId) {
+      const selectedUser = await User.findById(req.body.userId).populate('organization');
+      if (selectedUser) {
+        targetUser = selectedUser;
       }
     }
 
-    // Default Fallback
-    if (!markup) {
-      markup = { type: 'PERCENTAGE', percentageValue: 15, flatValue: 0 };
-    }
+    const { markup, policySource } = resolveEffectiveCarrierPolicy({
+      targetUser,
+      carrierCode,
+      availableCarrierCodes: carrierCodes
+    });
 
-    const markupQuotes = rawQuotes.map(quote => {
+    const carrier = CarrierFactory.getAdapter(carrierCode);
+    const rawQuotes = await carrier.getRates({ ...req.body, carrierCode });
+
+    const markupQuotes = rawQuotes.map((quote) => {
       const basePrice = Number(quote.totalPrice);
       const calculation = PricingService.calculateFinalPrice(basePrice, markup);
       const optionalServices = (quote.optionalServices || []).map((service) => ({
@@ -175,6 +209,7 @@ exports.getQuotes = async (req, res) => {
         estimatedShipmentCost,
         optionalServices,
         currency: quote.currency || 'KWD',
+        pricingPolicySource: policySource,
         // RESTRICTED: Only Admins can see the raw carrier price
         carrierCost: req.user.role === 'admin' ? basePrice : undefined,
         markupAmount: req.user.role === 'admin' ? calculation.markupAmount : undefined
@@ -187,7 +222,7 @@ exports.getQuotes = async (req, res) => {
     });
   } catch (error) {
     logger.error('Error fetching quotes:', error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       error: error.message
     });
@@ -200,13 +235,28 @@ exports.getQuotes = async (req, res) => {
 exports.getAvailableCarriers = async (req, res) => {
   try {
     const carriers = CarrierFactory.getAvailableCarriers();
+    const carrierCodes = carriers.map((carrier) => carrier.code.toUpperCase());
+
+    const currentUser = await User.findById(req.user._id).populate('organization');
+    if (!currentUser) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const { effectiveAllowed } = resolveEffectiveCarrierPolicy({
+      targetUser: currentUser,
+      carrierCode: null,
+      availableCarrierCodes: carrierCodes
+    });
+
+    const filteredCarriers = carriers.filter((carrier) => effectiveAllowed.includes(carrier.code.toUpperCase()));
+
     res.status(200).json({
       success: true,
-      data: carriers
+      data: filteredCarriers
     });
   } catch (error) {
     logger.error('Error getting available carriers:', error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       error: error.message
     });
@@ -338,11 +388,79 @@ exports.getShipmentHistory = async (req, res) => {
   }
 };
 
-// Submit to Carrier (Staff Only)
-exports.bookWithCarrier = async (req, res) => {
+// Fetch booking-time carrier options (service + optional services)
+exports.getBookingOptions = async (req, res) => {
   try {
     const { trackingNumber } = req.params;
-    const { carrierCode } = req.body;
+    const carrierCode = String(req.query.carrierCode || req.body?.carrierCode || 'DGR').toUpperCase();
+
+    const shipment = await Shipment.findOne({ trackingNumber });
+    if (!shipment) {
+      return res.status(404).json({ success: false, error: 'Shipment not found' });
+    }
+
+    const isPrivileged = ['admin', 'staff', 'manager'].includes(req.user.role);
+    const isOwner = shipment.user?.toString() === req.user._id.toString();
+    if (!isPrivileged && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Permission denied' });
+    }
+
+    const carrier = CarrierFactory.getAdapter(carrierCode);
+    const rawQuotes = await carrier.getRates({
+      sender: shipment.origin,
+      receiver: shipment.destination,
+      origin: shipment.origin,
+      destination: shipment.destination,
+      parcels: shipment.parcels || [],
+      items: shipment.items || [],
+      serviceCode: shipment.serviceCode,
+      currency: shipment.currency || 'KWD',
+      dangerousGoods: shipment.dangerousGoods,
+      carrierCode
+    });
+
+    if (!Array.isArray(rawQuotes) || rawQuotes.length === 0) {
+      return res.status(200).json({ success: true, data: { carrierCode, services: [], selectedServiceCode: shipment.serviceCode || null, optionalServices: [] } });
+    }
+
+    const selectedQuote = rawQuotes.find((quote) => quote.serviceCode === shipment.serviceCode) || rawQuotes[0];
+
+    const optionalServices = (selectedQuote.optionalServices || []).map((service) => ({
+      serviceCode: service.serviceCode,
+      serviceName: service.serviceName,
+      totalPrice: Number(Number(service.totalPrice || 0).toFixed(3)),
+      currency: service.currency || selectedQuote.currency || 'KWD'
+    }));
+
+    const services = rawQuotes.map((quote) => ({
+      serviceCode: quote.serviceCode,
+      serviceName: quote.serviceName,
+      totalPrice: Number(Number(quote.totalPrice || 0).toFixed(3)),
+      currency: quote.currency || 'KWD',
+      deliveryDate: quote.deliveryDate || null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        carrierCode,
+        selectedServiceCode: selectedQuote.serviceCode,
+        optionalServices,
+        services
+      }
+    });
+  } catch (error) {
+    logger.error('Error fetching booking options:', error);
+    return res.status(error.statusCode || 500).json({ success: false, error: error.message });
+  }
+};
+
+// Submit to Carrier (Staff Only)
+exports.bookWithCarrier = async (req, res) => {
+
+  try {
+    const { trackingNumber } = req.params;
+    const { carrierCode, optionalServiceCodes = [] } = req.body;
 
     // Find shipment
     const shipment = await Shipment.findOne({ trackingNumber });
@@ -350,17 +468,24 @@ exports.bookWithCarrier = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Shipment not found' });
     }
 
+    // Role/ownership guard
+    const isPrivileged = ['admin', 'staff', 'manager'].includes(req.user.role);
+    const isOwner = shipment.user?.toString() === req.user._id.toString();
+    if (!isPrivileged && !isOwner) {
+      return res.status(403).json({ success: false, error: 'Permission denied' });
+    }
+
     // Call Booking Service
-    const result = await ShipmentBookingService.bookShipment(trackingNumber, carrierCode);
+    const result = await ShipmentBookingService.bookShipment(trackingNumber, carrierCode, optionalServiceCodes);
 
     res.status(200).json({
       success: true,
       data: result,
-      message: `Shipment successfully booked with ${result.carrierCode}`
+      message: `Shipment successfully booked with ${carrierCode || shipment.carrierCode || shipment.carrier || 'DGR'}`
     });
   } catch (error) {
     logger.error('Error booking shipment:', error);
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
       error: error.message
     });
@@ -471,7 +596,7 @@ exports.getAllShipments = async (req, res) => {
     }
 
     // Role-based filtering: Clients only see their own shipments
-    if (req.user.role === 'client') {
+    if (['client', 'org_agent', 'org_manager'].includes(req.user.role)) {
       query.user = req.user._id;
     }
 
@@ -1639,7 +1764,7 @@ exports.updateShipment = async (req, res) => {
 
     // Apply allowed updates
     // Prevent updating critical fields like trackingNumber, user, history directly via this endpoint
-    const allowedFields = ['destination', 'origin', 'items', 'currentLocation', 'price', 'markup', 'pickupRequest', 'customer', 'status', 'allowPublicLocationUpdate', 'allowPublicInfoUpdate'];
+    const allowedFields = ['destination', 'origin', 'items', 'parcels', 'incoterm', 'currency', 'dangerousGoods', 'serviceCode', 'currentLocation', 'price', 'markup', 'pickupRequest', 'customer', 'status', 'allowPublicLocationUpdate', 'allowPublicInfoUpdate'];
 
     Object.keys(updates).forEach(key => {
       if (allowedFields.includes(key)) {

@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['client', 'staff', 'admin', 'driver'],
+        enum: ['client', 'staff', 'admin', 'driver', 'accounting', 'manager', 'org_manager', 'org_agent'],
         default: 'client'
     },
     password: {
@@ -87,7 +87,30 @@ const userSchema = new mongoose.Schema({
         defaultReference: { type: String, trim: true } // Default Shipper Reference pattern
     },
 
-    // Saved Addresses (for Sender selection)
+
+
+    // Organization Agent Policy (MVP foundation)
+    agentPolicy: {
+        allowedCarriers: [{
+            type: String,
+            enum: ['DGR', 'DHL', 'FEDEX', 'UPS', 'MOCK']
+        }],
+        defaultCarrier: {
+            type: String,
+            enum: ['DGR', 'DHL', 'FEDEX', 'UPS', 'MOCK']
+        },
+        markupOverride: {
+            type: {
+                type: String,
+                enum: ['PERCENTAGE', 'FLAT', 'COMBINED', 'FORMULA']
+            },
+            percentageValue: Number,
+            flatValue: Number,
+            formula: String
+        }
+    },
+
+        // Saved Addresses (for Sender selection)
     addresses: [{
         label: {
             type: String,

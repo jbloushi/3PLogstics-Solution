@@ -161,6 +161,7 @@ const DgrShipmentWizard = () => {
     const [parcels, setParcels] = useState([{ ...initialParcel }]);
     const [selectedService, setSelectedService] = useState(null);
     const [availableRates, setAvailableRates] = useState([]);
+    const [selectedOptionalServiceCodes, setSelectedOptionalServiceCodes] = useState([]);
     const [errors, setErrors] = useState({});
 
     // Load clients list for staff
@@ -388,6 +389,20 @@ const DgrShipmentWizard = () => {
         setParcels(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
     };
 
+    const selectedOptionalServices = selectedService?.optionalServices || [];
+
+    useEffect(() => {
+        setSelectedOptionalServiceCodes([]);
+    }, [selectedService?.serviceCode]);
+
+    const toggleOptionalService = (serviceCode) => {
+        setSelectedOptionalServiceCodes((prev) => (
+            prev.includes(serviceCode)
+                ? prev.filter((code) => code !== serviceCode)
+                : [...prev, serviceCode]
+        ));
+    };
+
     // Validate step
     const validateStep = () => {
         const newErrors = {};
@@ -513,6 +528,7 @@ const DgrShipmentWizard = () => {
                     height: parseFloat(p.height),
                 })),
                 serviceCode: selectedService?.serviceCode || 'P',
+                optionalServices: selectedOptionalServices.filter((service) => selectedOptionalServiceCodes.includes(service.serviceCode)),
             };
 
             const response = await fetch(`${API_URL}/shipments`, {
@@ -825,6 +841,30 @@ const DgrShipmentWizard = () => {
                                             {rate.totalPrice?.toFixed(3)} {rate.currency}
                                         </Typography>
                                     </Box>
+                                    {selectedService?.serviceCode === rate.serviceCode && (
+                                        <Box mt={2}>
+                                            <Typography variant="subtitle2" gutterBottom>Optional Services from DHL API</Typography>
+                                            {(rate.optionalServices || []).length === 0 ? (
+                                                <Alert severity="info">No optional services returned by carrier for this service/route.</Alert>
+                                            ) : (
+                                                <Grid container spacing={1}>
+                                                    {(rate.optionalServices || []).map((service) => (
+                                                        <Grid item xs={12} md={6} key={service.serviceCode}>
+                                                            <FormControlLabel
+                                                                control={
+                                                                    <Checkbox
+                                                                        checked={selectedOptionalServiceCodes.includes(service.serviceCode)}
+                                                                        onChange={() => toggleOptionalService(service.serviceCode)}
+                                                                    />
+                                                                }
+                                                                label={`${service.serviceName} (${service.serviceCode}) — ${Number(service.totalPrice || 0).toFixed(3)} ${service.currency || rate.currency}`}
+                                                            />
+                                                        </Grid>
+                                                    ))}
+                                                </Grid>
+                                            )}
+                                        </Box>
+                                    )}
                                 </CardContent>
                             </Card>
                         </Grid>
@@ -900,6 +940,20 @@ const DgrShipmentWizard = () => {
                                 <Typography variant="h4" color="primary.dark">
                                     {selectedService?.currency} {selectedService?.totalPrice?.toFixed(2)}
                                 </Typography>
+                            </Box>
+                            <Box mt={2}>
+                                <Typography variant="subtitle2" gutterBottom>Selected Optional Services</Typography>
+                                {selectedOptionalServiceCodes.length === 0 ? (
+                                    <Typography variant="body2" color="textSecondary">None selected</Typography>
+                                ) : (
+                                    selectedOptionalServices
+                                        .filter((service) => selectedOptionalServiceCodes.includes(service.serviceCode))
+                                        .map((service) => (
+                                            <Typography key={service.serviceCode} variant="body2">
+                                                • {service.serviceName} ({service.serviceCode}) - {Number(service.totalPrice || 0).toFixed(3)} {service.currency || selectedService?.currency}
+                                            </Typography>
+                                        ))
+                                )}
                             </Box>
                         </CardContent>
                     </Card>
