@@ -51,7 +51,7 @@ exports.getLedger = async (req, res) => {
 
         const currentUser = await User.findById(req.user._id);
 
-        if (req.user.role === 'client') {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role)) {
             if (!currentUser.organization) {
                 return res.status(404).json({ success: false, error: 'User is not linked to an organization' });
             }
