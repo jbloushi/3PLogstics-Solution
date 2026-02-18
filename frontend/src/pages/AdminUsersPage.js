@@ -9,7 +9,6 @@ import {
     Input,
     Select,
     Modal,
-    Badge,
     TableWrapper,
     Table,
     Thead,
@@ -22,6 +21,7 @@ import {
     Tab,
     Alert
 } from '../ui';
+import { getRoleLabel } from '../utils/roleLabels';
 
 // --- Styled Components ---
 
@@ -199,10 +199,14 @@ const AdminUsersPage = () => {
                         onChange={(e) => setRoleFilter(e.target.value)}
                     >
                         <option value="">All Roles</option>
-                        <option value="client">Client</option>
-                        <option value="staff">Staff</option>
-                        <option value="admin">Admin</option>
+                        <option value="client">Organization Agent</option>
+                        <option value="staff">Platform Staff</option>
+                        <option value="admin">Platform Admin</option>
                         <option value="driver">Driver</option>
+                        <option value="manager">Manager</option>
+                        <option value="accounting">Accounting</option>
+                        <option value="org_manager">Organization Manager</option>
+                        <option value="org_agent">Organization Agent</option>
                     </Select>
                 </div>
             </FilterBar>
@@ -234,7 +238,7 @@ const AdminUsersPage = () => {
                                     <Td>
                                         <StatusPill
                                             status={user.role === 'admin' ? 'error' : user.role === 'staff' ? 'warning' : 'success'}
-                                            text={user.role.toUpperCase()}
+                                            text={getRoleLabel(user.role)}
                                         />
                                     </Td>
                                     <Td>
@@ -315,6 +319,10 @@ const AdminUsersPage = () => {
                                 <option value="staff">Staff</option>
                                 <option value="admin">Admin</option>
                                 <option value="driver">Driver</option>
+                        <option value="manager">Manager</option>
+                        <option value="accounting">Accounting</option>
+                        <option value="org_manager">Organization Manager</option>
+                        <option value="org_agent">Organization Agent</option>
                             </Select>
 
                             {!editingUser && (

@@ -77,52 +77,156 @@ class DgrAdapter extends CarrierAdapter {
     // ...
 
     async getRates(shipmentData) {
-        // Normalize input first
         const shipment = normalizeShipment(shipmentData);
-        const currency = shipment.currency || 'KWD';
-        const optionalServices = [
-            {
-                serviceCode: 'II',
-                serviceName: 'Shipment Insurance',
-                totalPrice: 3.000,
-                currency
-            },
-            {
-                serviceCode: 'WY',
-                serviceName: 'Non-Standard Pickup',
-                totalPrice: 1.500,
-                currency
-            },
-            {
-                serviceCode: 'NN',
-                serviceName: 'Saturday Delivery',
-                totalPrice: 4.000,
-                currency
-            }
-        ];
+        const payload = this.buildRatePayload(shipment);
 
-        // --- TEMP FALLBACK FOR RATES (Preserving existing behavior) ---
-        // TODO: Implement actual DGR Rate Request in Phase 3
-        return [
-            {
-                serviceName: 'DGR Express Worldwide',
-                serviceCode: 'P',
+        const res = await axios.post(`${this.config.baseUrl}/rates`, payload, {
+            headers: this.getAuthHeader()
+        });
+
+        const products = Array.isArray(res.data?.products) ? res.data.products : [];
+        if (products.length === 0) {
+            throw new Error('No rate products returned from DGR API');
+        }
+
+        return products.map((product) => {
+            const currency = this.extractCurrency(product, shipment.currency || 'KWD');
+            const totalPrice = this.extractTotalPrice(product);
+            const optionalServices = this.extractOptionalServices(product, currency);
+
+            return {
+                serviceName: product.productName || product.localProductName || `DGR ${product.productCode || 'Service'}`,
+                serviceCode: product.productCode || product.localProductCode,
                 carrierCode: 'DGR',
-                totalPrice: 15.000,
+                totalPrice,
                 currency,
-                deliveryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                deliveryDate: product.deliveryCapabilities?.estimatedDeliveryDateAndTime,
                 optionalServices
+            };
+        });
+    }
+
+    buildRatePayload(shipment) {
+        return {
+            customerDetails: {
+                shipperDetails: {
+                    postalCode: shipment.sender?.postalCode,
+                    cityName: shipment.sender?.city,
+                    countryCode: shipment.sender?.countryCode
+                },
+                receiverDetails: {
+                    postalCode: shipment.receiver?.postalCode,
+                    cityName: shipment.receiver?.city,
+                    countryCode: shipment.receiver?.countryCode
+                }
             },
-            {
-                serviceName: 'DGR Express 12:00',
-                serviceCode: 'Y',
-                carrierCode: 'DGR',
-                totalPrice: 22.500,
-                currency,
-                deliveryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-                optionalServices
-            },
-        ];
+            accounts: [
+                {
+                    typeCode: 'shipper',
+                    number: this.config.accountNumber
+                }
+            ],
+            plannedShippingDateAndTime: shipment.shipmentDate || new Date().toISOString(),
+            unitOfMeasurement: 'metric',
+            isCustomsDeclarable: !shipment.isDocument,
+            monetaryAmount: [
+                {
+                    typeCode: 'declaredValue',
+                    value: Number(
+                        shipment.items?.reduce((sum, item) => sum + (Number(item.value || 0) * Number(item.quantity || 1)), 0) || 0
+                    ).toFixed(2),
+                    currency: shipment.currency || 'KWD'
+                }
+            ],
+            requestAllValueAddedServices: true,
+            returnStandardProductsOnly: false,
+            nextBusinessDay: false,
+            productCode: shipment.serviceCode,
+            packages: (shipment.packages || []).map((pkg) => ({
+                weight: Number(pkg.weight?.value || 0),
+                dimensions: {
+                    length: Number(pkg.dimensions?.length || 0),
+                    width: Number(pkg.dimensions?.width || 0),
+                    height: Number(pkg.dimensions?.height || 0)
+                }
+            }))
+        };
+    }
+
+    extractTotalPrice(product) {
+        if (typeof product.totalPrice === 'number') {
+            return Number(product.totalPrice.toFixed(3));
+        }
+
+        if (Array.isArray(product.totalPrice)) {
+            const totalPriceEntry = product.totalPrice.find((price) => price.price != null) || product.totalPrice[0];
+            return Number(Number(totalPriceEntry?.price || 0).toFixed(3));
+        }
+
+        if (product.price && typeof product.price === 'number') {
+            return Number(product.price.toFixed(3));
+        }
+
+        return 0;
+    }
+
+    extractCurrency(product, fallbackCurrency) {
+        if (Array.isArray(product.totalPrice) && product.totalPrice[0]?.currencyType) {
+            return product.totalPrice[0].currencyType;
+        }
+
+        if (product.priceCurrency) {
+            return product.priceCurrency;
+        }
+
+        return fallbackCurrency;
+    }
+
+    extractOptionalServices(product, fallbackCurrency) {
+        const candidateLists = [
+            product?.valueAddedServices,
+            product?.productAndServices?.valueAddedServices,
+            product?.outputValueAddedServices,
+            product?.additionalServices
+        ].filter(Array.isArray);
+
+        const flattened = candidateLists.flat();
+
+        const normalized = flattened
+            .map((service) => {
+                const code = service?.serviceCode || service?.localServiceCode || service?.typeCode || service?.code;
+                if (!code) return null;
+
+                const rawPrice =
+                    service?.price?.amount ??
+                    service?.price?.value ??
+                    service?.price ??
+                    service?.totalPrice?.[0]?.price ??
+                    service?.totalPrice ??
+                    0;
+
+                const currency =
+                    service?.price?.currency ||
+                    service?.price?.currencyType ||
+                    service?.totalPrice?.[0]?.currencyType ||
+                    fallbackCurrency;
+
+                return {
+                    serviceCode: String(code).toUpperCase(),
+                    serviceName: service?.localServiceName || service?.serviceName || service?.name || String(code).toUpperCase(),
+                    totalPrice: Number(Number(rawPrice || 0).toFixed(3)),
+                    currency
+                };
+            })
+            .filter(Boolean);
+
+        // Deduplicate by service code while keeping the first occurrence.
+        const seen = new Set();
+        return normalized.filter((service) => {
+            if (seen.has(service.serviceCode)) return false;
+            seen.add(service.serviceCode);
+            return true;
+        });
     }
 
     /**

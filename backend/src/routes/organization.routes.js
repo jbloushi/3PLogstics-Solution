@@ -7,7 +7,7 @@ const authController = require('../controllers/auth.controller');
 router.use(authController.protect);
 
 // Admin only routes for management
-router.use(authController.restrictTo('admin', 'staff'));
+router.use(authController.restrictTo('admin', 'staff', 'manager'));
 
 router
     .route('/')

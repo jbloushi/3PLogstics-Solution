@@ -42,7 +42,19 @@ const organizationSchema = new mongoose.Schema({
         default: 'KWD'
     },
 
-    // Resources
+
+
+    allowedCarriers: [{
+        type: String,
+        enum: ['DGR', 'DHL', 'FEDEX', 'UPS', 'MOCK']
+    }],
+    defaultCarrier: {
+        type: String,
+        enum: ['DGR', 'DHL', 'FEDEX', 'UPS', 'MOCK'],
+        default: 'DGR'
+    },
+
+        // Resources
     members: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
@@ -68,6 +80,33 @@ const organizationSchema = new mongoose.Schema({
         flatValue: {
             type: Number,
             default: 0 // e.g., 2.000 KD
+        },
+        byCarrier: {
+            DGR: {
+                type: { type: String, enum: ['PERCENTAGE', 'FLAT', 'COMBINED'], default: 'PERCENTAGE' },
+                percentageValue: { type: Number, default: 15 },
+                flatValue: { type: Number, default: 0 }
+            },
+            DHL: {
+                type: { type: String, enum: ['PERCENTAGE', 'FLAT', 'COMBINED'], default: 'PERCENTAGE' },
+                percentageValue: { type: Number, default: 15 },
+                flatValue: { type: Number, default: 0 }
+            },
+            FEDEX: {
+                type: { type: String, enum: ['PERCENTAGE', 'FLAT', 'COMBINED'], default: 'PERCENTAGE' },
+                percentageValue: { type: Number, default: 15 },
+                flatValue: { type: Number, default: 0 }
+            },
+            UPS: {
+                type: { type: String, enum: ['PERCENTAGE', 'FLAT', 'COMBINED'], default: 'PERCENTAGE' },
+                percentageValue: { type: Number, default: 15 },
+                flatValue: { type: Number, default: 0 }
+            },
+            MOCK: {
+                type: { type: String, enum: ['PERCENTAGE', 'FLAT', 'COMBINED'], default: 'PERCENTAGE' },
+                percentageValue: { type: Number, default: 15 },
+                flatValue: { type: Number, default: 0 }
+            }
         }
     },
 
