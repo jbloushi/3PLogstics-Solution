@@ -32,6 +32,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import { useAuth } from '../../context/AuthContext';
+import { getRoleLabel } from '../../utils/roleLabels';
 
 const DRAWER_WIDTH = 240;
 const COLLAPSED_WIDTH = 80;
@@ -63,7 +64,7 @@ const Sidebar = () => {
         { text: 'Organizations', icon: <BusinessIcon />, path: '/admin/organizations', staffOnly: true },
         { text: 'Address Book', icon: <MenuBookIcon />, path: '/address-book', restricted: true },
         { text: 'Drivers', icon: <PersonIcon />, path: '/drivers', disabled: true, restricted: true, tooltip: 'Coming Soon' },
-        { text: 'Finance & Credits', icon: <AccountBalanceWalletIcon />, path: '/finance', staffOnly: true },
+        { text: 'Finance & Credits', icon: <AccountBalanceWalletIcon />, path: '/finance', financeOnly: true },
     ];
 
     const utilityItems = [
@@ -109,7 +110,7 @@ const Sidebar = () => {
                             {user?.name || 'Demo Admin'}
                         </Typography>
                         <Typography variant="caption" sx={{ fontSize: '13px', color: '#9ca3af', textTransform: 'capitalize' }}>
-                            {user?.role || 'Admin'}
+                            {getRoleLabel(user?.role) || 'Platform Admin'}
                         </Typography>
                     </Box>
                 )}
@@ -128,7 +129,8 @@ const Sidebar = () => {
                         // Basic role check
                         if (item.restricted && user?.role === 'driver') return null;
                         if (item.adminOnly && user?.role !== 'admin') return null;
-                        if (item.staffOnly && !['admin', 'staff'].includes(user?.role)) return null;
+                        if (item.staffOnly && !['admin', 'staff', 'manager'].includes(user?.role)) return null;
+                        if (item.financeOnly && !['admin', 'staff', 'accounting', 'manager'].includes(user?.role)) return null;
 
                         return (
                             <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
