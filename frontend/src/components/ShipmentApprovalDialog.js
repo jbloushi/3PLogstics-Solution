@@ -73,9 +73,6 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
     const [availableCarriers, setAvailableCarriers] = useState([]);
     const [bookingCarrier, setBookingCarrier] = useState('DGR');
     const [selectedDgPreset, setSelectedDgPreset] = useState('Manual Entry');
-    const [bookingOptions, setBookingOptions] = useState([]);
-    const [bookingOptionsLoading, setBookingOptionsLoading] = useState(false);
-    const [selectedOptionalServiceCodes, setSelectedOptionalServiceCodes] = useState([]);
 
     useEffect(() => {
         if (shipment) {
@@ -479,31 +476,6 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
                             />
                         </div>
                     </div>
-                )}
-
-                {!isClient && (
-                    <>
-                        <SectionHeader>Booking Optional Services (Carrier Response)</SectionHeader>
-                        {bookingOptionsLoading ? (
-                            <Alert severity="info">Loading carrier optional services…</Alert>
-                        ) : bookingOptions.length === 0 ? (
-                            <Alert severity="info">No optional services returned by carrier for this shipment context.</Alert>
-                        ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: '12px' }}>
-                                {bookingOptions.map((service) => (
-                                    <label key={service.serviceCode} style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '13px' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedOptionalServiceCodes.includes(service.serviceCode)}
-                                            onChange={() => toggleOptionalService(service.serviceCode)}
-                                            disabled={!editMode}
-                                        />
-                                        <span>{service.serviceName} ({service.serviceCode}) — {Number(service.totalPrice || 0).toFixed(3)} {service.currency || 'KWD'}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                    </>
                 )}
 
                 <SectionHeader>Parcels (Physical)</SectionHeader>

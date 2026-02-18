@@ -153,25 +153,18 @@ class DgrAdapter extends CarrierAdapter {
         };
     }
 
-    toMoneyNumber(value) {
-        if (value == null) return 0;
-        const parsed = Number(value);
-        if (!Number.isFinite(parsed)) return 0;
-        return Number(parsed.toFixed(3));
-    }
-
     extractTotalPrice(product) {
-        if (typeof product.totalPrice === 'number' || typeof product.totalPrice === 'string') {
-            return this.toMoneyNumber(product.totalPrice);
+        if (typeof product.totalPrice === 'number') {
+            return Number(product.totalPrice.toFixed(3));
         }
 
         if (Array.isArray(product.totalPrice)) {
-            const totalPriceEntry = product.totalPrice.find((price) => price?.price != null || price?.amount != null) || product.totalPrice[0];
-            return this.toMoneyNumber(totalPriceEntry?.price ?? totalPriceEntry?.amount);
+            const totalPriceEntry = product.totalPrice.find((price) => price.price != null) || product.totalPrice[0];
+            return Number(Number(totalPriceEntry?.price || 0).toFixed(3));
         }
 
-        if (product.price != null) {
-            return this.toMoneyNumber(product.price?.amount ?? product.price?.value ?? product.price);
+        if (product.price && typeof product.price === 'number') {
+            return Number(product.price.toFixed(3));
         }
 
         return 0;
@@ -182,10 +175,6 @@ class DgrAdapter extends CarrierAdapter {
             return product.totalPrice[0].currencyType;
         }
 
-        if (product?.price?.currency || product?.price?.currencyType) {
-            return product.price.currency || product.price.currencyType;
-        }
-
         if (product.priceCurrency) {
             return product.priceCurrency;
         }
@@ -193,104 +182,17 @@ class DgrAdapter extends CarrierAdapter {
         return fallbackCurrency;
     }
 
-    collectOptionalServiceCandidates(node) {
-        if (!node) return [];
-
-        const buckets = [];
-        const queue = [node];
-
-        while (queue.length) {
-            const current = queue.shift();
-            if (!current) continue;
-
-            if (Array.isArray(current)) {
-                current.forEach((item) => queue.push(item));
-                continue;
-            }
-
-            if (typeof current !== 'object') continue;
-
-            const optionalServices = current.optionalServices;
-            if (Array.isArray(optionalServices)) {
-                buckets.push(...optionalServices);
-            } else if (optionalServices && typeof optionalServices === 'object' && Array.isArray(optionalServices.items)) {
-                buckets.push(...optionalServices.items);
-            }
-
-            Object.keys(current).forEach((key) => {
-                const value = current[key];
-                if (value && (Array.isArray(value) || typeof value === 'object')) {
-                    queue.push(value);
-                }
-            });
-        }
-
-        return buckets;
-    }
-
     extractOptionalServices(product, fallbackCurrency) {
-        const orderedSources = [
-            { priority: 1, entries: product?.valueAddedServices },
-            { priority: 2, entries: product?.productAndServices?.valueAddedServices },
-            { priority: 3, entries: product?.outputValueAddedServices },
-            { priority: 4, entries: product?.additionalServices },
-            { priority: 5, entries: this.collectOptionalServiceCandidates(product) }
-        ];
+        const valueAddedServices = Array.isArray(product.valueAddedServices) ? product.valueAddedServices : [];
 
-        const normalized = orderedSources
-            .filter((source) => Array.isArray(source.entries))
-            .flatMap((source) => source.entries.map((service) => ({ ...service, __priority: source.priority })))
-            .map((service) => {
-                const code = service?.serviceCode || service?.localServiceCode || service?.typeCode || service?.code;
-                if (!code) return null;
-
-                const rawPrice =
-                    service?.price?.amount ??
-                    service?.price?.value ??
-                    service?.price ??
-                    service?.totalPrice?.[0]?.price ??
-                    service?.totalPrice?.[0]?.amount ??
-                    service?.totalPrice ??
-                    service?.charge ??
-                    service?.amount ??
-                    0;
-
-                const currency =
-                    service?.price?.currency ||
-                    service?.price?.currencyType ||
-                    service?.totalPrice?.[0]?.currencyType ||
-                    service?.totalPrice?.[0]?.currency ||
-                    service?.currency ||
-                    fallbackCurrency;
-
-                return {
-                    serviceCode: String(code).toUpperCase(),
-                    serviceName: service?.localServiceName || service?.serviceName || service?.name || String(code).toUpperCase(),
-                    totalPrice: this.toMoneyNumber(rawPrice),
-                    currency,
-                    __priority: service.__priority || 99
-                };
-            })
-            .filter(Boolean);
-
-        const byCode = new Map();
-        normalized.forEach((service) => {
-            if (!byCode.has(service.serviceCode)) {
-                byCode.set(service.serviceCode, service);
-                return;
-            }
-
-            const current = byCode.get(service.serviceCode);
-            const shouldReplace =
-                service.__priority < current.__priority ||
-                (service.__priority === current.__priority && (current.totalPrice || 0) === 0 && (service.totalPrice || 0) > 0);
-
-            if (shouldReplace) {
-                byCode.set(service.serviceCode, service);
-            }
-        });
-
-        return Array.from(byCode.values()).map(({ __priority, ...service }) => service);
+        return valueAddedServices
+            .filter((service) => service.serviceCode)
+            .map((service) => ({
+                serviceCode: service.serviceCode,
+                serviceName: service.localServiceName || service.serviceName || service.serviceCode,
+                totalPrice: Number(Number(service?.price?.amount || service?.price || 0).toFixed(3)),
+                currency: service?.price?.currency || fallbackCurrency
+            }));
     }
 
     /**

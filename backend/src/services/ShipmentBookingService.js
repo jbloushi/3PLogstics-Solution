@@ -16,7 +16,7 @@ class ShipmentBookingService {
      * @param {string|null} overrideCarrierCode
      * @returns {Object} { success, shipment, message }
      */
-    async bookShipment(trackingNumber, overrideCarrierCode = null, optionalServiceCodes = []) {
+    async bookShipment(trackingNumber, overrideCarrierCode = null) {
         const shipment = await Shipment.findOne({ trackingNumber });
         if (!shipment) throw new Error('Shipment not found');
 
@@ -32,28 +32,9 @@ class ShipmentBookingService {
 
         this.ensureCarrierAllowed({ carrierCode, organization, payingUser });
 
-        const normalizedOptionalCodes = Array.isArray(optionalServiceCodes)
-            ? optionalServiceCodes.map((code) => String(code).toUpperCase()).filter(Boolean)
-            : [];
-
-        const existingOptionalCodes = (shipment.pricingSnapshot?.optionalServices || [])
-            .map((service) => String(service.serviceCode || '').toUpperCase())
-            .filter(Boolean);
-
-        const optionalCodesChanged = normalizedOptionalCodes.length > 0 && (
-            normalizedOptionalCodes.length !== existingOptionalCodes.length ||
-            normalizedOptionalCodes.some((code) => !existingOptionalCodes.includes(code))
-        );
-
         // Validate or refresh pricing snapshot for booking safety
-        if (!PricingService.validateSnapshot(shipment.pricingSnapshot) || optionalCodesChanged) {
-            await this.refreshPricingSnapshotForBooking({
-                shipment,
-                carrierCode,
-                payingUser,
-                organization,
-                selectedOptionalServiceCodes: normalizedOptionalCodes
-            });
+        if (!PricingService.validateSnapshot(shipment.pricingSnapshot)) {
+            await this.refreshPricingSnapshotForBooking({ shipment, carrierCode, payingUser, organization });
         }
 
         const price = shipment.pricingSnapshot?.totalPrice ?? shipment.price ?? 0;
@@ -190,7 +171,7 @@ class ShipmentBookingService {
         return markup;
     }
 
-    async refreshPricingSnapshotForBooking({ shipment, carrierCode, payingUser, organization, selectedOptionalServiceCodes = [] }) {
+    async refreshPricingSnapshotForBooking({ shipment, carrierCode, payingUser, organization }) {
         try {
             const adapter = CarrierFactory.getAdapter(carrierCode);
             const payload = this.mapToCarrierPayload(shipment);
@@ -205,29 +186,7 @@ class ShipmentBookingService {
             const markupConfig = this.resolveMarkup({ payingUser, organization, carrierCode });
             const calculation = PricingService.calculateFinalPrice(carrierRate, markupConfig);
 
-            const selectedCodesSet = new Set((selectedOptionalServiceCodes || []).map((code) => String(code).toUpperCase()));
-            const quoteOptionalServices = Array.isArray(selectedQuote.optionalServices) ? selectedQuote.optionalServices : [];
-
-            const optionalServices = selectedCodesSet.size === 0
-                ? []
-                : quoteOptionalServices
-                    .filter((service) => selectedCodesSet.has(String(service.serviceCode || '').toUpperCase()))
-                    .map((service) => ({
-                        serviceCode: service.serviceCode,
-                        serviceName: service.serviceName,
-                        totalPrice: Number(Number(service.totalPrice || 0).toFixed(3)),
-                        currency: service.currency || selectedQuote.currency || shipment.currency || 'KWD'
-                    }));
-
-            if (selectedCodesSet.size > 0 && optionalServices.length !== selectedCodesSet.size) {
-                const missingCodes = Array.from(selectedCodesSet).filter(
-                    (code) => !optionalServices.some((service) => String(service.serviceCode || '').toUpperCase() === code)
-                );
-                const err = new Error(`Invalid optional service codes for carrier quote: ${missingCodes.join(', ')}`);
-                err.statusCode = 400;
-                throw err;
-            }
-
+            const optionalServices = shipment.pricingSnapshot?.optionalServices || [];
             const optionalServicesTotal = Number(
                 optionalServices.reduce((sum, service) => sum + Number(service.totalPrice || 0), 0).toFixed(3)
             );
