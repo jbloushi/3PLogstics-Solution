@@ -1,5 +1,6 @@
 const PickupRequest = require('../models/pickupRequest.model');
 const Shipment = require('../models/shipment.model');
+const User = require('../models/user.model');
 
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
@@ -52,7 +53,7 @@ exports.createRequest = async (req, res) => {
 exports.getAllRequests = async (req, res) => {
     try {
         let query = {};
-        if (req.user.role === 'client') {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role)) {
             query.client = req.user._id;
         }
 
@@ -80,7 +81,7 @@ exports.getRequest = async (req, res) => {
         }
 
         // Access Control
-        if (req.user.role === 'client' && request.client._id.toString() !== req.user._id.toString()) {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role) && request.client._id.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
@@ -100,7 +101,7 @@ exports.updateRequest = async (req, res) => {
         }
 
         // Access Control
-        if (req.user.role === 'client' && request.client.toString() !== req.user._id.toString()) {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role) && request.client.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 
@@ -125,6 +126,8 @@ const processApproval = async (requestId, approverId) => {
     const request = await PickupRequest.findById(requestId);
     if (!request) throw new Error('Request not found');
     if (request.status === 'APPROVED') return { request, shipment: await Shipment.findById(request.shipment) };
+
+    const clientUser = await User.findById(request.client).populate('organization');
 
     // 1. Prepare Shipment Data
     const shipmentItems = request.parcels.map(p => ({
@@ -153,6 +156,8 @@ const processApproval = async (requestId, approverId) => {
         estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
         items: shipmentItems,
         user: request.client,
+        organization: clientUser?.organization?._id || null,
+        serviceCode: request.serviceCode || 'P',
         pickupRequest: request._id,
         history: [{
             location: request.sender,
@@ -242,7 +247,7 @@ exports.deleteRequest = async (req, res) => {
         }
 
         // Access Control
-        if (req.user.role === 'client' && request.client.toString() !== req.user._id.toString()) {
+        if (['client', 'org_agent', 'org_manager'].includes(req.user.role) && request.client.toString() !== req.user._id.toString()) {
             return res.status(403).json({ success: false, error: 'Permission denied' });
         }
 

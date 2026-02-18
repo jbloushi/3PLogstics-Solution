@@ -40,6 +40,15 @@ const Row = styled.div`
     align-items: center;
 `;
 
+const DG_PRESETS = [
+    { label: 'Manual Entry', code: '', serviceCode: '', contentId: '', hazardClass: '', properShippingName: '', packingGroup: 'II' },
+    { label: 'Perfumes (UN1266) Passenger/Cargo', code: '1266', serviceCode: 'HE', contentId: '910', hazardClass: '3', properShippingName: 'PERFUMERY PRODUCTS', packingGroup: 'II' },
+    { label: 'Perfumes (UN1266) Cargo Only', code: '1266', serviceCode: 'HE', contentId: '911', hazardClass: '3', properShippingName: 'PERFUMERY PRODUCTS', packingGroup: 'II' },
+    { label: 'Lithium Ion Batteries (UN3481 PI967)', code: '3481', serviceCode: 'HV', contentId: '967', hazardClass: '9', properShippingName: 'LITHIUM ION BATTERIES CONTAINED IN EQUIPMENT', packingGroup: 'II' },
+    { label: 'Consumer Commodity (ID8000)', code: '8000', serviceCode: 'HK', contentId: '700', hazardClass: '9', properShippingName: 'CONSUMER COMMODITY', packingGroup: 'II' },
+    { label: 'Dry Ice (UN1845)', code: '1845', serviceCode: 'HC', contentId: '901', hazardClass: '9', properShippingName: 'DRY ICE', packingGroup: 'III' }
+];
+
 const IndexCircle = styled.div`
     width: 24px;
     height: 24px;
@@ -63,6 +72,7 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
     const [editMode, setEditMode] = useState(false);
     const [availableCarriers, setAvailableCarriers] = useState([]);
     const [bookingCarrier, setBookingCarrier] = useState('DGR');
+    const [selectedDgPreset, setSelectedDgPreset] = useState('Manual Entry');
 
     useEffect(() => {
         if (shipment) {
@@ -107,9 +117,46 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
     };
 
     const handleDGChange = (field, value) => {
-        setFormData(prev => ({
+        setFormData(prev => {
+            const next = { ...prev.dangerousGoods };
+
+            if (field === 'contains') {
+                next.contains = !!value;
+                return { ...prev, dangerousGoods: next };
+            }
+
+            if (field === 'serviceCode') {
+                next[field] = String(value || '').toUpperCase().slice(0, 2);
+                return { ...prev, dangerousGoods: next };
+            }
+
+            if (field === 'code' || field === 'contentId') {
+                next[field] = String(value || '').replace(/[^0-9]/g, '');
+                return { ...prev, dangerousGoods: next };
+            }
+
+            next[field] = value;
+            return { ...prev, dangerousGoods: next };
+        });
+    };
+
+    const handleDgPresetChange = (presetLabel) => {
+        setSelectedDgPreset(presetLabel);
+        const preset = DG_PRESETS.find((p) => p.label === presetLabel);
+        if (!preset || preset.label === 'Manual Entry') return;
+
+        setFormData((prev) => ({
             ...prev,
-            dangerousGoods: { ...prev.dangerousGoods, [field]: value }
+            dangerousGoods: {
+                ...prev.dangerousGoods,
+                contains: true,
+                code: preset.code,
+                serviceCode: preset.serviceCode,
+                contentId: preset.contentId,
+                hazardClass: preset.hazardClass,
+                properShippingName: preset.properShippingName,
+                packingGroup: preset.packingGroup
+            }
         }));
     };
 
@@ -313,7 +360,7 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
                         {formData.dangerousGoods?.contains && (
                             <div style={{ flex: 1 }}>
                                 <Input
-                                    placeholder="UN Code"
+                                    placeholder="UN/ID Code (e.g. 8000, 3481, 1845)"
                                     value={formData.dangerousGoods?.code || ''}
                                     onChange={e => handleDGChange('code', e.target.value)}
                                     disabled={!editMode}
@@ -322,6 +369,80 @@ const ShipmentApprovalDialog = ({ open, onClose, shipment, onShipmentUpdated }) 
                         )}
                     </div>
                 </div>
+
+                {formData.dangerousGoods?.contains && (
+                    <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
+                        <Select
+                            label="DG Quick Select (Autofill)"
+                            value={selectedDgPreset}
+                            onChange={e => handleDgPresetChange(e.target.value)}
+                            disabled={!editMode}
+                        >
+                            {DG_PRESETS.map((preset) => (
+                                <option key={preset.label} value={preset.label}>{preset.label}</option>
+                            ))}
+                        </Select>
+                        <div></div>
+                        <div></div>
+                        <Input
+                            label="Service Code"
+                            placeholder="HK / HV / HE / HC"
+                            value={formData.dangerousGoods?.serviceCode || ''}
+                            onChange={e => handleDGChange('serviceCode', e.target.value)}
+                            disabled={!editMode}
+                        />
+                        <Input
+                            label="Content ID"
+                            placeholder="700 / 967 / 910 / 901"
+                            value={formData.dangerousGoods?.contentId || ''}
+                            onChange={e => handleDGChange('contentId', e.target.value)}
+                            disabled={!editMode}
+                        />
+                        <Input
+                            label="Hazard Class"
+                            placeholder="3 / 9"
+                            value={formData.dangerousGoods?.hazardClass || ''}
+                            onChange={e => handleDGChange('hazardClass', e.target.value)}
+                            disabled={!editMode}
+                        />
+
+                        <Input
+                            label="Proper Shipping Name"
+                            placeholder="Consumer Commodity / Dry Ice / etc"
+                            value={formData.dangerousGoods?.properShippingName || ''}
+                            onChange={e => handleDGChange('properShippingName', e.target.value)}
+                            disabled={!editMode}
+                        />
+                        <Select
+                            label="Packing Group"
+                            value={formData.dangerousGoods?.packingGroup || 'II'}
+                            onChange={e => handleDGChange('packingGroup', e.target.value)}
+                            disabled={!editMode}
+                        >
+                            <option value="I">I</option>
+                            <option value="II">II</option>
+                            <option value="III">III</option>
+                        </Select>
+                        <Input
+                            label="Dry Ice Weight (kg)"
+                            type="number"
+                            placeholder="Required for 1845"
+                            value={formData.dangerousGoods?.dryIceWeight || ''}
+                            onChange={e => handleDGChange('dryIceWeight', e.target.value)}
+                            disabled={!editMode}
+                        />
+
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <Input
+                                label="DG Custom Description / Marks"
+                                placeholder="Editable carrier description for AWB/value-added service"
+                                value={formData.dangerousGoods?.customDescription || ''}
+                                onChange={e => handleDGChange('customDescription', e.target.value)}
+                                disabled={!editMode}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <SectionHeader>Parcels (Physical)</SectionHeader>
                 {formData.parcels.map((parcel, i) => (

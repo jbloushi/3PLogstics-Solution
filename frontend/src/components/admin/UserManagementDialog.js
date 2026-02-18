@@ -141,10 +141,14 @@ const UserManagementDialog = ({ open, onClose, user, onSave, refreshTrigger }) =
                                     label="Role"
                                     onChange={(e) => handleChange('role', e.target.value)}
                                 >
-                                    <MenuItem value="client">Client</MenuItem>
-                                    <MenuItem value="staff">Staff</MenuItem>
-                                    <MenuItem value="admin">Admin</MenuItem>
+                                    <MenuItem value="client">Organization Agent</MenuItem>
+                                    <MenuItem value="staff">Platform Staff</MenuItem>
+                                    <MenuItem value="admin">Platform Admin</MenuItem>
                                     <MenuItem value="driver">Driver</MenuItem>
+                                    <MenuItem value="manager">Manager</MenuItem>
+                                    <MenuItem value="accounting">Accounting</MenuItem>
+                                    <MenuItem value="org_manager">Organization Manager</MenuItem>
+                                    <MenuItem value="org_agent">Organization Agent</MenuItem>
                                 </Select>
                             </FormControl>
                         </Grid>
